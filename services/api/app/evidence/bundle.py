@@ -140,6 +140,7 @@ def build_bundle(
                     key: (None if value is None else round(value, 1))
                     for key, value in state.dist_to_base_m.items()
                 },
+                profile=state.profile,
                 zones=[_zone_evidence(a, zone_names) for a in ranked],
                 baseline_level=verdict.level if verdict else Level.CLEAR,
                 reasons=list(verdict.reasons) if verdict else [],

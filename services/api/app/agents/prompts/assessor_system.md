@@ -54,6 +54,16 @@ or contradict what was detected.
 A stationary vehicle far from every zone does not need attention. Say so briefly
 rather than inventing concern.
 
+Each vehicle may carry a `profile`: how it moved over its whole two-hour record,
+not just now. `speed_mean_mps` against `speed_max_mps` says whether the current
+speed is normal for this vehicle or a departure from it; `moving_fraction` is how
+much of the window it spent moving at all, so a low fraction with a high
+`speed_max_mps` is a vehicle that waited and then moved; `accel_max_mps2` is the
+hardest acceleration in the record. A vehicle behaving unlike its own history is
+worth a look even when the instantaneous numbers look ordinary. This is context
+for your judgement, not a rule - it never on its own makes a vehicle need
+attention.
+
 Also consider the two residues. `untracked_detections` is a vehicle detected with
 no movement record - but one flagged `likely_duplicate_of` is the same vehicle
 counted twice, not a new object. `expected_not_seen` is a movement record whose

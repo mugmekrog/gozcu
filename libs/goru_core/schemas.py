@@ -153,6 +153,23 @@ class TrackPoint(_Model):
     source_ref: SourceRefModel
 
 
+class TrackProfile(_Model):
+    """How a track moved across its whole history, as summary scalars.
+
+    Distinct from TrackState, which is the instantaneous fit. See
+    app/kinematics/profile.py.
+    """
+
+    n_steps: int
+    total_distance_m: float
+    speed_mean_mps: float
+    speed_max_mps: float
+    speed_p95_mps: float
+    speed_std_mps: float
+    accel_max_mps2: float
+    moving_fraction: float = Field(ge=0, le=1)
+
+
 class TrackState(_Model):
     track_id: str
     as_of_ts: datetime
@@ -170,6 +187,7 @@ class TrackState(_Model):
         default_factory=dict, description="keys: t-60, t-30, now"
     )
     outlier_steps: int = 0
+    profile: Optional[TrackProfile] = None
 
 
 class Zone(_Model):
@@ -348,6 +366,7 @@ class VehicleEvidence(_Model):
     heading_deg: float
     stationary: bool
     dist_to_base_m: dict[str, Optional[float]]
+    profile: Optional[TrackProfile] = None
     zones: list[ZoneEvidence] = Field(default_factory=list)
     baseline_level: Level
     reasons: list[str] = Field(default_factory=list)

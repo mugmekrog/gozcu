@@ -12,8 +12,9 @@ from datetime import timedelta
 import numpy as np
 import pytest
 
-from goru_core.schemas import ENU, LatLon, Level, TrackState
+from goru_core.schemas import ENU, LatLon, Level, SourceRefModel, TrackPoint, TrackState
 from goru_core.timeline import Timeline, TimeFormatError
+from app.kinematics.profile import track_profile
 from app.perception.postprocess import class_agnostic_nms
 from app.risk.engine import Hysteresis, ReportSupport, RuleEngine
 from app.risk.zones import assess_zones, most_likely_destination
@@ -400,3 +401,52 @@ def test_alerts_are_ordered_and_stamped(analyses, cfg):
             assert alert.rules_version == cfg.rules_version
             assert alert.status == "open"
             assert alert.level is not Level.CLEAR
+
+
+# --- trajectory profile (app/kinematics/profile.py) ------------------------- #
+
+
+def _straight_track(speeds_mps: list[float], step_s: float = 300.0) -> list[TrackPoint]:
+    """A track heading due east, one step per entry in `speeds_mps`."""
+    from datetime import datetime, timedelta, timezone
+
+    t0 = datetime(2024, 5, 1, 12, 0, tzinfo=timezone.utc)
+    ref = SourceRefModel(file_name="synthetic", file_sha256="0" * 64, record_key="T0001")
+    points, e = [], 0.0
+    for i, speed in enumerate([0.0, *speeds_mps]):
+        e += speed * step_s
+        points.append(
+            TrackPoint(
+                track_id="T0001",
+                ts=t0 + timedelta(seconds=i * step_s),
+                lat=39.9,
+                lon=32.8,
+                e_m=e,
+                n_m=0.0,
+                source_ref=ref,
+            )
+        )
+    return points
+
+
+def test_track_profile_measures_the_whole_history():
+    profile = track_profile(_straight_track([10.0, 10.0, 10.0, 10.0]))
+    assert profile is not None
+    assert profile.n_steps == 4
+    assert profile.speed_mean_mps == pytest.approx(10.0)
+    assert profile.speed_max_mps == pytest.approx(10.0)
+    assert profile.moving_fraction == 1.0
+    assert profile.total_distance_m == pytest.approx(12000.0)
+
+
+def test_track_profile_separates_a_waiting_vehicle_from_a_steady_one():
+    """Same mean speed, very different behaviour - this is what the agent reads."""
+    steady = track_profile(_straight_track([2.0] * 8))
+    waited = track_profile(_straight_track([0.0] * 6 + [8.0, 8.0]))
+    assert steady.speed_mean_mps == pytest.approx(waited.speed_mean_mps)
+    assert waited.moving_fraction < steady.moving_fraction
+    assert waited.speed_max_mps > steady.speed_max_mps
+
+
+def test_track_profile_needs_enough_fixes():
+    assert track_profile(_straight_track([5.0])) is None

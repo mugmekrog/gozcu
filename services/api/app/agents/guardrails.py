@@ -179,6 +179,9 @@ def vehicle_numbers(bundle: EvidenceBundle, track_id: str) -> set[float]:
         _admit_into(values, vehicle.score)
         for value in vehicle.dist_to_base_m.values():
             _admit_into(values, value)
+        if vehicle.profile is not None:
+            for value in vehicle.profile.model_dump().values():
+                _admit_into(values, value)
         for zone in vehicle.zones:
             _admit_into(values, zone.dist_now_m)
             _admit_into(values, zone.cpa_m)
