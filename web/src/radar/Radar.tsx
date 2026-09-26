@@ -11,7 +11,7 @@
  * A drag only begins after a few pixels of travel, so a plain click still
  * selects a vehicle or a zone. Recentring (the button, or a double-click) flies
  * to the zone in the zone filter, or to the base when none is chosen, and
- * settles at RECENTRE_KM.
+ * settles at RECENTRE_ZONE_KM on a zone or RECENTRE_ALL_KM on the base.
  *
  * The mouse wheel zooms continuously and keeps the ground point under the
  * cursor fixed. The toolbar shows the current radius and offers step controls.
@@ -54,8 +54,9 @@ const NO_PAN: Pan = { eKm: 0, nKm: 0 };
 /** Match one ordinary 100 px wheel notch to the toolbar's 15% zoom step. */
 const WHEEL_ZOOM_PER_PX = Math.log(1.15) / 100;
 
-/** The radius the recentre button settles at, in kilometres. */
-const RECENTRE_KM = 2.25;
+/** The radius recentring settles at, in km: close on one zone, wide on the base. */
+const RECENTRE_ZONE_KM = 2.25;
+const RECENTRE_ALL_KM = 7;
 
 /** Flight lengths: short for a wheel notch, longer for a jump across the map. */
 const WHEEL_FLIGHT_MS = 260;
@@ -176,7 +177,8 @@ export const Radar = memo(function Radar() {
 
   useEffect(() => stopFlight, [stopFlight]);
 
-  const recentre = () => fly(centre, RECENTRE_KM, JUMP_FLIGHT_MS);
+  const recentre = () =>
+    fly(centre, focusZone ? RECENTRE_ZONE_KM : RECENTRE_ALL_KM, JUMP_FLIGHT_MS);
 
   useEffect(() => {
     if (!mapFocus) return;
