@@ -684,7 +684,7 @@ def cmd_serve_stt(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="goru", description=__doc__.split("\n")[0])
-    parser.add_argument("--config", default="goru.yaml", help="path to goru.yaml")
+    parser.add_argument("--config", default=str(_ROOT / "goru.yaml"), help="path to goru.yaml")
     parser.add_argument(
         "--allow-errors",
         action="store_true",

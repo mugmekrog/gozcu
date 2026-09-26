@@ -24,6 +24,7 @@ import { GlyphChip } from '@/radar/Glyph';
 import { bandOf, riskStyle } from '@/domain/risk';
 import { classLabel, T } from '@/domain/strings';
 import * as fmt from '@/domain/format';
+import { cropAround } from '@/domain/crop';
 import { modalRows, type AssembledBrief } from '@/domain/brief';
 import { rangeSeries, stopsOf } from '@/domain/tracks';
 import type { Alert, Decision, FrameDetail, TrackHistory } from '@/domain/types';
@@ -449,25 +450,6 @@ export const AlertModal = memo(function AlertModal({
     </>
   );
 });
-
-/** A crop window around a box, padded to twice its size and clamped to the image. */
-function cropAround(
-  bbox: readonly [number, number, number, number],
-  imageW: number,
-  imageH: number,
-) {
-  const [x1, y1, x2, y2] = bbox;
-  const w = (x2 - x1) * 3;
-  const h = (y2 - y1) * 3;
-  const cx = (x1 + x2) / 2;
-  const cy = (y1 + y2) / 2;
-  return {
-    x: Math.max(0, Math.min(cx - w / 2, imageW - w)),
-    y: Math.max(0, Math.min(cy - h / 2, imageH - h)),
-    w: Math.min(w, imageW),
-    h: Math.min(h, imageH),
-  };
-}
 
 /**
  * What the agent could not settle.

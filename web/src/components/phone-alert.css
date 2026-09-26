@@ -1,0 +1,407 @@
+/* An iPhone-shaped lock screen, sized to the map's height.
+ *
+ * The device is a size container, so everything inside is laid out in `cqw`
+ * (percent of the phone's width) and scales with the map instead of with the
+ * page's font size. */
+
+.phone {
+  position: absolute;
+  top: var(--space-6);
+  bottom: var(--space-6);
+  right: var(--space-10);
+  z-index: 5;
+  display: flex;
+  align-items: stretch;
+  pointer-events: none;
+}
+
+.phone--in {
+  /* No overshoot: the phone lands and stays exactly where it fades. */
+  animation: phone-in 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.phone--out {
+  animation: phone-out 420ms cubic-bezier(0.55, 0, 0.8, 0.3) both;
+}
+
+.phone--fade {
+  animation: phone-fade 900ms ease-in both;
+}
+
+@keyframes phone-fade {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: none;
+  }
+}
+
+@keyframes phone-in {
+  from {
+    transform: translateX(calc(100% + 80px)) rotate(4deg);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes phone-out {
+  from {
+    transform: none;
+  }
+  to {
+    transform: translateX(calc(100% + 80px)) rotate(4deg);
+  }
+}
+
+.phone__close {
+  pointer-events: auto;
+  position: absolute;
+  top: 0;
+  left: -40px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: var(--lift-modal);
+}
+
+.phone__device {
+  pointer-events: auto;
+  position: relative;
+  height: 100%;
+  aspect-ratio: 71.6 / 147.6;
+  container-type: size;
+}
+
+/* The shell sits inside the container so its own padding and radius can be
+ * written in `cqw` too. */
+.phone__frame {
+  position: absolute;
+  inset: 0;
+  padding: 1.6cqw;
+  border-radius: 17cqw;
+  background: linear-gradient(145deg, #4b4f58, #1d1f24 45%, #3a3d44);
+  box-shadow:
+    0 0 0 0.5cqw #0b0c0e inset,
+    0 30px 60px rgba(15, 23, 42, 0.45),
+    0 8px 18px rgba(15, 23, 42, 0.3);
+}
+
+.phone__button {
+  position: absolute;
+  width: 1.1cqw;
+  border-radius: 1cqw;
+  background: #2a2c31;
+}
+
+.phone__button--action {
+  left: -0.8cqw;
+  top: 17cqh;
+  height: 5cqh;
+}
+.phone__button--up {
+  left: -0.8cqw;
+  top: 25cqh;
+  height: 8cqh;
+}
+.phone__button--down {
+  left: -0.8cqw;
+  top: 35cqh;
+  height: 8cqh;
+}
+.phone__button--power {
+  right: -0.8cqw;
+  top: 28cqh;
+  height: 12cqh;
+}
+
+.phone__screen {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 15.5cqw;
+  border: 1.4cqw solid #000;
+  color: #fff;
+  font-family: -apple-system, 'SF Pro Display', 'Helvetica Neue', system-ui, sans-serif;
+  background:
+    radial-gradient(120% 60% at 20% 10%, #3b4f8f 0%, transparent 60%),
+    radial-gradient(110% 70% at 90% 85%, #7a2a3a 0%, transparent 55%),
+    linear-gradient(180deg, #111a33 0%, #1c1430 55%, #0b0b14 100%);
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- status bar and dynamic island --------------------------------------- */
+
+.phone__status {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3.4cqw 7cqw 0;
+  height: 11cqw;
+}
+
+.phone__island {
+  width: 30cqw;
+  height: 8.6cqw;
+  border-radius: 5cqw;
+  background: #000;
+}
+
+.phone__signal {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.7cqw;
+  width: 12cqw;
+}
+
+.phone__signal i {
+  width: 1.3cqw;
+  border-radius: 0.4cqw;
+  background: #fff;
+}
+.phone__signal i:nth-child(1) { height: 1.4cqw; }
+.phone__signal i:nth-child(2) { height: 2.1cqw; }
+.phone__signal i:nth-child(3) { height: 2.8cqw; }
+.phone__signal i:nth-child(4) { height: 3.5cqw; }
+
+.phone__battery {
+  position: relative;
+  width: 6.8cqw;
+  height: 3.4cqw;
+  margin-left: 5.2cqw;
+  border: 0.35cqw solid rgba(255, 255, 255, 0.55);
+  border-radius: 1.1cqw;
+  padding: 0.4cqw;
+}
+
+.phone__battery::after {
+  content: '';
+  position: absolute;
+  right: -1.1cqw;
+  top: 0.9cqw;
+  width: 0.6cqw;
+  height: 1cqw;
+  border-radius: 0 0.5cqw 0.5cqw 0;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.phone__battery i {
+  display: block;
+  width: 78%;
+  height: 100%;
+  border-radius: 0.5cqw;
+  background: #fff;
+}
+
+/* --- lock screen ---------------------------------------------------------- */
+
+.phone__lock {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 3cqw;
+}
+
+.phone__lock-icon {
+  width: 3.4cqw;
+  height: 2.8cqw;
+  margin-bottom: 2cqw;
+  border-radius: 0.6cqw;
+  background: rgba(255, 255, 255, 0.85);
+  position: relative;
+}
+
+.phone__lock-icon::before {
+  content: '';
+  position: absolute;
+  left: 0.6cqw;
+  right: 0.6cqw;
+  bottom: 100%;
+  height: 2cqw;
+  border: 0.5cqw solid rgba(255, 255, 255, 0.85);
+  border-bottom: 0;
+  border-radius: 2cqw 2cqw 0 0;
+}
+
+.phone__date {
+  margin: 0;
+  font-size: 4.6cqw;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.phone__clock {
+  margin: 0;
+  font-size: 23cqw;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- notifications -------------------------------------------------------- */
+
+.phone__notes {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 8cqw 3.2cqw 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 1.8cqw;
+  overflow: hidden;
+}
+
+.phone__notes > li {
+  animation: note-drop 520ms cubic-bezier(0.2, 0.9, 0.25, 1.1) 520ms both;
+}
+
+@keyframes note-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-6cqw) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.phone__note {
+  width: 100%;
+  display: flex;
+  gap: 3cqw;
+  align-items: flex-start;
+  padding: 3.4cqw 3.6cqw;
+  border: 0;
+  border-radius: 5.5cqw;
+  text-align: left;
+  color: #0b0b0f;
+  background: rgba(245, 245, 247, 0.78);
+  backdrop-filter: blur(18px) saturate(1.6);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6);
+  cursor: pointer;
+  font: inherit;
+}
+
+.phone__note:focus-visible {
+  outline: 0.6cqw solid #fff;
+  outline-offset: 0.6cqw;
+}
+
+.phone__app-icon {
+  flex: none;
+  width: 10cqw;
+  height: 10cqw;
+  border-radius: 2.4cqw;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(160deg, #ff4d4d, #c81e1e);
+}
+
+.phone__app-icon svg {
+  width: 65%;
+  height: 65%;
+}
+
+.phone__note-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6cqw;
+}
+
+.phone__note-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 2cqw;
+  font-size: 3.5cqw;
+}
+
+.phone__note-head b {
+  font-weight: 700;
+}
+
+.phone__note-head span {
+  flex: none;
+  color: rgba(11, 11, 15, 0.5);
+}
+
+.phone__note-body {
+  font-size: 4cqw;
+  font-weight: 600;
+  line-height: 1.25;
+  text-wrap: pretty;
+}
+
+.phone__note-meta {
+  font-size: 3.2cqw;
+  color: rgba(11, 11, 15, 0.6);
+}
+
+.phone__more {
+  text-align: center;
+  font-size: 3.4cqw;
+  opacity: 0.8;
+}
+
+/* --- bottom of the lock screen -------------------------------------------- */
+
+.phone__dock {
+  flex: none;
+  display: flex;
+  justify-content: space-between;
+  padding: 6cqw 11cqw 4cqw;
+}
+
+.phone__dock-btn {
+  width: 13cqw;
+  height: 13cqw;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.phone__dock-btn svg {
+  width: 45%;
+  height: 45%;
+  color: #fff;
+}
+
+.phone__home {
+  flex: none;
+  align-self: center;
+  width: 36cqw;
+  height: 1.4cqw;
+  margin-bottom: 2.4cqw;
+  border-radius: 1cqw;
+  background: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .phone--in,
+  .phone--out,
+  .phone--fade,
+  .phone__notes > li {
+    animation-duration: 1ms;
+    animation-delay: 0ms;
+  }
+}

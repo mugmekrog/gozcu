@@ -15,6 +15,7 @@
 export const T = {
   app: {
     title: 'GÖZCÜ · BÖLGE İZLEME',
+    mobileNotify: 'Mobil bildirim',
     loading: 'Tatbikat verisi yükleniyor…',
     loadFailed: 'Tatbikat verisi okunamadı.',
     loadFailedHint:
@@ -97,6 +98,19 @@ export const T = {
     pinNote: 'İz ve etiket sabitleme rengini kullanır · araç şekli türünü gösterir',
     pinLimit: 'En fazla 6 araç sabitlenebilir.',
     convoy: 'KONVOY',
+  },
+
+  crop: {
+    title: 'HEDEF GÖRÜNTÜ',
+    enlarge: '⤢ Görseli büyüt',
+    fullFrame: 'Tüm kare',
+    target: 'Hedef',
+    close: 'Kapat ✕',
+    loading: 'Kare yükleniyor…',
+    notCaptured: 'Araç henüz bir drone karesinde görüntülenmedi.',
+    noFrame: 'Bu araç hiçbir drone karesinde yok.',
+    noMatch: 'Karede bu araca eşleşen tespit yok.',
+    matchLow: 'düşük güvenli eşleşme',
   },
 
   agent: {
