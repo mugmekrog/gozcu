@@ -1,0 +1,32 @@
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH="/app/libs:/app/services/api" \
+    HF_HOME="/app/data/huggingface" \
+    LD_LIBRARY_PATH="/usr/local/lib/python3.12/site-packages/nvidia/cublas/lib:/usr/local/lib/python3.12/site-packages/nvidia/cudnn/lib"
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt requirements-stt.txt /app/
+RUN pip install --no-cache-dir -r requirements.txt -r requirements-stt.txt \
+    nvidia-cublas-cu12 'nvidia-cudnn-cu12==9.*'
+
+COPY libs/ /app/libs/
+COPY services/ /app/services/
+COPY contracts/ /app/contracts/
+COPY goru.yaml /app/goru.yaml
+
+RUN useradd -m -u 1000 appuser && \
+    mkdir -p /app/data/huggingface /app/data/processed && \
+    chown -R appuser:appuser /app/data
+
+USER appuser
+
+EXPOSE 8800
+
+CMD ["python", "-m", "app.cli", "serve-stt", "--host", "0.0.0.0", "--port", "8800"]
