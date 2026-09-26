@@ -48,6 +48,7 @@ export const T = {
     all: 'Tümü',
     scale: 'ÖLÇEK',
     scaleUnit: 'km',
+    scaleHint: 'Yakınlaştırmak / uzaklaştırmak için haritada fare tekerleğini kullanın (1–12 km)',
   },
 
   legend: {

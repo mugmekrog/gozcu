@@ -25,7 +25,19 @@ export const AppHeader = memo(function AppHeader({
 }: AppHeaderProps) {
   return (
     <header className="app-header">
-      <h1 className="app-header__brand">{T.app.title}</h1>
+      <h1 className="app-header__brand">
+        <span className="app-header__mark" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor">
+            <circle cx="9" cy="9" r="7.5" strokeWidth="1.5" />
+            <circle cx="9" cy="9" r="4" strokeWidth="1.5" />
+            <path d="M9 9 L14.3 3.7" strokeWidth="1.5" strokeLinecap="round" />
+            <circle cx="9" cy="9" r="1.3" fill="currentColor" stroke="none" />
+          </svg>
+        </span>
+        {T.app.title}
+      </h1>
+
+      <span className="app-header__divider" aria-hidden="true" />
 
       <div className="app-header__pills">
         <span className="pill">

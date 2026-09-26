@@ -1,4 +1,4 @@
-/* The map card's toolbar: view menu, filters, legend, scale.
+/* The map card's toolbar: view menu, filters, legend, and the scale readout.
  *
  * The legend sits here rather than floating over the map because it has to be
  * readable from across a room during the demo (PLAN F3.4) and because a legend
@@ -7,7 +7,6 @@
 
 import { memo } from 'react';
 import { GlyphChip } from '@/radar/Glyph';
-import { SCALE_OPTIONS, type ScaleKm } from '@/domain/polar';
 import { T } from '@/domain/strings';
 import type { VehicleClass, Zone } from '@/domain/types';
 import './map-toolbar.css';
@@ -19,13 +18,12 @@ export interface MapToolbarProps {
   zones: readonly Zone[];
   zoneFilter: string | 'all';
   classFilter: VehicleClass | 'all';
-  /** The highlighted scale option; null while the wheel zoom is off-preset. */
-  scalePreset: ScaleKm | null;
+  /** Visible radius in kilometres. Read-only here: the mouse wheel sets it. */
+  scaleKm: number;
   menuOpen: boolean;
   onMenuToggle: () => void;
   onZoneFilter: (value: string | 'all') => void;
   onClassFilter: (value: VehicleClass | 'all') => void;
-  onScale: (value: ScaleKm) => void;
 }
 
 export const MapToolbar = memo(function MapToolbar({
@@ -33,12 +31,11 @@ export const MapToolbar = memo(function MapToolbar({
   zones,
   zoneFilter,
   classFilter,
-  scalePreset,
+  scaleKm,
   menuOpen,
   onMenuToggle,
   onZoneFilter,
   onClassFilter,
-  onScale,
 }: MapToolbarProps) {
   return (
     <div className="map-toolbar">
@@ -108,20 +105,13 @@ export const MapToolbar = memo(function MapToolbar({
 
       <div className="map-toolbar__scale">
         <span className="label">{T.filter.scale}</span>
-        <div className="seg" role="group" aria-label={T.filter.scale}>
-          {SCALE_OPTIONS.map((option) => (
-            <button
-              key={option}
-              type="button"
-              className="seg__opt"
-              aria-pressed={option === scalePreset}
-              onClick={() => onScale(option)}
-            >
-              {option}
-              {option === SCALE_OPTIONS[SCALE_OPTIONS.length - 1] ? ` ${T.filter.scaleUnit}` : ''}
-            </button>
-          ))}
-        </div>
+        <output className="map-toolbar__scale-value" title={T.filter.scaleHint}>
+          {scaleKm.toLocaleString('tr-TR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}{' '}
+          {T.filter.scaleUnit}
+        </output>
       </div>
     </div>
   );

@@ -3,13 +3,15 @@
   display: flex;
   align-items: center;
   gap: var(--space-8);
-  padding: var(--space-4) var(--space-7) var(--space-3);
-  border-top: var(--rule-width) solid var(--rule);
+  padding: var(--space-5) var(--space-7);
+  border-top: 1px solid var(--rule);
   background: var(--surface);
+  box-shadow: 0 -1px 3px rgba(15, 23, 42, 0.05);
 }
 
 .timeline__transport {
-  height: var(--transport-h);
+  height: var(--action-h);
+  padding: 0 var(--space-8);
   font-weight: 700;
   border-color: var(--ink);
   white-space: nowrap;
@@ -28,16 +30,18 @@
   position: absolute;
   left: 0;
   right: 0;
-  top: 22px;
-  height: 1px;
-  background: var(--hairline);
+  top: 20px;
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-active);
 }
 
 .timeline__progress {
   position: absolute;
   left: 0;
-  top: 21px;
-  height: 3px;
+  top: 20px;
+  height: 5px;
+  border-radius: var(--radius-pill);
   background: var(--ink);
 }
 
@@ -46,9 +50,13 @@
   opacity: 0.75;
 }
 
+/* Above the ticks and the scrubber so the diamonds take the click; the layer
+ * itself lets clicks through to the scrubber between them. */
 .timeline__markers {
   position: absolute;
   inset: 0;
+  z-index: 2;
+  pointer-events: none;
 }
 
 .timeline__frame {
@@ -60,6 +68,7 @@
   transform: rotate(45deg);
   outline: 1px solid var(--surface);
   cursor: pointer;
+  pointer-events: auto;
 }
 
 .timeline__frame:hover {
@@ -78,11 +87,12 @@
 .timeline__ticks {
   position: absolute;
   inset: 0;
+  pointer-events: none;
 }
 
 .timeline__tick {
   position: absolute;
-  top: 23px;
+  top: 26px;
   width: 1px;
   height: 5px;
   background: var(--hairline);
@@ -132,19 +142,22 @@
 .timeline__scrub::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;
-  width: 10px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
   background: var(--ink);
-  border: 2px solid var(--surface);
+  border: 3px solid var(--surface);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.35);
   cursor: grab;
 }
 
 .timeline__scrub::-moz-range-thumb {
   width: 10px;
-  height: 14px;
-  border-radius: 0;
+  height: 10px;
+  border-radius: 50%;
   background: var(--ink);
-  border: 2px solid var(--surface);
+  border: 3px solid var(--surface);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.35);
   cursor: grab;
 }
 
@@ -165,6 +178,10 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  padding: var(--space-3) var(--space-6);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-control);
+  background: var(--surface-sunken);
 }
 
 .timeline__clock-value {

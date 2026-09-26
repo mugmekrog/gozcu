@@ -16,22 +16,18 @@
 
 import type { Enu } from './types';
 
-/** The scale options in the map toolbar, in kilometres of visible radius. */
-export const SCALE_OPTIONS = [2, 3, 5, 8, 12] as const;
-export type ScaleKm = (typeof SCALE_OPTIONS)[number];
-
 /**
- * The default scale.
+ * The default scale, in kilometres of visible radius.
  *
  * 8 km, because the furthest track fix in the shipped data sits 7.99 km from
  * the base -- so 8 km is the smallest ring that holds the whole exercise. The
  * wireframe also shows 8 selected, which is the same answer arrived at twice.
  */
-export const DEFAULT_SCALE: ScaleKm = 8;
+export const DEFAULT_SCALE = 8;
 
 /**
- * The wheel zooms continuously between these radii, in kilometres. 1 km is the
- * closest look the map offers; 12 km matches the widest scale option.
+ * The wheel is the only zoom control, continuous between these radii in
+ * kilometres. 1 km is the closest look the map offers, 12 km the widest.
  */
 export const MIN_ZOOM_KM = 1;
 export const MAX_ZOOM_KM = 12;

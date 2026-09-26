@@ -74,7 +74,8 @@
   align-items: center;
   gap: var(--space-5);
   padding: var(--space-4) var(--space-6);
-  border-bottom: var(--rule-width) solid var(--rule);
+  background: var(--surface-sunken);
+  border-bottom: 1px solid var(--rule);
 }
 
 .app__camera-body {

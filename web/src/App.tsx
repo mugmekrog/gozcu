@@ -86,7 +86,7 @@ function Workspace() {
   const menuOpen = useAppStore((s) => s.menuOpen);
   const zoneFilter = useAppStore((s) => s.zoneFilter);
   const classFilter = useAppStore((s) => s.classFilter);
-  const scalePreset = useAppStore((s) => s.scalePreset);
+  const scaleKm = useAppStore((s) => s.scaleKm);
   const selectedTrackId = useAppStore((s) => s.selectedTrackId);
   const pins = useAppStore((s) => s.pins);
   const selectedFrameId = useAppStore((s) => s.selectedFrameId);
@@ -111,10 +111,10 @@ function Workspace() {
   const setMenuOpen = useAppStore((s) => s.setMenuOpen);
   const setZoneFilter = useAppStore((s) => s.setZoneFilter);
   const setClassFilter = useAppStore((s) => s.setClassFilter);
-  const setScale = useAppStore((s) => s.setScale);
   const selectTrack = useAppStore((s) => s.selectTrack);
   const togglePin = useAppStore((s) => s.togglePin);
   const openFrame = useAppStore((s) => s.openFrame);
+  const focusMap = useAppStore((s) => s.focusMap);
   const assess = useAppStore((s) => s.assess);
   const setStepsExpanded = useAppStore((s) => s.setStepsExpanded);
   const openModal = useAppStore((s) => s.openModal);
@@ -236,6 +236,15 @@ function Workspace() {
     store,
   ]);
 
+  /** The timeline follows the zone filter: only that zone's frames are marked. */
+  const timelineFrames = useMemo(
+    () =>
+      zoneFilter === 'all'
+        ? dataset.frames
+        : dataset.frames.filter((frame) => frame.zone_id === zoneFilter),
+    [dataset.frames, zoneFilter],
+  );
+
   /** Timeline bands: the selected vehicle's window, then each pinned one's. */
   const bands = useMemo(() => {
     const out: { fromMin: number; toMin: number; colour: string }[] = [];
@@ -278,12 +287,11 @@ function Workspace() {
             zones={dataset.zones}
             zoneFilter={zoneFilter}
             classFilter={classFilter}
-            scalePreset={scalePreset}
+            scaleKm={scaleKm}
             menuOpen={menuOpen}
             onMenuToggle={() => setMenuOpen(!menuOpen)}
             onZoneFilter={setZoneFilter}
             onClassFilter={setClassFilter}
-            onScale={setScale}
           />
 
           <div className="app__stage">
@@ -367,13 +375,19 @@ function Workspace() {
             tMin={tMin}
             playing={playing}
             speed={speed}
-            frames={dataset.frames}
+            frames={timelineFrames}
             selectedFrameId={selectedFrameId}
             bands={bands}
             onSeek={setTime}
             onTogglePlay={togglePlay}
             onSpeed={setSpeed}
-            onSelectFrame={(imageId) => void openFrame(imageId)}
+            onSelectFrame={(imageId) => {
+              // A timeline marker jumps the clock to the capture and the map to
+              // where the drone was looking.
+              const summary = dataset.frames.find((f) => f.image_id === imageId);
+              if (summary) focusMap(summary.centre_enu);
+              void openFrame(imageId);
+            }}
           />
         </main>
 

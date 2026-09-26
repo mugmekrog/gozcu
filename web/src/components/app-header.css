@@ -6,14 +6,38 @@
   gap: var(--space-7);
   padding: 0 var(--space-8);
   background: var(--surface);
-  border-bottom: var(--rule-width) solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  box-shadow: var(--lift-bar);
+  position: relative;
+  z-index: 2;
 }
 
 .app-header__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
   font-weight: 700;
   font-size: var(--text-lead);
   letter-spacing: 0.05em;
   white-space: nowrap;
+}
+
+/* The logo tile: the radar rings in ink, the one mark the product carries. */
+.app-header__mark {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-control);
+  background: var(--ink);
+  color: var(--ink-inverse);
+}
+
+.app-header__divider {
+  width: 1px;
+  height: 22px;
+  background: var(--rule);
 }
 
 .app-header__pills {

@@ -14,13 +14,14 @@
 import { create } from 'zustand';
 import { api } from '@/api';
 import type { AgentStep } from '@/api';
-import { DEFAULT_SCALE, type ScaleKm } from '@/domain/polar';
+import { DEFAULT_SCALE } from '@/domain/polar';
 import { minutesOf } from '@/domain/format';
 import type {
   Alert,
   Brief,
   DatasetInfo,
   Decision,
+  Enu,
   FieldReport,
   FrameDetail,
   TrackHistory,
@@ -75,10 +76,8 @@ interface State {
   // --- filters ------------------------------------------------------------- //
   zoneFilter: string | 'all';
   classFilter: VehicleClass | 'all';
-  /** Visible map radius in kilometres; continuous under the mouse wheel. */
+  /** Visible map radius in kilometres; set continuously by the mouse wheel. */
   scaleKm: number;
-  /** The toolbar option in force, or null once the wheel has zoomed off it. */
-  scalePreset: ScaleKm | null;
   showSuppressed: boolean;
   showAllInMotion: boolean;
 
@@ -97,6 +96,11 @@ interface State {
   modal: ModalKind | null;
   modalInfoOpen: boolean;
   modalTargetDetId: string | null;
+  /**
+   * A request for the map to centre on a ground point. `seq` makes a repeat
+   * request for the same point still move a map the operator has panned since.
+   */
+  mapFocus: { enu: Enu; seq: number } | null;
 
   // --- record -------------------------------------------------------------- //
   decisions: Decision[];
@@ -123,14 +127,14 @@ interface Actions {
 
   setZoneFilter(zoneId: string | 'all'): void;
   setClassFilter(cls: VehicleClass | 'all'): void;
-  setScale(scaleKm: ScaleKm): void;
-  /** Continuous zoom from the wheel; clears the toolbar's selection. */
+  /** Continuous zoom from the mouse wheel. */
   setZoom(scaleKm: number): void;
   setShowSuppressed(show: boolean): void;
   setShowAllInMotion(show: boolean): void;
 
   /** Open a frame: loads its detail and moves the clock to its capture time. */
   openFrame(imageId: string, opts?: { seek?: boolean }): Promise<void>;
+  focusMap(enu: Enu): void;
   assess(imageId: string): Promise<void>;
   setStepsExpanded(expanded: boolean): void;
 
@@ -184,7 +188,6 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   zoneFilter: 'all',
   classFilter: 'all',
   scaleKm: DEFAULT_SCALE,
-  scalePreset: DEFAULT_SCALE,
   showSuppressed: false,
   showAllInMotion: false,
 
@@ -201,6 +204,7 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   modal: null,
   modalInfoOpen: false,
   modalTargetDetId: null,
+  mapFocus: null,
 
   decisions: [],
   toast: null,
@@ -302,11 +306,8 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   setClassFilter(classFilter) {
     set({ classFilter });
   },
-  setScale(scaleKm) {
-    set({ scaleKm, scalePreset: scaleKm });
-  },
   setZoom(scaleKm) {
-    set({ scaleKm, scalePreset: null });
+    set({ scaleKm });
   },
   setShowSuppressed(showSuppressed) {
     set({ showSuppressed });
@@ -351,6 +352,10 @@ export const useAppStore = create<State & Actions>((set, get) => ({
         assessError: error instanceof Error ? error.message : String(error),
       });
     }
+  },
+
+  focusMap(enu) {
+    set({ mapFocus: { enu, seq: (get().mapFocus?.seq ?? 0) + 1 } });
   },
 
   async assess(imageId) {
