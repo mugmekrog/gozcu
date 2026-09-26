@@ -1,10 +1,7 @@
 /* The risk symbol.
  *
- * One component draws every vehicle mark in the app, so shape and colour cannot
- * drift apart between the map, a legend and a modal row. Level is carried by the
- * *shape* -- triangle, circle, square -- with colour as the redundant second
- * encoding, which is what keeps the display readable for a colour-blind reviewer
- * and on a washed-out projector (PLAN 7.3.1).
+ * Compact risk glyph used by badges and modal rows. Map vehicle symbols are
+ * drawn separately, with shape for class and colour for warning level.
  */
 
 import { memo } from 'react';

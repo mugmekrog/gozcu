@@ -26,7 +26,7 @@ import { classLabel, T } from '@/domain/strings';
 import * as fmt from '@/domain/format';
 import { modalRows, type AssembledBrief } from '@/domain/brief';
 import { rangeSeries, stopsOf } from '@/domain/tracks';
-import type { Decision, FrameDetail, TrackHistory } from '@/domain/types';
+import type { Alert, Decision, FrameDetail, TrackHistory } from '@/domain/types';
 import type { ModalKind } from '@/store/useAppStore';
 import './alert-modal.css';
 
@@ -50,6 +50,17 @@ export interface AlertModalProps {
 
 /** How much history the modal's chart shows. */
 const WINDOW_MIN = 120;
+
+function alertEvidence(alert: Alert): string {
+  const place = alert.zone_name || alert.zone_id || 'korunan bölge';
+  const facts = [`${alert.track_id}, ${place} bölgesine ${fmt.distance(alert.dist_now_m)} uzaklıkta`];
+  if (alert.eta_entry_s != null) facts.push(`tahmini giriş ${fmt.eta(alert.eta_entry_s)}`);
+  if (alert.closing_speed_mps != null) {
+    facts.push(`${alert.closing_speed_mps >= 0 ? 'yaklaşma' : 'uzaklaşma'} hızı ${fmt.speed(Math.abs(alert.closing_speed_mps))}`);
+  }
+  facts.push(`yaklaşma güveni ${fmt.percent(alert.approach_conf)}`);
+  return facts.join(' · ');
+}
 
 export const AlertModal = memo(function AlertModal({
   kind,
@@ -332,7 +343,7 @@ export const AlertModal = memo(function AlertModal({
                 </h4>
                 <p className="modal__assessment-text">
                   {targetAlert
-                    ? targetAlert.reasons.join(' ')
+                    ? alertEvidence(targetAlert)
                     : `Bu tespit hiçbir hareket kaydıyla eşleşmedi (${fmt.distance(
                         frame.untracked.find((u) => u.det_id === target.det_id)
                           ?.nearest_track_dist_m ?? null,
@@ -344,7 +355,7 @@ export const AlertModal = memo(function AlertModal({
                   <br />
                   rapor: field_reports.json
                   {frame.funnel &&
-                    ` · funnel: ${fmt.count(frame.funnel.raw)} → ${fmt.count(frame.funnel.kept)}`}
+                    ` · tespit süzmesi: ${fmt.count(frame.funnel.raw)} → ${fmt.count(frame.funnel.kept)}`}
                 </p>
               </div>
             </section>

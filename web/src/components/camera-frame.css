@@ -37,6 +37,21 @@
   outline-offset: 2px;
 }
 
+.camera__gps-link {
+  stroke: #00d8e6;
+  stroke-opacity: 0.82;
+  stroke-dasharray: 6 4;
+  pointer-events: none;
+}
+
+.camera__gps[role='button'] {
+  cursor: pointer;
+}
+
+.camera__gps:focus-visible {
+  outline: 2px solid var(--ink-inverse);
+}
+
 .camera__missing {
   position: absolute;
   inset: 0;
@@ -66,9 +81,26 @@
   display: flex;
   align-items: center;
   gap: var(--space-5);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 70%;
   padding: var(--space-2) var(--space-4);
   background: rgba(255, 255, 255, 0.92);
   font-size: var(--text-micro);
+}
+
+.camera__selection {
+  position: absolute;
+  left: var(--space-5);
+  bottom: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: calc(100% - 2 * var(--space-5));
+  padding: var(--space-2) var(--space-4);
+  background: rgba(16, 30, 44, 0.92);
+  color: var(--ink-inverse);
+  font-size: var(--text-small);
 }
 
 .camera__hint {

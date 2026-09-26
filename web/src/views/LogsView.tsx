@@ -145,7 +145,7 @@ export const LogsView = memo(function LogsView() {
               [
                 ['all', T.logs.filterAll],
                 ['contradicts', T.consistency.contradicts],
-                ['third_party', 'third_party'],
+                ['third_party', 'Üçüncü taraf'],
               ] as const
             ).map(([value, label]) => (
               <button
@@ -243,7 +243,7 @@ export const LogsView = memo(function LogsView() {
 function SourceBadge({ source }: { source: FieldReport['source'] }) {
   return (
     <span className="logs-view__source" data-source={source}>
-      {source}
+      {source === 'official' ? 'Resmî' : 'Üçüncü taraf'}
     </span>
   );
 }
@@ -267,7 +267,7 @@ function ReportVerdict({ report }: { report: FieldReport }) {
     <>
       <b style={{ color: tone }}>{consistencyLabel(report.consistency)}</b>{' '}
       <span className="muted">
-        · {report.kind}
+        · {({ area_wide: 'bölge geneli', degraded_coverage: 'görüş kısıtlı', identified_friendly: 'kimliği doğrulanmış', irrelevant: 'ilgisiz', negative_claim: 'olumsuz bildirim', sighting: 'gözlem', unknown: 'belirsiz', unverified: 'doğrulanmamış', zone_status: 'bölge durumu' } as Record<string, string>)[report.kind] ?? report.kind}
         {report.vehicle_type && ` · ${classLabel(report.vehicle_type)}`}
         {report.zone_ref && ` · ${report.zone_ref}`}
         {report.matched_track_ids.length > 0 && ` · ${report.matched_track_ids.length} iz`}

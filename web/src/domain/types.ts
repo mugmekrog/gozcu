@@ -148,6 +148,16 @@ export interface TrackStateRow {
   outlier_steps: number;
 }
 
+/** Recorded GPS fix at capture time, projected through the image corners. */
+export interface TrackPosition {
+  track_id: string;
+  lat: number;
+  lon: number;
+  /** Source-image pixels; may be outside the image for an out-of-footprint track. */
+  pixel: [number, number];
+  in_frame: boolean;
+}
+
 export interface ZoneAssessmentRow {
   zone_id: string;
   dist_now_m: number;
@@ -302,6 +312,7 @@ export interface FrameDetail {
   funnel: DetectionFunnel | null;
   detections: Detection[];
   track_states: TrackStateRow[];
+  track_positions: TrackPosition[];
   zone_assessments: Record<string, ZoneAssessmentRow[]>;
   matches: Match[];
   untracked: UntrackedDetection[];

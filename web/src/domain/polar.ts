@@ -16,28 +16,30 @@
 
 import type { Enu } from './types';
 
+/** Visible radius in kilometres; continuous zoom is clamped to this range. */
+export type ScaleKm = number;
+export const MIN_SCALE = 2;
+export const MAX_SCALE = 16;
+export function zoomScale(current: number, direction: -1 | 1): number {
+  const next = direction < 0 ? current / 1.15 : current * 1.15;
+  return Math.min(MAX_SCALE, Math.max(MIN_SCALE, Math.round(next * 10) / 10));
+}
+
 /**
- * The default scale, in kilometres of visible radius.
+ * The default scale.
  *
  * 8 km, because the furthest track fix in the shipped data sits 7.99 km from
  * the base -- so 8 km is the smallest ring that holds the whole exercise. The
  * wireframe also shows 8 selected, which is the same answer arrived at twice.
  */
-export const DEFAULT_SCALE = 8;
-
-/**
- * The wheel is the only zoom control, continuous between these radii in
- * kilometres. 1 km is the closest look the map offers, 12 km the widest.
- */
-export const MIN_ZOOM_KM = 1;
-export const MAX_ZOOM_KM = 12;
+export const DEFAULT_SCALE: ScaleKm = 8;
 
 /** SVG user-space extent. Fixed, so the viewBox is stable and text is crisp. */
 export const VIEW = { w: 960, h: 680, cx: 480, cy: 340 } as const;
 
 export interface Projection {
-  /** Visible radius in kilometres. Any value: the wheel zooms continuously. */
-  scaleKm: number;
+  /** Visible radius in kilometres. */
+  scaleKm: ScaleKm;
   /** SVG units per kilometre. */
   unitsPerKm: number;
   /** ENU metres to an SVG point. North is up, so north maps to -y. */
@@ -57,7 +59,7 @@ export interface Projection {
  * outermost ring is always fully on screen and the horizontal margin carries
  * the range labels.
  */
-export function projectionFor(scaleKm: number): Projection {
+export function projectionFor(scaleKm: ScaleKm): Projection {
   const usable = VIEW.h / 2 - 20;
   const unitsPerKm = usable / scaleKm;
   const limitM = scaleKm * 1000 * 1.02;
@@ -85,12 +87,8 @@ export function projectionFor(scaleKm: number): Projection {
   };
 }
 
-/**
- * Ring ranges in kilometres for a scale: whole kilometres (half kilometres at
- * 2 km and closer), up to the edge.
- * `extentKm` carries the rings further out once the map is panned off the base.
- */
-export function ringsFor(scaleKm: number, extentKm: number = scaleKm): number[] {
+/** Ring ranges extend past the viewport when the map is panned. */
+export function ringsFor(scaleKm: ScaleKm, extentKm = scaleKm): number[] {
   const step = scaleKm <= 2 ? 0.5 : scaleKm <= 8 ? 1 : 2;
   const out: number[] = [];
   for (let k = step; k <= Math.max(scaleKm, extentKm); k += step) out.push(k);
