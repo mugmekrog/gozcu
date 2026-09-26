@@ -230,11 +230,11 @@ def test_situational_report_cannot_assign_threat_levels(offline_cfg, bundle, tmp
     from app.agents.situational_report import SituationalReportPolicy
 
     answer = {
-        "image_summary": "One vehicle needs closer review.",
+        "image_summary": "Bir araç yakından incelenmeli.",
         "assessments": [
             {
                 "track_id": bundle.vehicles[0].track_id,
-                "rationale": ["Detection and movement record agree."],
+                "rationale": ["Tespit ve hareket kaydı birbiriyle uyumlu."],
                 "cited_ids": [bundle.vehicles[0].track_id],
                 "report_conflicts": [],
             }
@@ -249,6 +249,33 @@ def test_situational_report_cannot_assign_threat_levels(offline_cfg, bundle, tmp
     assert outcome.value.assessments[0].track_id == bundle.vehicles[0].track_id
     assert "level" not in outcome.value.model_dump_json()
     assert "level" not in json.dumps(gateway.requests[0].response_schema)
+
+
+def test_situational_report_repairs_english_and_falls_back_in_turkish(
+    offline_cfg, bundle, tmp_path
+):
+    from app.agents.situational_report import SituationalReportPolicy
+
+    english = {
+        "image_summary": "One vehicle needs closer review.",
+        "assessments": [{
+            "track_id": bundle.vehicles[0].track_id,
+            "rationale": ["The detection and movement record agree."],
+            "cited_ids": [bundle.vehicles[0].track_id],
+            "report_conflicts": [],
+        }],
+    }
+    gateway = ScriptedGateway([json.dumps(english), json.dumps(english)])
+    outcome = make_runner(offline_cfg, gateway, tmp_path).run(
+        SituationalReportPolicy(offline_cfg), bundle
+    )
+
+    assert outcome.used_fallback
+    assert len(gateway.requests) == 2
+    assert "Turkish" in gateway.requests[0].messages[0]["content"]
+    assert "araç değerlendirildi" in outcome.value.image_summary
+    assert all("Araç" in item.rationale[0] or "araç" in item.rationale[0]
+               for item in outcome.value.assessments)
 
 
 def test_the_prompt_puts_evidence_in_a_data_block(offline_cfg, bundle, tmp_path):
@@ -277,7 +304,7 @@ def test_invented_citation_invalidates_and_falls_back(offline_cfg, bundle, tmp_p
     assert any("T9999" in problem for problem in outcome.run.problems)
     assert len(gateway.requests) == 2  # one repair attempt, then the template
     assert outcome.value.assessments  # the template still fills the display
-    assert "Template assessment" in outcome.value.image_summary
+    assert "araç değerlendirildi" in outcome.value.image_summary
 
 
 def test_a_repaired_answer_is_accepted(offline_cfg, bundle, tmp_path):

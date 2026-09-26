@@ -151,15 +151,16 @@ def test_negative_claim_contradicted_by_a_detected_truck():
         report, [NearbyDetection(det_id="img_x#001", cls="truck", distance_m=40.0)]
     )
     assert consistency == "contradicts"
-    assert "truck" in note
+    assert "kamyon" in note
 
 
 def test_negative_claim_agrees_when_only_cars_are_seen():
     report = _report("agir arac hareketi yok", kind="negative_claim", vehicle_type="heavy")
-    consistency, _ = evaluate_consistency(
+    consistency, note = evaluate_consistency(
         report, [NearbyDetection(det_id="img_x#002", cls="car", distance_m=30.0)]
     )
     assert consistency == "agrees"
+    assert note == "Burada ağır araç tespit edilmedi; 1 hafif araç görüldü"
 
 
 def test_sighting_agrees_with_a_matching_class():
@@ -181,13 +182,14 @@ def test_sighting_contradicts_when_no_such_class_is_near():
         report, [NearbyDetection(det_id="img_x#005", cls="car", distance_m=12.0)]
     )
     assert consistency == "contradicts"
-    assert "car" in note
+    assert "otomobil" in note
 
 
 def test_report_with_nothing_detected_is_unrelated():
     report = _report("1 kamyon goruldu", vehicle_type="truck", count=1)
-    consistency, _ = evaluate_consistency(report, [])
+    consistency, note = evaluate_consistency(report, [])
     assert consistency == "unrelated"
+    assert note == "Eşleşen zaman aralığında bu raporun yakınında tespit yok"
 
 
 def test_weather_report_makes_no_testable_claim():
