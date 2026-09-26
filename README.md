@@ -87,7 +87,7 @@ python app/cli.py serve-stt                            # the service the display
 ```bash
 python web/scripts/export_fixtures.py                  # real pipeline output → web/public/fixtures
 cd web && npm install && npm run dev                   # read the URL it prints
-npm test                                               # 153 tests, no network
+npm test                                               # 162 tests, no network
 ```
 
 The frontend runs on static fixtures by default so it works with the network off.
