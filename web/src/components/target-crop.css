@@ -1,0 +1,115 @@
+.target-crop {
+  flex: none;
+}
+
+.target-crop__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.target-crop__view {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  border: 1px solid var(--hairline);
+  background: var(--surface-camera);
+  cursor: zoom-in;
+}
+
+.target-crop__view:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.target-crop__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.target-crop__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.target-crop__caption {
+  font-size: var(--text-micro);
+  min-width: 0;
+}
+
+.target-crop__empty {
+  font-size: var(--text-small);
+  margin: 0;
+}
+
+/* --- the large view ------------------------------------------------------- */
+
+.target-crop__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-10);
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.target-crop__lightbox {
+  width: min(1200px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  box-shadow: var(--lift-modal);
+}
+
+.target-crop__lightbox-head,
+.target-crop__lightbox-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-6);
+}
+
+.target-crop__lightbox-head {
+  border-bottom: var(--rule-width) solid var(--rule);
+}
+
+.target-crop__lightbox-foot {
+  border-top: var(--rule-width) solid var(--rule);
+}
+
+.target-crop__lightbox-body {
+  flex: 1;
+  min-height: 0;
+  height: min(70vh, 680px);
+  background: var(--surface-camera);
+}
+
+.target-crop__toggle {
+  display: flex;
+}
+
+.target-crop__toggle .btn + .btn {
+  margin-left: -1px;
+}
+
+.target-crop__toggle .btn[aria-pressed='true'],
+.target-crop__toggle .btn[aria-pressed='true']:hover:not(:disabled) {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--ink-inverse);
+}
+
+@media (max-width: 720px) {
+  .target-crop__backdrop {
+    padding: var(--space-4);
+  }
+}
