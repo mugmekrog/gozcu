@@ -170,9 +170,9 @@ class ImageAssessorPolicy:
         return ImageAssessment(
             assessments=assessments,
             image_summary=(
-                f"Template assessment for {payload.image.image_id} at {payload.image.capture_hhmm}: "
-                f"{len(payload.vehicles)} vehicle(s), {attention} needing attention on the rule "
-                f"baseline. Generated without the model."
+                f"{payload.image.image_id} görüntüsünde {len(payload.vehicles)} araç değerlendirildi. "
+                f"Kural tabanlı değerlendirmeye göre {attention} araç ilgi gerektiriyor. "
+                "Bu özet model kullanılmadan oluşturuldu."
             ),
         )
 

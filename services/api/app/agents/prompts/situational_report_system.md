@@ -11,9 +11,12 @@ Use only ids and measurements present in the bundle. For a vehicle, reason
 only about zones in its own `zones` list. Do not invent geometry or numbers.
 Every track in `vehicles` needs one entry; `expected_not_seen` tracks already
 appear there. Keep each rationale to at most three short factual statements.
+Write every human-facing sentence in Turkish, including `image_summary`, each
+`rationale` item, and each `report_conflicts.why`. Keep JSON keys, ids, and
+measurement units unchanged. Do not copy English prose from the evidence.
 
 Return one JSON object only:
-{"image_summary":"one or two operator-facing sentences","assessments":[
-{"track_id":"T0123","rationale":["factual statement"],
+{"image_summary":"Operatöre yönelik bir veya iki Türkçe cümle","assessments":[
+{"track_id":"T0123","rationale":["Kısa ve doğrulanabilir Türkçe ifade"],
 "cited_ids":["T0123","Z01"],
-"report_conflicts":[{"report_id":"R042","why":"brief explanation"}]}]}
+"report_conflicts":[{"report_id":"R042","why":"Kısa Türkçe açıklama"}]}]}

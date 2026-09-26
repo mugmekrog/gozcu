@@ -72,6 +72,18 @@ VEHICLE_WORDS: dict[str, str] = {
 }
 
 HEAVY_CLASSES = frozenset({"truck", "bus"})
+VEHICLE_LABELS = {
+    "car": "otomobil",
+    "van": "minibüs",
+    "truck": "kamyon",
+    "bus": "otobüs",
+    "heavy": "ağır araç",
+    "vehicle": "araç",
+}
+
+
+def _vehicle_label(cls: str) -> str:
+    return VEHICLE_LABELS.get(cls, cls)
 
 # Template keyword rules, most specific first (PLAN 2.7). Each entry is
 # (kind, pattern, area_wide).
@@ -206,41 +218,41 @@ def evaluate_consistency(
     if kind == "negative_claim":
         heavy = [d for d in nearby if d.cls in HEAVY_CLASSES]
         if heavy:
-            names = ", ".join(sorted({d.cls for d in heavy}))
+            names = ", ".join(sorted({_vehicle_label(d.cls) for d in heavy}))
             ids = ", ".join(d.det_id for d in heavy[:3])
             return (
                 "contradicts",
-                f"report claims no heavy vehicle movement, but we detect {names} here ({ids})",
+                f"Rapor ağır araç hareketi olmadığını bildiriyor; burada {names} tespit edildi ({ids})",
             )
         if nearby:
-            return ("agrees", f"no heavy vehicle detected here; {len(nearby)} light vehicle(s) seen")
-        return ("agrees", "no vehicle detected here either")
+            return ("agrees", f"Burada ağır araç tespit edilmedi; {len(nearby)} hafif araç görüldü")
+        return ("agrees", "Burada da araç tespit edilmedi")
 
     if kind in {"sighting", "identified_friendly"}:
         if not nearby:
-            return ("unrelated", "no detection near this report in the matching window")
+            return ("unrelated", "Eşleşen zaman aralığında bu raporun yakınında tespit yok")
         if claimed in {None, "vehicle"}:
-            return ("agrees", f"a vehicle is detected here ({nearby[0].det_id})")
+            return ("agrees", f"Burada araç tespit edildi ({nearby[0].det_id})")
         if claimed == "heavy":
             heavy = [d for d in nearby if d.cls in HEAVY_CLASSES]
             if heavy:
-                return ("agrees", f"heavy vehicle detected ({heavy[0].det_id})")
+                return ("agrees", f"Ağır araç tespit edildi ({heavy[0].det_id})")
             return (
                 "contradicts",
-                f"report says heavy vehicle; nearest detection is {nearby[0].cls} ({nearby[0].det_id})",
+                f"Rapor ağır araç bildiriyor; en yakın tespit {_vehicle_label(nearby[0].cls)} ({nearby[0].det_id})",
             )
         if any(d.cls == claimed for d in nearby):
             match = next(d for d in nearby if d.cls == claimed)
-            return ("agrees", f"detection class {claimed} matches the report ({match.det_id})")
+            return ("agrees", f"Tespit edilen {_vehicle_label(claimed)} raporla eşleşiyor ({match.det_id})")
         return (
             "contradicts",
-            f"report says {claimed}; nearest detection is {nearby[0].cls} ({nearby[0].det_id})",
+            f"Rapor {_vehicle_label(claimed)} bildiriyor; en yakın tespit {_vehicle_label(nearby[0].cls)} ({nearby[0].det_id})",
         )
 
     if kind == "zone_status":
         if any(d.cls in HEAVY_CLASSES for d in nearby):
-            return ("contradicts", "report calls the zone normal while a heavy vehicle is detected there")
-        return ("agrees", "nothing detected that contradicts the reported status")
+            return ("contradicts", "Rapor bölgeyi normal bildiriyor; burada ağır araç tespit edildi")
+        return ("agrees", "Bildirilen durumla çelişen bir tespit yok")
 
     return (None, None)
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import re
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -11,7 +12,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from goru_core.config import Config
 from goru_core.schemas import EvidenceBundle, ReportConflict
 
-from app.agents.assessor import ImageAssessorPolicy
 from app.agents.guardrails import (
     check_citations,
     check_numeric_drift,
@@ -41,6 +41,14 @@ class SituationalReport(BaseModel):
     image_summary: str = Field(default="", max_length=1000)
 
 
+_ENGLISH_PROSE = re.compile(
+    r"\b(?:the|this|that|with|from|is|are|and|one|vehicle|vehicles|detection|detected|"
+    r"movement|report|reports|needs|near|inside|outside|approaching|"
+    r"confirmed|friendly|threat|review|zone|summary)\b",
+    re.IGNORECASE,
+)
+
+
 @dataclass(frozen=True)
 class SituationalReportPolicy:
     cfg: Config
@@ -56,9 +64,9 @@ class SituationalReportPolicy:
             {
                 "role": "user",
                 "content": (
-                    f"Report on image {payload.image.image_id} at {payload.image.capture_hhmm}.\n"
+                    f"{payload.image.image_id} görüntüsünü {payload.image.capture_hhmm} saati için raporla.\n"
                     + data_block("EVIDENCE", payload.model_dump_json(exclude_none=False))
-                    + "\nReturn the JSON report described in your instructions."
+                    + "\nİstenen JSON raporunu Türkçe açıklamalarla döndür."
                 ),
             },
         ]
@@ -90,6 +98,13 @@ class SituationalReportPolicy:
         )
         if bad_reports:
             problems.append(f"unknown report conflicts: {', '.join(bad_reports)}")
+        prose = [report.image_summary]
+        prose.extend(line for item in report.assessments for line in item.rationale)
+        prose.extend(
+            conflict.why for item in report.assessments for conflict in item.report_conflicts
+        )
+        if any(_ENGLISH_PROSE.search(line) for line in prose):
+            problems.append("report contains English prose; write all explanations in Turkish")
         problems.extend(check_zone_scope(report.assessments, payload))
         if problems:
             return ValidationResult(value=None, problems=problems)
@@ -111,17 +126,22 @@ class SituationalReportPolicy:
         )
 
     def fallback(self, payload: EvidenceBundle) -> SituationalReport:
-        template = ImageAssessorPolicy(self.cfg).fallback(payload)
         return SituationalReport(
-            image_summary=template.image_summary,
+            image_summary=(
+                f"{payload.image.image_id} görüntüsünde {len(payload.vehicles)} araç değerlendirildi. "
+                "Ayrıntılı rapor oluşturulamadı; kural tabanlı değerlendirme gösteriliyor."
+            ),
             assessments=[
                 ReportItem(
-                    track_id=item.track_id,
-                    rationale=item.rationale,
-                    cited_ids=item.cited_ids,
-                    report_conflicts=item.report_conflicts,
+                    track_id=vehicle.track_id,
+                    rationale=[
+                        "Bu görüntüde araç tespit edilmedi; hareket kaydı mevcut."
+                        if not vehicle.detected
+                        else "Araç tespiti ve kural tabanlı değerlendirme mevcut."
+                    ],
+                    cited_ids=[vehicle.track_id, *([vehicle.det_id] if vehicle.det_id else [])],
                 )
-                for item in template.assessments
+                for vehicle in payload.vehicles
             ],
         )
 
