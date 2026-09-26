@@ -31,6 +31,7 @@ import {
   type PointerEvent,
 } from 'react';
 import { GridLayer } from './GridLayer';
+import { ChartFurniture } from './ChartFurniture';
 import { BaseLayer, ZoneLayer } from './ZoneLayer';
 import { FrameLayer } from './FrameLayer';
 import { VehicleLayer } from './VehicleLayer';
@@ -363,17 +364,7 @@ export const Radar = memo(function Radar() {
         />
       </g>
 
-      <text
-        x={VIEW.w - 20}
-        y={26}
-        fontSize={13}
-        fontWeight={700}
-        textAnchor="end"
-        fill="var(--ink)"
-        aria-hidden="true"
-      >
-        K ↑
-      </text>
+      <ChartFurniture projection={projection} base={dataset.base} />
       {offCentre && (
         <g
           className="radar-recentre"
