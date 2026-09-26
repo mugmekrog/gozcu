@@ -39,15 +39,19 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
+  /* The target crop can push the lower panels past the fold; scroll, don't squash. */
+  overflow-y: auto;
 }
 
 .app__column-kicker {
   margin-bottom: calc(var(--space-3) * -1);
 }
 
+/* The floor keeps the brief readable when the target crop is open; past it,
+ * the column scrolls. */
 .app__column .brief {
   flex: 1 1 0;
-  min-height: 0;
+  min-height: 280px;
   overflow: hidden;
 }
 

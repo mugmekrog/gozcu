@@ -43,29 +43,34 @@ services/api/app/
 web/                      React tactical display (see web/README.md)
 stage2/                   organizer files, read-only
 bounding_boxes.csv        our Stage-1 detector's output, read-only
-tests/                    123 Python tests
+tests/                    135 Python tests
 logs/                     step logs, one per stage
 ```
 
 ## Running it
 
-**Backend** — Python 3.12:
+**Backend** — Python 3.11+ (3.12 recommended). Name the interpreter explicitly:
+on macOS a bare `python3` can be the system 3.9, which cannot install `scipy>=1.14`.
 
 ```bash
-python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt
-.venv/Scripts/python -m pytest -q                      # 123 tests, ~2.5 s, no network
+python3.12 -m venv .venv                               # or python3.11 / python3.13
+source .venv/bin/activate                              # Windows: .venv\Scripts\activate
+python -m pip install -r requirements.txt
+python -m pytest -q                                    # 135 tests, ~3 s, no network
 
-cd services/api
-python app/cli.py data-report                          # reproduce every measured number
-python app/cli.py detections img_000860                # the 474 → 5 funnel, with reasons
-python app/cli.py assess img_000860                    # agent verdict (spends ~1 cent)
-python app/cli.py budget                               # spend vs the $15 cap
+python services/api/app/cli.py data-report             # reproduce every measured number
+python services/api/app/cli.py detections img_000860   # the 474 → 5 funnel, with reasons
+python services/api/app/cli.py assess img_000860       # agent verdict (spends ~1 cent)
+python services/api/app/cli.py budget                  # spend vs the $15 cap
 ```
 
-**Frontend** — Node 20:
+The CLI finds `goru.yaml` at the repo root on its own, so it runs from any
+directory; pass `--config path/to/goru.yaml` to use a different file.
+
+**Frontend** — Node 20 (with the venv active):
 
 ```bash
-.venv/Scripts/python web/scripts/export_fixtures.py    # real pipeline output → web/public/fixtures
+python web/scripts/export_fixtures.py                  # real pipeline output → web/public/fixtures
 cd web && npm install && npm run dev                   # read the URL it prints
 npm test                                               # 87 tests, no network
 ```
@@ -87,7 +92,7 @@ consequences to keep in mind:
   Deleting the file will not remove it from git history; every clone and fork
   already has it.
 - Anyone with read access to this repo can spend the budget. Check what is left
-  with `python app/cli.py budget` — the gateway's own `/key/info` is the
+  with `python services/api/app/cli.py budget` — the gateway's own `/key/info` is the
   authoritative figure, and the ledger prefers it over its local estimate.
 
 The three `GORU_*_PASSWORD` values are still the `change-me-*` placeholders. Set
@@ -97,7 +102,7 @@ them for real before auth is built (that stream has not started).
 
 | Stage | State |
 |---|---|
-| Deterministic engine | built, 123 tests |
+| Deterministic engine | built, 135 tests |
 | Agent layer | built — assessor, report parser, reviewer copilot, guardrails, budget ledger |
 | Frontend | built, 87 tests |
 | REST + WebSocket API | **not built** — `web/src/api/http.ts` specifies what it must serve |
