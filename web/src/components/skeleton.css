@@ -1,0 +1,64 @@
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.skeleton__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.skeleton__badge {
+  width: 74px;
+  height: 22px;
+  background: var(--surface-active);
+}
+
+.skeleton__score {
+  width: 70px;
+  height: 30px;
+  background: var(--surface-active);
+}
+
+.skeleton__line {
+  height: 9px;
+  background: #eef2f6;
+}
+
+.skeleton__line:first-of-type {
+  height: 12px;
+  background: var(--surface-active);
+}
+
+.skeleton__note {
+  font-size: var(--text-dense);
+  color: var(--ink-muted);
+}
+
+/* A slow pulse across the whole block, not per line: a staggered shimmer draws
+ * the eye to the animation instead of to the panel that is about to fill. */
+.skeleton__line,
+.skeleton__badge,
+.skeleton__score {
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton__line,
+  .skeleton__badge,
+  .skeleton__score {
+    animation: none;
+  }
+}

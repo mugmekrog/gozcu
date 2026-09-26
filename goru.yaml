@@ -1,0 +1,93 @@
+# Goru single config file. PLAN.md §6.10.
+# Every threshold that influences a decision lives here and is hashed into
+# `rules_version` / `thresholds_version`, which are stamped on every alert and
+# detection for provenance.
+
+exercise_date: "2026-09-26"
+tz: "Europe/Istanbul"
+
+paths:
+  stage2_dir: "stage2"
+  boxes_csv: "bounding_boxes.csv"
+  processed_dir: "data/processed"
+
+geo:
+  projection: linear        # linear | homography
+  ground_point: center      # center | bottom_center
+
+detection:                  # post-processing of bounding_boxes.csv (§6.3)
+  score_threshold: 0.35     # calibrated by count parity in §2.5; 0.30-0.40 defensible
+  nms_iou: 0.50
+  nms_class_agnostic: true
+  min_area_m2: 2.5          # replaces the fixed 200 px^2 rule.
+                            # MEASURED: at 3.0 this drops 3 genuine cars of ground area
+                            # 2.83 / 2.92 / 3.00 m2, contradicting PLAN 10.1 ("drops 0
+                            # boxes"). 2.5 keeps all 217 NMS survivors and still filters
+                            # sub-car debris.
+  legacy_min_bbox_area_px: 200   # logged only, never drops
+
+matching:
+  gate_m: 30
+  low_conf_m: 25
+  duplicate_radius_m: 12        # an unmatched detection this close to an already
+                                # matched track is a double-detection, not a new object
+  nn_reference_gate_m: 60       # only for reproducing the PLAN 2.8 reference figure
+  report_gate_m: 150
+  report_time_window_min: 15
+
+kinematics:
+  fit_points: 4
+  stationary_disp_m: 25
+  max_step_speed_mps: 40
+
+zones:
+  default_radius_m: 250
+  default_buffer_m: 750
+  overrides: {}
+
+warning:
+  horizon_min: 30
+  alert_eta_min: 10
+  alert_conf: 0.6
+  watch_conf: 0.4
+  heavy_vehicle_multiplier: 1.25
+  downgrade_consecutive: 2
+
+sim:
+  start: "08:10"
+  end: "15:50"
+  default_speed: 120
+  tick_sim_s: 60
+
+agents:
+  enabled: true
+  cache_only: false         # demo fallback (§9.3): replay cached AgentRuns, spend $0
+  base_url: "https://berriailitellm-databasev1826rc3-production-d691.up.railway.app/v1"
+  model: "glm-5.3-flash"    # the only model this key may access
+  api_key_env: GLM_API_KEY
+  assess:  { reasoning_effort: low,  max_tokens: 4000 }
+  parse:   { reasoning_effort: low,  max_tokens: 1500 }
+  copilot: { reasoning_effort: high, max_tokens: 6000 }
+  max_concurrency: 4        # gateway hard limit
+  requests_per_min: 55      # gateway limit is 60
+  timeout_s: 45             # GLM always thinks first; 10-15 s typical at low effort
+  max_retries: 5
+  budget_cap_usd: 15.0
+  budget_soft_stop_usd: 11.0
+  send_images: false
+  max_tool_calls: 10        # per copilot turn (§7.4.2 DoS control)
+  cache_dir: "data/processed/agent_cache"
+  budget_file: "data/processed/agent_budget.json"
+  runs_file: "data/processed/agent_runs.jsonl"
+  # Local cost ESTIMATE only, for the pre-flight guard, and deliberately
+  # pessimistic: a guard that under-estimates lets a batch run past the stop.
+  # MEASURED 2026-09-26: one assess call of 4920 in / 926 out tokens moved the
+  # gateway's own `spend` by more than an order of magnitude beyond the 0.10/0.30
+  # first assumed here, so these are set high on purpose. The authoritative figure
+  # is always the gateway's `spend` from GET /key/info, which the ledger
+  # reconciles against and prefers whenever it is reachable.
+  pricing: { input_usd_per_mtok: 0.60, output_usd_per_mtok: 2.20 }
+
+security:
+  jwt_ttl_h: 8
+  retention_days: 7

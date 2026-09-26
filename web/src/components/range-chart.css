@@ -1,0 +1,16 @@
+.range-chart {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.range-chart__line {
+  /* A wide transparent stroke would be needed for a comfortable hover target;
+   * instead the table rows below are the primary way to pick a vehicle, and the
+   * line responds when the pointer is actually on it. */
+  cursor: pointer;
+}
+
+.range-chart__line:hover {
+  stroke-width: 4;
+}

@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "goru"
+version = "0.1.0"
+description = "Zone-proximity early-warning system with an LLM assessment agent (Stage-2)"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.9",
+    "numpy>=2.0",
+    "scipy>=1.14",
+    "openai>=1.99",
+    "python-dotenv>=1.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.setuptools]
+package-dir = { goru_core = "libs/goru_core", app = "services/api/app" }
+
+[tool.setuptools.packages.find]
+where = ["libs", "services/api"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["libs", "services/api"]
+filterwarnings = ["error::DeprecationWarning"]

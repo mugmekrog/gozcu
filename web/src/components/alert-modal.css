@@ -1,0 +1,392 @@
+.modal__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: var(--scrim);
+}
+
+.modal {
+  position: absolute;
+  inset: 20px;
+  z-index: 21;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 3px solid var(--risk-threat);
+  box-shadow: var(--lift-modal);
+}
+
+.modal__head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-7);
+  padding: var(--space-6) var(--space-9);
+  border-bottom: var(--rule-width) solid var(--rule);
+}
+
+.modal__title {
+  font-size: var(--text-title);
+  font-weight: 700;
+  letter-spacing: var(--tracking-title);
+}
+
+.modal__subtitle {
+  font-size: var(--text-body);
+}
+
+/* The pulsing triangle is the only pulsing thing in the modal, as on the map. */
+.modal__pulse {
+  display: inline-block;
+  color: var(--risk-threat);
+  font-size: var(--text-score);
+  line-height: 1;
+  animation: modal-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes modal-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal__pulse {
+    animation: none;
+  }
+}
+
+.modal__query {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--risk-review);
+  color: var(--risk-review-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.modal__close {
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.modal__close:hover {
+  color: var(--ink);
+}
+
+.modal__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: var(--space-7);
+  padding: var(--space-7) var(--space-9) 0;
+}
+
+/* The camera narrows from full width to 45% when the detail panel opens. The
+ * animation is the explanation of what happened -- the image did not vanish, it
+ * made room -- so it is one of the few transitions in the app. */
+.modal__camera {
+  flex: none;
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  background: var(--surface-camera);
+  transition: width var(--dur-shift) var(--ease);
+}
+
+.modal__panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--rule);
+  animation: modal-panel-in var(--dur-shift) var(--ease);
+}
+
+@keyframes modal-panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.modal__panel--target {
+  border: 0;
+  gap: var(--space-6);
+}
+
+.modal__chart {
+  flex: none;
+  height: 300px;
+  padding: var(--space-2) var(--space-4);
+}
+
+.modal__rows {
+  display: flex;
+  flex-direction: column;
+  border-top: var(--rule-width) solid var(--rule);
+  overflow-y: auto;
+}
+
+.modal__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: 7px var(--space-6);
+  border-bottom: 1px solid var(--rule);
+}
+
+.modal__row[data-lead='true'] {
+  background: var(--ground);
+  font-weight: 700;
+}
+
+.modal__row-id {
+  width: 96px;
+  flex: none;
+}
+
+.modal__row span:last-child {
+  font-weight: 400;
+}
+
+/* --- the target inspector -------------------------------------------------- */
+
+.modal__target {
+  flex: none;
+  border: 1px solid var(--rule);
+}
+
+.modal__crop {
+  height: 220px;
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-camera);
+}
+
+.modal__readings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-6);
+  flex: none;
+}
+
+.reading {
+  border: 1px solid var(--rule);
+  padding: var(--space-5) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.reading__label {
+  font-size: var(--text-micro);
+  font-weight: 700;
+  letter-spacing: var(--tracking-label);
+  color: var(--ink-muted);
+}
+
+.reading__value {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+}
+
+.reading__value b {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.reading__badge {
+  padding: 2px var(--space-4);
+  font-weight: 700;
+  font-size: var(--text-small);
+  align-self: center;
+}
+
+.reading__bar {
+  height: 6px;
+  background: var(--surface-active);
+}
+
+.reading__bar span {
+  display: block;
+  height: 100%;
+}
+
+.reading__steps {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.reading__steps span {
+  flex: 1;
+  height: 6px;
+  background: var(--surface-active);
+}
+
+.reading__scale {
+  display: flex;
+  gap: var(--space-5);
+  font-size: var(--text-micro);
+  color: var(--ink-muted);
+}
+
+.reading__scale li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.reading__scale span {
+  width: 8px;
+  height: 8px;
+}
+
+.modal__assessment {
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--hairline);
+  padding: var(--space-7) var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  overflow: hidden;
+}
+
+.modal__assessment-title {
+  font-size: var(--text-lead);
+  font-weight: 700;
+  letter-spacing: var(--tracking-title);
+}
+
+.modal__assessment-text {
+  font-size: var(--text-lead);
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.modal__provenance {
+  font-size: var(--text-small);
+  line-height: 1.5;
+}
+
+/* --- rationale and actions ------------------------------------------------ */
+
+.modal__rationale {
+  flex: none;
+  margin: var(--space-6) var(--space-9) 0;
+  padding: var(--space-5) var(--space-6);
+  border: 1px solid var(--rule);
+  background: var(--surface-sunken);
+}
+
+.modal__rationale-title {
+  font-size: var(--text-micro);
+  font-weight: 700;
+  letter-spacing: var(--tracking-label);
+  margin-bottom: 3px;
+}
+
+.modal__rationale p,
+.modal__rationale li {
+  text-wrap: pretty;
+}
+
+.modal__actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-6) var(--space-9);
+  margin-top: var(--space-6);
+  border-top: var(--rule-width) solid var(--rule);
+}
+
+.modal__note {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+}
+
+.modal__note .input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Tablet and below: the camera goes full width on top and the detail panel below
+ * it, because a 45/55 split at 1024 px leaves neither side usable. */
+@media (max-width: 1100px) {
+  .modal {
+    inset: 16px;
+  }
+
+  .modal__body {
+    flex-direction: column;
+    padding: var(--space-6) var(--space-7) 0;
+    overflow-y: auto;
+  }
+
+  .modal__camera {
+    width: 100% !important;
+    height: 220px;
+    flex: none;
+  }
+
+  .modal__chart {
+    height: 200px;
+  }
+
+  .modal__rationale,
+  .modal__actions {
+    margin-left: var(--space-7);
+    margin-right: var(--space-7);
+  }
+
+  .modal__actions {
+    flex-wrap: wrap;
+    padding: var(--space-5) var(--space-7);
+  }
+
+  .modal__note {
+    order: 10;
+    flex-basis: 100%;
+  }
+
+  @keyframes modal-panel-in {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+@media (max-width: 720px) {
+  .modal__readings {
+    grid-template-columns: 1fr;
+  }
+
+  .modal__title {
+    font-size: var(--text-figure);
+  }
+}

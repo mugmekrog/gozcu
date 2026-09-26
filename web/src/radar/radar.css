@@ -1,0 +1,88 @@
+.radar {
+  width: 100%;
+  height: 100%;
+  display: block;
+  /* The map does not scroll or select; dragging it should feel like a map. */
+  user-select: none;
+  touch-action: manipulation;
+}
+
+/* --- the sweep: the only unprompted motion on the display ----------------- */
+
+.radar-sweep {
+  transform-origin: 50% 50%;
+  animation: radar-rotate 10s linear infinite;
+}
+
+@keyframes radar-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* --- zones ---------------------------------------------------------------- */
+
+.radar-zone--interactive {
+  cursor: pointer;
+}
+
+.radar-zone--interactive:hover circle:nth-child(2) {
+  fill-opacity: 0.24;
+}
+
+.radar-zone:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.radar-zone__pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: radar-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes radar-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 0.35;
+  }
+}
+
+/* --- frames and vehicles -------------------------------------------------- */
+
+.radar-frame,
+.radar-vehicle {
+  cursor: pointer;
+}
+
+.radar-frame:focus-visible,
+.radar-vehicle:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.radar-frame:hover rect:first-of-type {
+  fill: var(--ground);
+}
+
+/* An operator who has asked for less motion gets a still display. The sweep is
+ * decoration; the pulse is a warning, so it degrades to a solid ring rather
+ * than disappearing. */
+@media (prefers-reduced-motion: reduce) {
+  .radar-sweep {
+    animation: none;
+    opacity: 0.5;
+  }
+
+  .radar-zone__pulse {
+    animation: none;
+  }
+}

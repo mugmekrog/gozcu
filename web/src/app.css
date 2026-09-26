@@ -1,0 +1,142 @@
+.app {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.app__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: var(--space-6);
+  padding: var(--space-6);
+}
+
+.app__map {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+/* The stage holds whichever view is active plus the map's overlays. Every view
+ * absolutely fills it, so switching views cannot shift the chrome around it. */
+.app__stage {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  background: var(--surface-map);
+  overflow: hidden;
+}
+
+.app__column {
+  width: var(--column-w);
+  flex: none;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.app__column-kicker {
+  margin-bottom: calc(var(--space-3) * -1);
+}
+
+/* The brief is the only panel that grows; the others are their content's height,
+ * so a long brief takes the slack instead of every panel stretching. */
+.app__column .brief {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app__column .brief__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.app__camera {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+}
+
+.app__camera-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-6);
+  border-bottom: var(--rule-width) solid var(--rule);
+}
+
+.app__camera-body {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+/* --- the boot gate -------------------------------------------------------- */
+
+.app-gate {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--space-5);
+  padding: var(--space-10);
+  max-width: 68ch;
+}
+
+.app-gate__hint {
+  font-size: var(--text-small);
+  text-wrap: pretty;
+}
+
+/* --- tablet: the column moves below the map ------------------------------- */
+
+@media (max-width: 1100px) {
+  .app__body {
+    flex-direction: column;
+    overflow-y: auto;
+    gap: var(--space-5);
+    padding: var(--space-5);
+  }
+
+  .app__map {
+    flex: none;
+    height: 440px;
+  }
+
+  .app__column {
+    width: auto;
+    flex: none;
+  }
+
+  .app__column .brief {
+    flex: none;
+  }
+
+  .app__column .brief__body {
+    overflow: visible;
+  }
+}
+
+@media (max-width: 720px) {
+  .app__body {
+    padding: var(--space-4);
+    gap: var(--space-4);
+  }
+
+  .app__map {
+    height: 360px;
+  }
+}

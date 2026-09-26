@@ -1,0 +1,40 @@
+.ask {
+  flex: none;
+}
+
+.ask__form {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-4) var(--space-5);
+}
+
+.ask__label {
+  font-size: var(--text-small);
+  font-weight: 700;
+  letter-spacing: var(--tracking-label);
+  white-space: nowrap;
+}
+
+.ask__input {
+  flex: 1;
+  height: var(--control-h-lg);
+  min-width: 0;
+}
+
+.ask__input:disabled {
+  background: var(--surface-sunken);
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+
+.ask__answer,
+.ask__error {
+  padding: 0 var(--space-5) var(--space-5);
+  font-size: var(--text-dense);
+  text-wrap: pretty;
+}
+
+.ask__error {
+  color: var(--risk-threat-deep);
+}

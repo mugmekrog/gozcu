@@ -1,0 +1,36 @@
+.app-header {
+  height: var(--header-h);
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-7);
+  padding: 0 var(--space-8);
+  background: var(--surface);
+  border-bottom: var(--rule-width) solid var(--rule);
+}
+
+.app-header__brand {
+  font-weight: 700;
+  font-size: var(--text-lead);
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.app-header__pills {
+  display: flex;
+  gap: var(--space-3);
+}
+
+/* Below the tablet breakpoint the provenance pills lose their labels before the
+ * brand does, because the brand is what tells an operator which system they are
+ * looking at. */
+@media (max-width: 720px) {
+  .app-header {
+    gap: var(--space-4);
+    padding: 0 var(--space-6);
+  }
+
+  .app-header__pills {
+    display: none;
+  }
+}

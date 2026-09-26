@@ -1,0 +1,52 @@
+.target-frame {
+  flex: none;
+}
+
+.target-frame__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.target-frame__select {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: var(--control-h-lg);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--hairline);
+  font-size: var(--text-small);
+}
+
+.target-frame__select:focus-within {
+  border-color: var(--ink);
+}
+
+.target-frame__select select {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  color: inherit;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.target-frame__diamond {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  transform: rotate(45deg);
+}
+
+.target-frame__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.target-frame__meta {
+  font-size: var(--text-micro);
+}

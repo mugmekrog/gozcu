@@ -1,0 +1,94 @@
+.agent-steps {
+  flex: none;
+}
+
+.agent-steps__toggle {
+  font-weight: 400;
+  letter-spacing: normal;
+  color: var(--ink-muted);
+}
+
+.agent-steps__toggle:hover {
+  color: var(--ink);
+}
+
+.agent-steps__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.agent-steps__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid transparent;
+}
+
+.agent-steps__icon {
+  width: 14px;
+  flex: none;
+  font-weight: 700;
+}
+
+.agent-steps__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.agent-steps__title {
+  display: block;
+}
+
+.agent-steps__detail {
+  display: block;
+  font-size: var(--text-dense);
+  color: var(--ink-muted);
+}
+
+.agent-steps__time {
+  flex: none;
+  font-size: var(--text-micro);
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* One row style per state. The three that mean something went differently -- a
+ * tool call, a refused report, a failed gateway -- each get their own colour and
+ * their own icon, so the list is scannable for trouble. */
+
+.agent-steps__row[data-state='active'] {
+  background: var(--ground);
+  border-color: var(--hairline);
+  font-weight: 700;
+}
+
+.agent-steps__row[data-state='pending'] {
+  color: var(--ink-faint);
+}
+
+.agent-steps__row[data-state='tool'] {
+  margin-left: var(--space-9);
+  background: rgba(25, 129, 230, 0.08);
+  border-color: var(--risk-safe);
+  color: var(--risk-safe-ink);
+  font-weight: 700;
+}
+
+.agent-steps__row[data-state='warn'] {
+  background: rgba(245, 183, 83, 0.16);
+  border-color: var(--risk-review);
+  color: var(--risk-review-ink);
+  font-weight: 700;
+}
+
+.agent-steps__row[data-state='error'] {
+  background: rgba(252, 48, 48, 0.07);
+  border-color: var(--risk-threat);
+  color: var(--risk-threat-deep);
+  font-weight: 700;
+}

@@ -1,0 +1,129 @@
+/* Visual tokens (PLAN F0.3: one source of truth).
+ *
+ * Every value here was read off the wireframe set in `Sentinel system
+ * wireframes.zip`, which is the authority for this UI. Where PLAN 7.3.1
+ * disagrees -- it specifies a dark #0A0F14 display with a diagonal-slash CLEAR
+ * glyph -- the wireframes win, and the divergence is recorded in
+ * logs/step_frontend_development_logs.md.
+ *
+ * The scheme's one rule: colour means risk. Nothing else in the interface is
+ * allowed to be coloured, so a red pixel anywhere is always a threat. Terrain
+ * green and the pin identity palette are the two carve-outs, and both are
+ * visually distinct from the three risk hues.
+ */
+
+:root {
+  /* --- ground and surfaces ------------------------------------------------ */
+  --ground: #f1f5f9;
+  --surface: #ffffff;
+  --surface-sunken: #f8fafc;
+  --surface-map: #f8f9fa;
+  --surface-active: #e2e8f0;
+  --surface-camera: #cbd5e1;
+
+  /* --- ink ---------------------------------------------------------------- */
+  --ink: #1e293b;
+  --ink-body: #334155;
+  --ink-muted: #64748b;
+  --ink-faint: #94a3b8;
+  --ink-inverse: #ffffff;
+
+  /* --- rules: 2px for sections, 1px for rows ------------------------------ */
+  --rule: #e2e8f0;
+  --rule-strong: #1e293b;
+  --hairline: #cbd5e1;
+  --control-border: #94a3b8;
+  --rule-width: 2px;
+
+  /* --- risk. The only colours that carry meaning. ------------------------- */
+  --risk-threat: #fc3030;
+  --risk-threat-ink: #d42222; /* threat red on white at body sizes: 4.6:1 */
+  --risk-threat-deep: #b42318;
+  --risk-review: #f5b753;
+  --risk-review-ink: #9a6212; /* review amber is too light for text; use this */
+  --risk-review-deep: #6b430a;
+  --risk-review-wash: #fef6e7;
+  --risk-safe: #1981e6;
+  --risk-safe-ink: #1467b8;
+
+  /* --- terrain: the base and the protected zones -------------------------- */
+  --terrain: #3a913f;
+  --terrain-deep: #2f6f33;
+  --terrain-light: #6db871;
+
+  /* --- pin identity. Paul Tol's qualitative set: safe for the common forms
+         of colour blindness, and deliberately unlike the three risk hues so a
+         pinned vehicle never reads as a risk level. Six is the hard ceiling. */
+  --pin-1: #332288;
+  --pin-2: #44aa99;
+  --pin-3: #aa4499;
+  --pin-4: #882255;
+  --pin-5: #88ccee;
+  --pin-6: #999933;
+
+  /* --- type. One family everywhere: the wireframes are set in the system
+         monospace, and a webfont would break the offline requirement. ------ */
+  --font: ui-monospace, 'Cascadia Mono', Consolas, 'SF Mono', Menlo, monospace;
+  --text-micro: 10px;
+  --text-dense: 10.5px;
+  --text-small: 11px;
+  --text-body: 12px;
+  --text-lead: 13px;
+  --text-figure: 15px;
+  --text-title: 20px;
+  --text-score: 26px;
+  --text-clock: 30px;
+  --leading: 1.4;
+  --leading-tight: 1.25;
+  --tracking-label: 0.06em;
+  --tracking-title: 0.04em;
+  --tracking-kicker: 0.08em;
+
+  /* --- space. 2px base step, as the wireframes' dense chrome requires. ---- */
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 10px;
+  --space-6: 12px;
+  --space-7: 14px;
+  --space-8: 16px;
+  --space-9: 18px;
+  --space-10: 24px;
+
+  /* --- chrome dimensions, fixed by the wireframes ------------------------- */
+  --header-h: 48px;
+  --toolbar-h: 44px;
+  --control-h: 28px;
+  --control-h-lg: 30px;
+  --action-h: 34px;
+  --transport-h: 32px;
+  --column-w: 430px;
+  --menu-w: 230px;
+  --overlay-w: 310px;
+  --pinlist-w: 220px;
+
+  /* --- elevation. Only overlays float; nothing else does. ----------------- */
+  --lift-panel: 0 4px 14px rgba(15, 23, 42, 0.1);
+  --lift-overlay: 0 6px 18px rgba(15, 23, 42, 0.14);
+  --lift-menu: 6px 0 18px rgba(15, 23, 42, 0.12);
+  --lift-modal: 0 20px 50px rgba(15, 23, 42, 0.35);
+  --lift-toast: 0 8px 24px rgba(15, 23, 42, 0.25);
+  --scrim: rgba(15, 23, 42, 0.55);
+  --scrim-light: rgba(30, 41, 59, 0.22);
+
+  /* --- radius. Zero, everywhere, on purpose. ------------------------------ */
+  --radius: 0;
+
+  /* --- motion. Two durations: one for a panel, one for a layout shift. ---- */
+  --dur-quick: 160ms;
+  --dur-shift: 500ms;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-quick: 0ms;
+    --dur-shift: 0ms;
+  }
+}

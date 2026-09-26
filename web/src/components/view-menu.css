@@ -1,0 +1,79 @@
+.view-menu__scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim-light);
+  z-index: 2;
+}
+
+.view-menu {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--menu-w);
+  z-index: 3;
+  background: var(--surface);
+  border-right: var(--rule-width) solid var(--rule);
+  box-shadow: var(--lift-menu);
+  display: flex;
+  flex-direction: column;
+  animation: view-menu-in var(--dur-quick) var(--ease);
+}
+
+@keyframes view-menu-in {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.view-menu__head {
+  display: flex;
+  align-items: center;
+  padding: var(--space-5) var(--space-6);
+  border-bottom: var(--rule-width) solid var(--rule);
+  font-size: var(--text-micro);
+  font-weight: 700;
+  letter-spacing: var(--tracking-label);
+}
+
+.view-menu__close {
+  color: var(--ink-muted);
+  font-weight: 400;
+}
+
+.view-menu__close:hover {
+  color: var(--ink);
+}
+
+.view-menu__item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: var(--space-5) var(--space-6);
+  border-bottom: 1px solid var(--rule);
+  border-left: 3px solid transparent;
+}
+
+.view-menu__item:hover {
+  background: var(--surface-sunken);
+}
+
+/* The active view is marked by a terrain-green edge, not by a risk colour: which
+ * view you are in is not a risk state. */
+.view-menu__item[data-current='true'] {
+  border-left-color: var(--terrain);
+  background: var(--ground);
+}
+
+.view-menu__name {
+  font-weight: 700;
+}
+
+.view-menu__desc {
+  font-size: var(--text-dense);
+  color: var(--ink-muted);
+}

@@ -1,0 +1,67 @@
+.infobox {
+  position: absolute;
+  right: var(--space-6);
+  bottom: var(--space-6);
+  width: var(--overlay-w);
+  z-index: 1;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--lift-overlay);
+}
+
+.infobox__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-6);
+  border-bottom: var(--rule-width) solid var(--rule);
+}
+
+.infobox__id {
+  font-size: var(--text-lead);
+}
+
+.infobox__close {
+  color: var(--ink-muted);
+  padding: 0 var(--space-1);
+}
+
+.infobox__close:hover {
+  color: var(--ink);
+}
+
+.infobox__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4) var(--space-6);
+  padding: var(--space-5) var(--space-6);
+  margin: 0;
+}
+
+.infobox__grid dd {
+  margin: 0;
+}
+
+.infobox__note {
+  padding: 0 var(--space-6) var(--space-5);
+  font-size: var(--text-dense);
+  color: var(--ink-muted);
+  text-wrap: pretty;
+}
+
+.infobox__actions {
+  display: flex;
+  gap: var(--space-3);
+  padding: 0 var(--space-6) var(--space-6);
+}
+
+/* On a narrow viewport the card becomes a full-width sheet at the bottom of the
+ * map: at 310 px fixed it would cover most of a tablet's map area. */
+@media (max-width: 720px) {
+  .infobox {
+    left: var(--space-4);
+    right: var(--space-4);
+    bottom: var(--space-4);
+    width: auto;
+  }
+}

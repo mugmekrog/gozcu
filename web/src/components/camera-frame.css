@@ -1,0 +1,86 @@
+.camera {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--surface-camera);
+}
+
+/* The image and the overlay are both stretched to the container and both letterbox
+ * the same way, so a box drawn in source pixels lands on the vehicle. */
+.camera__image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: transform var(--dur-shift) var(--ease);
+}
+
+.camera__overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.camera__box {
+  cursor: pointer;
+}
+
+.camera__box:hover rect {
+  stroke-width: 6;
+}
+
+.camera__box:focus-visible {
+  outline: 2px solid var(--ink-inverse);
+  outline-offset: 2px;
+}
+
+.camera__missing {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-8);
+  text-align: center;
+}
+
+.camera__label {
+  position: absolute;
+  left: var(--space-5);
+  top: var(--space-5);
+  padding: var(--space-2) var(--space-5);
+  background: rgba(30, 41, 59, 0.82);
+  color: var(--ink-inverse);
+  font-size: var(--text-small);
+}
+
+.camera__legend {
+  position: absolute;
+  right: var(--space-5);
+  top: var(--space-5);
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-2) var(--space-4);
+  background: rgba(255, 255, 255, 0.92);
+  font-size: var(--text-micro);
+}
+
+.camera__hint {
+  position: absolute;
+  left: var(--space-6);
+  bottom: var(--space-6);
+}
+
+.camera__hint-text {
+  display: inline-block;
+  padding: var(--space-3) var(--space-5);
+  background: var(--surface);
+  border: 1px dashed var(--ink);
+  font-weight: 700;
+}

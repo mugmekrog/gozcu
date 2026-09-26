@@ -1,0 +1,70 @@
+.logs-view {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-5) var(--space-6);
+  background: var(--surface);
+  overflow-y: auto;
+  font-size: var(--text-dense);
+}
+
+.logs-view__table {
+  font-size: var(--text-dense);
+}
+
+.logs-view__table tbody th {
+  font-weight: 700;
+  text-align: left;
+}
+
+.logs-view__table tbody tr {
+  vertical-align: top;
+}
+
+.logs-view__alert-cell,
+.logs-view__agent-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  white-space: nowrap;
+}
+
+.logs-view__text {
+  color: var(--ink-body);
+  text-wrap: pretty;
+  max-width: 44ch;
+}
+
+.logs-view__verdict {
+  max-width: 36ch;
+  text-wrap: pretty;
+}
+
+/* Provenance by border style, not colour: solid is official, dashed is third
+ * party. Colour is spoken for by risk, and a report's source is not a risk. */
+.logs-view__source {
+  display: inline-block;
+  padding: 0 var(--space-3);
+  font-size: var(--text-micro);
+  border: 1px solid var(--ink-muted);
+}
+
+.logs-view__source[data-source='third_party'] {
+  border-style: dashed;
+}
+
+.logs-view__empty {
+  padding: var(--space-6) 0;
+}
+
+@media (max-width: 1100px) {
+  .logs-view__text {
+    max-width: 30ch;
+  }
+
+  .logs-view__verdict {
+    max-width: 26ch;
+  }
+}

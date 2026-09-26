@@ -1,0 +1,84 @@
+.motion-view {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-6);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.motion-view__chart {
+  flex: none;
+  border: 1px solid var(--rule);
+}
+
+.motion-view__chart-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-6);
+  border-bottom: var(--rule-width) solid var(--rule);
+  font-size: var(--text-small);
+}
+
+.motion-view__band-key {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink-muted);
+}
+
+.motion-view__band-swatch {
+  width: 14px;
+  height: 10px;
+  background: var(--risk-review);
+  opacity: 0.45;
+}
+
+.motion-view__chart-body {
+  height: 232px;
+  padding: var(--space-2) var(--space-4);
+}
+
+.motion-view__empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+  justify-content: center;
+  height: 100%;
+  padding: var(--space-6);
+}
+
+.motion-view__table {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* The header stays put while the table scrolls: the column a figure belongs to
+ * is not guessable from the figure itself. */
+.motion-view__table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 1;
+}
+
+.motion-view__table tbody th {
+  font-weight: inherit;
+  text-align: left;
+}
+
+@media (max-width: 820px) {
+  .motion-view {
+    padding: var(--space-4);
+    gap: var(--space-4);
+  }
+
+  .motion-view__chart-body {
+    height: 180px;
+  }
+}

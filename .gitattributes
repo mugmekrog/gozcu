@@ -1,0 +1,12 @@
+# Normalise line endings so a Windows and a Linux checkout produce identical
+# diffs. Without this every file in the first commit shows as changed for the
+# next person who touches it on a different OS.
+* text=auto eol=lf
+
+# Binary: never normalise, never diff as text.
+*.jpg   binary
+*.jpeg  binary
+*.png   binary
+*.pdf   binary
+*.zip   binary
+*.csv   text eol=lf

@@ -1,0 +1,128 @@
+.brief__chip {
+  padding: 0 var(--space-3);
+  font-size: var(--text-micro);
+  font-weight: 400;
+  letter-spacing: normal;
+  border: 1px solid var(--hairline);
+  color: var(--ink-muted);
+}
+
+/* The rules-only chip is the honesty marker, so it carries ink weight rather
+ * than sitting back as a quiet note. */
+.brief__chip--rules {
+  border-color: var(--ink);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.brief__body {
+  padding: var(--space-4) var(--space-6) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  font-size: var(--text-dense);
+  line-height: 1.35;
+}
+
+.brief__verdict {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.brief__score {
+  font-size: var(--text-score);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.brief__score-max {
+  font-size: var(--text-body);
+  color: var(--ink-muted);
+  font-weight: 400;
+}
+
+.brief__headline {
+  font-size: var(--text-body);
+  font-weight: 700;
+  text-wrap: pretty;
+}
+
+.brief__summary {
+  color: var(--ink-body);
+  text-wrap: pretty;
+}
+
+/* Dissent is bordered, not coloured: the disagreement is between two assessments,
+ * and tinting it would imply a risk level of its own. */
+.brief__dissent {
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--ink);
+  background: var(--surface-sunken);
+  text-wrap: pretty;
+}
+
+.brief__section {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.brief__section-title {
+  font-size: var(--text-micro);
+  font-weight: 700;
+  letter-spacing: var(--tracking-label);
+  color: var(--ink-muted);
+}
+
+.brief__section li {
+  text-wrap: pretty;
+}
+
+.brief__cite:hover {
+  background: var(--surface-sunken);
+}
+
+.brief__actions li {
+  text-wrap: pretty;
+}
+
+.brief__terms li {
+  display: flex;
+  gap: var(--space-4);
+  padding: 1px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.brief__terms b {
+  font-variant-numeric: tabular-nums;
+}
+
+.brief__total {
+  display: flex;
+  gap: var(--space-4);
+  margin-top: var(--space-2);
+  padding: 3px var(--space-3);
+  background: var(--ground);
+  border: 1px solid var(--hairline);
+  text-wrap: pretty;
+}
+
+.brief__total span {
+  flex: 1;
+}
+
+.brief__footnote {
+  margin-top: var(--space-2);
+  font-size: var(--text-micro);
+  text-wrap: pretty;
+}
+
+.brief__empty,
+.brief__error {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  text-wrap: pretty;
+}
