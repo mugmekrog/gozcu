@@ -1,6 +1,6 @@
 /* The header bar: identity, provenance pills, and the LLM brief switch.
  *
- * The two pills are the honesty row. `dedektör: yolo` names where the detections
+ * The two pills are the honesty row. `dedektör: YOLO + RF-DETR` names where the detections
  * came from, and the LLM pill says whether a brief is model output or the
  * deterministic rule template -- which is the difference between "the agent
  * judged this" and "the rules did", and an operator is entitled to know which

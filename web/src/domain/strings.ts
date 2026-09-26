@@ -15,7 +15,7 @@
 export const T = {
   app: {
     title: 'SENTINEL · ÜS RİSK AJANI',
-    detector: 'dedektör: yolo',
+    detector: 'dedektör: YOLO + RF-DETR',
     llmOn: 'LLM: bağlı',
     llmOff: 'LLM: kapalı (kural tabanlı)',
     llmBrief: 'LLM brief',

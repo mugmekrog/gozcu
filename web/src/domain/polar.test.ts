@@ -61,9 +61,15 @@ describe('bearingOf and rangeOf', () => {
 });
 
 describe('ringsFor', () => {
-  it('steps by 1 km up to 8 and by 2 beyond', () => {
+  it('steps by half a km to 2, by 1 km to 8 and by 2 beyond', () => {
+    expect(ringsFor(1)).toEqual([0.5, 1]);
+    expect(ringsFor(2)).toEqual([0.5, 1, 1.5, 2]);
     expect(ringsFor(3)).toEqual([1, 2, 3]);
     expect(ringsFor(8)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     expect(ringsFor(12)).toEqual([2, 4, 6, 8, 10, 12]);
+  });
+
+  it('stops at the last whole ring inside a wheel-zoomed radius', () => {
+    expect(ringsFor(6.4)).toEqual([1, 2, 3, 4, 5, 6]);
   });
 });

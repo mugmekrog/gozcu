@@ -1,6 +1,6 @@
-/* The polar grid: roads, range rings, the sweep and the north mark.
+/* The polar grid: roads, range rings and the sweep.
  *
- * Memoised on the scale alone, because none of it moves with the clock. That is
+ * Memoised on the scale and the pan extent, because none of it moves with the clock. That is
  * the single biggest thing keeping the map cheap during playback: roughly 40
  * static nodes are built once per scale change and React skips the whole subtree
  * on every tick after that.
@@ -12,16 +12,24 @@ import { MAJOR_BEARINGS, ringsFor, VIEW, type Projection } from '@/domain/polar'
 /** Ring labels sit off the 022.5 bearing so they never collide with a spoke. */
 const LABEL_BEARING = 22.5;
 
-export const GridLayer = memo(function GridLayer({ projection }: { projection: Projection }) {
-  const rings = ringsFor(projection.scaleKm);
+export const GridLayer = memo(function GridLayer({
+  projection,
+  extentKm = projection.scaleKm,
+}: {
+  projection: Projection;
+  /** How far out roads and rings reach; beyond the scale only while panned. */
+  extentKm?: number;
+}) {
+  const rings = ringsFor(projection.scaleKm, extentKm);
   const edge = projection.scaleKm * 1.02;
+  const roadEdge = Math.max(edge, extentKm * 1.02);
 
   return (
     <g aria-hidden="true">
       {/* The eight approach roads, drawn as broad pale bands rather than lines:
           the zones sit on them, so they read as terrain, not as graticule. */}
       {MAJOR_BEARINGS.map((bearing) => {
-        const [x, y] = projection.polar(bearing, edge);
+        const [x, y] = projection.polar(bearing, roadEdge);
         return (
           <line
             key={`road-${bearing}`}
@@ -67,17 +75,6 @@ export const GridLayer = memo(function GridLayer({ projection }: { projection: P
           strokeOpacity={0.35}
         />
       </g>
-
-      <text
-        x={VIEW.w - 20}
-        y={26}
-        fontSize={13}
-        fontWeight={700}
-        textAnchor="end"
-        fill="var(--ink)"
-      >
-        K ↑
-      </text>
     </g>
   );
 });

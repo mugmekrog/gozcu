@@ -19,7 +19,8 @@ export interface MapToolbarProps {
   zones: readonly Zone[];
   zoneFilter: string | 'all';
   classFilter: VehicleClass | 'all';
-  scaleKm: ScaleKm;
+  /** The highlighted scale option; null while the wheel zoom is off-preset. */
+  scalePreset: ScaleKm | null;
   menuOpen: boolean;
   onMenuToggle: () => void;
   onZoneFilter: (value: string | 'all') => void;
@@ -32,7 +33,7 @@ export const MapToolbar = memo(function MapToolbar({
   zones,
   zoneFilter,
   classFilter,
-  scaleKm,
+  scalePreset,
   menuOpen,
   onMenuToggle,
   onZoneFilter,
@@ -113,7 +114,7 @@ export const MapToolbar = memo(function MapToolbar({
               key={option}
               type="button"
               className="seg__opt"
-              aria-pressed={option === scaleKm}
+              aria-pressed={option === scalePreset}
               onClick={() => onScale(option)}
             >
               {option}
