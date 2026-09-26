@@ -38,8 +38,35 @@ interface Pan {
 
 const NO_PAN: Pan = { eKm: 0, nKm: 0 };
 
-/** Match one ordinary 100 px wheel notch to the toolbar's 15% zoom step. */
-const WHEEL_ZOOM_PER_PX = Math.log(1.15) / 100;
+/** Zoom per wheel pixel: one ordinary notch (100 px) is about a 16% step. */
+const WHEEL_ZOOM_PER_PX = 0.0015;
+
+/** The radius the recentre button settles at, in kilometres. */
+const RECENTRE_KM = 2.25;
+
+/** Flight lengths: short for a wheel notch, longer for a jump across the map. */
+const WHEEL_FLIGHT_MS = 260;
+const JUMP_FLIGHT_MS = 480;
+
+/** Kilometres per SVG unit at a scale. */
+const kmPerUnit = (scaleKm: number) => 1 / projectionFor(scaleKm).unitsPerKm;
+
+const easeOutCubic = (t: number) => 1 - (1 - t) ** 3;
+
+interface Flight {
+  fromScale: number;
+  toScale: number;
+  fromPan: Pan;
+  toPan: Pan;
+  /**
+   * For a wheel zoom: the ground point (km) held under the cursor, and the
+   * cursor's offset from the view centre (SVG units). Pan is derived from it
+   * every frame so the point stays put all the way through the flight.
+   */
+  anchor: { eKm: number; nKm: number; dx: number; dy: number } | null;
+  start: number;
+  ms: number;
+}
 
 export const Radar = memo(function Radar() {
   const dataset = useAppStore((s) => s.dataset);
