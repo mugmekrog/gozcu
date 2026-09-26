@@ -39,10 +39,10 @@
   --risk-threat: #fc3030;
   --risk-threat-ink: #d42222; /* threat red on white at body sizes: 4.6:1 */
   --risk-threat-deep: #b42318;
-  --risk-review: #f5b753;
-  --risk-review-ink: #9a6212; /* review amber is too light for text; use this */
-  --risk-review-deep: #6b430a;
-  --risk-review-wash: #fef6e7;
+  --risk-review: #f2c94c;
+  --risk-review-ink: #806400;
+  --risk-review-deep: #604b00;
+  --risk-review-wash: #fff9dd;
   --risk-safe: #1981e6;
   --risk-safe-ink: #1467b8;
 

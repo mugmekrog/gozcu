@@ -24,7 +24,7 @@ export interface VehicleInfoboxProps {
   assessment: ZoneAssessmentRow | null;
   pinned: boolean;
   onSelectFrame: (imageId: string) => void;
-  onOpenMotion: () => void;
+  onInspect: () => void;
   onTogglePin: () => void;
   onClose: () => void;
 }
@@ -42,7 +42,7 @@ export const VehicleInfobox = memo(function VehicleInfobox({
   assessment,
   pinned,
   onSelectFrame,
-  onOpenMotion,
+  onInspect,
   onTogglePin,
   onClose,
 }: VehicleInfoboxProps) {
@@ -82,7 +82,7 @@ export const VehicleInfobox = memo(function VehicleInfobox({
           <dd className="figure">{fmt.speed(vehicle.sample.speed_mps)}</dd>
         </div>
         <div>
-          <dt className="label">{zone ? `${zone.name} · ETA` : T.vehicle.eta}</dt>
+          <dt className="label">{zone ? `${zone.name} · varış` : T.vehicle.eta}</dt>
           <dd className="figure">{fmt.eta(assessment?.eta_entry_s ?? null)}</dd>
         </div>
         <div>
@@ -96,7 +96,7 @@ export const VehicleInfobox = memo(function VehicleInfobox({
 
       {vehicle.level === null && (
         <p className="infobox__note">
-          Bu araç henüz bir drone karesinde değerlendirilmedi; konum iz kaydından geliyor.
+          Bu araç için görüntü karesi bulunmadı; konum iz kaydından geliyor.
         </p>
       )}
 
@@ -109,9 +109,9 @@ export const VehicleInfobox = memo(function VehicleInfobox({
         >
           {T.vehicle.selectFrame}
         </button>
-        <button type="button" className="btn btn--small" onClick={onOpenMotion}>
-          {T.vehicle.toMotion}
-        </button>
+        {vehicle.alert && <button type="button" className="btn btn--small" onClick={onInspect}>
+          Uyarıyı incele
+        </button>}
         <button
           type="button"
           className={pinned ? 'btn btn--small' : 'btn btn--small btn--primary'}

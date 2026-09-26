@@ -1,9 +1,7 @@
 /* Risk presentation: level -> shape, colour and badge.
  *
- * This is the one place that decides how a risk level looks. Every screen -- map
- * symbol, table glyph, badge, timeline diamond, modal frame -- reads from here,
- * so the promise that "colour means risk" is enforced by construction rather
- * than by remembering.
+ * These styles serve badges and table glyphs. The map's vehicle symbols use
+ * class for shape and warning level for colour.
  *
  * Accessibility (PLAN 7.3.1): level is carried by *shape as well as colour*.
  * The glyph is never decoration -- it is the redundant encoding, so the display
@@ -121,7 +119,7 @@ export function riskRank(level: Level | null): number {
   }
 }
 
-/** The map symbol a level draws, as a shape only. Deliberately not a colour. */
+/** Shape used by risk badges and table glyphs. */
 export function shapeOf(level: Level | null): RiskShape {
   switch (level) {
     case 'ALERT':

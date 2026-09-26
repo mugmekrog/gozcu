@@ -1,4 +1,4 @@
-# web — Sentinel tactical display and review UI
+# web — Gözcü harita ve inceleme arayüzü
 
 Built to the wireframe set in `Sentinel system wireframes.zip`, which is the
 authority for this UI. Where PLAN §7.3 disagrees with the wireframes, the
@@ -27,7 +27,7 @@ still works; the camera view shows a placeholder and says why.
 
 ```bash
 npm run typecheck   # tsc, no emit
-npm test            # 87 tests, no network
+npm test            # 85 tests, no network
 npm run build       # production bundle
 ```
 
@@ -52,22 +52,28 @@ src/
 ├── api/         the data seam: port + fixture and http adapters
 ├── domain/      pure logic — risk bands, polar projection, track sampling,
 │                brief assembly, formatting, the Turkish string table
-├── store/       Zustand state and the simulation clock
+├── store/       Zustand state and the manual time cursor
 ├── radar/       the SVG tactical display, one file per layer
 ├── components/  panels and controls
-├── views/       Harita / Hareket / Kayıtlar
+├── views/       Harita / Kayıtlar
 └── styles/      tokens.css is the single source of visual truth
 ```
 
 Nothing is fetched from a CDN at runtime and the type is the system monospace, so
 the demo works with the network off (PLAN §F4.3).
 
-## Demo hotkeys
+## Harita kontrolleri
+
+Fare tekerleği veya `+ / −` düğmeleri haritayı 2–16 km aralığında yakınlaştırır.
+Otomobil kare, minibüs üçgen, kamyon yıldız, otobüs yuvarlakla gösterilir.
+Mavi güvenli, sarı şüpheli, kırmızı tehlike düzeyidir. Gri işaretler henüz
+görüntü karesinde sınıflandırılmamış izlerdir. Zaman çizelgesi elle sürüklenir;
+kare işaretleri yalnızca çekim zamanını gösterir. Bir aracı seçince iz kaydı,
+varış süresi ve varsa uyarıyı inceleme düğmesi açılır.
+
+## Kısayollar
 
 | Key | Action |
 |---|---|
-| `Space` | play / pause |
 | `←` `→` | step the clock 5 minutes (`Shift` for 30) |
-| `M` `H` `K` | Harita / Hareket / Kayıtlar |
-| `D` | evaluate the selected frame |
 | `Esc` | close the modal, then the camera, then the selection |

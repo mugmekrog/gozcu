@@ -12,7 +12,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '@/App';
 import { FixtureApi } from './fixture';
@@ -142,17 +142,13 @@ suite('FixtureApi against the exported data', () => {
     expect(map.textContent).toContain('MERKEZ US');
   });
 
-  it('evaluates a real frame end to end and shows the engine score', async () => {
+  it('shows the real frame warning through a selected vehicle', async () => {
     render(<App />);
-    await waitFor(() => expect(screen.getByText('AGENT OUTPUTS')).toBeTruthy(), {
+    await waitFor(() => expect(screen.getByRole('img', { name: /Bölge haritası/ })).toBeTruthy(), {
       timeout: 5000,
     });
-
-    await act(async () => {
-      screen.getByRole('button', { name: /Değerlendir/ }).click();
-    });
-
-    // img_008333 is the first frame: one ALERT on T0062 at priority 1.0.
+    fireEvent.click(screen.getByRole('button', { name: /T0062, / }));
+    await act(async () => { screen.getByRole('button', { name: 'Uyarıyı incele' }).click(); });
     await waitFor(() => expect(screen.getByRole('alertdialog')).toBeTruthy(), {
       timeout: 5000,
     });
@@ -160,7 +156,5 @@ suite('FixtureApi against the exported data', () => {
     expect(modal.textContent).toContain('KRİTİK TEHDİT ALGILANDI');
     expect(modal.textContent).toContain('Kuzeydogu Kavsagi');
     expect(document.body.textContent).toContain('100');
-    // And it is honest about where the text came from.
-    expect(document.body.textContent).toContain('kural tabanlı');
   });
 });

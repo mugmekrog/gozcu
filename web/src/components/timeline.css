@@ -2,20 +2,12 @@
   flex: none;
   display: flex;
   align-items: center;
-  gap: var(--space-8);
-  padding: var(--space-5) var(--space-7);
-  border-top: 1px solid var(--rule);
+  gap: var(--space-6);
+  padding: var(--space-4) var(--space-7) var(--space-3);
+  border-top: var(--rule-width) solid var(--rule);
   background: var(--surface);
-  box-shadow: 0 -1px 3px rgba(15, 23, 42, 0.05);
 }
-
-.timeline__transport {
-  height: var(--action-h);
-  padding: 0 var(--space-8);
-  font-weight: 700;
-  border-color: var(--ink);
-  white-space: nowrap;
-}
+.timeline__heading { color: var(--ink-muted); font-size: var(--text-small); font-weight: 700; white-space: nowrap; letter-spacing: .06em; }
 
 .timeline__axis {
   position: relative;
@@ -30,33 +22,22 @@
   position: absolute;
   left: 0;
   right: 0;
-  top: 20px;
-  height: 5px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-active);
+  top: 22px;
+  height: 1px;
+  background: var(--hairline);
 }
 
 .timeline__progress {
   position: absolute;
   left: 0;
-  top: 20px;
-  height: 5px;
-  border-radius: var(--radius-pill);
+  top: 21px;
+  height: 3px;
   background: var(--ink);
 }
 
-.timeline__band {
-  position: absolute;
-  opacity: 0.75;
-}
-
-/* Above the ticks and the scrubber so the diamonds take the click; the layer
- * itself lets clicks through to the scrubber between them. */
 .timeline__markers {
   position: absolute;
   inset: 0;
-  z-index: 2;
-  pointer-events: none;
 }
 
 .timeline__frame {
@@ -68,7 +49,7 @@
   transform: rotate(45deg);
   outline: 1px solid var(--surface);
   cursor: pointer;
-  pointer-events: auto;
+  background: var(--ink-faint);
 }
 
 .timeline__frame:hover {
@@ -77,6 +58,7 @@
 
 .timeline__frame--selected {
   outline: 2px solid var(--ink);
+  background: var(--ink);
 }
 
 .timeline__frame:focus-visible {
@@ -87,12 +69,11 @@
 .timeline__ticks {
   position: absolute;
   inset: 0;
-  pointer-events: none;
 }
 
 .timeline__tick {
   position: absolute;
-  top: 26px;
+  top: 23px;
   width: 1px;
   height: 5px;
   background: var(--hairline);
@@ -142,22 +123,19 @@
 .timeline__scrub::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
+  width: 10px;
+  height: 14px;
   background: var(--ink);
-  border: 3px solid var(--surface);
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.35);
+  border: 2px solid var(--surface);
   cursor: grab;
 }
 
 .timeline__scrub::-moz-range-thumb {
   width: 10px;
-  height: 10px;
-  border-radius: 50%;
+  height: 14px;
+  border-radius: 0;
   background: var(--ink);
-  border: 3px solid var(--surface);
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.35);
+  border: 2px solid var(--surface);
   cursor: grab;
 }
 
@@ -166,22 +144,11 @@
   outline-offset: 2px;
 }
 
-.timeline__speed {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex: none;
-}
-
 .timeline__clock {
   flex: none;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  padding: var(--space-3) var(--space-6);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-control);
-  background: var(--surface-sunken);
 }
 
 .timeline__clock-value {
@@ -197,16 +164,9 @@
     padding: var(--space-4) var(--space-5) var(--space-3);
   }
 
-  .timeline__speed .label {
-    display: none;
-  }
 }
 
 @media (max-width: 820px) {
-  .timeline__speed {
-    display: none;
-  }
-
   .timeline__clock-value {
     font-size: var(--text-score);
   }

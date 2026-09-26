@@ -36,22 +36,6 @@
   outline-offset: 2px;
 }
 
-/* --- the sweep: the only unprompted motion on the display ----------------- */
-
-.radar-sweep {
-  transform-origin: 50% 50%;
-  animation: radar-rotate 10s linear infinite;
-}
-
-@keyframes radar-rotate {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 /* --- zones ---------------------------------------------------------------- */
 
 .radar-zone--interactive {
@@ -102,15 +86,8 @@
   fill: var(--ground);
 }
 
-/* An operator who has asked for less motion gets a still display. The sweep is
- * decoration; the pulse is a warning, so it degrades to a solid ring rather
- * than disappearing. */
+/* The warning pulse becomes a static ring when motion is reduced. */
 @media (prefers-reduced-motion: reduce) {
-  .radar-sweep {
-    animation: none;
-    opacity: 0.5;
-  }
-
   .radar-zone__pulse {
     animation: none;
   }

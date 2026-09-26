@@ -9,8 +9,7 @@
  */
 
 import { memo } from 'react';
-import { GlyphChip } from '@/radar/Glyph';
-import { bandOf } from '@/domain/risk';
+import { bandOf, riskStyle } from '@/domain/risk';
 import { classLabel, T } from '@/domain/strings';
 import { PIN_COLOURS } from '@/radar/VehicleLayer';
 import { PIN_LIMIT } from '@/store/useAppStore';
@@ -58,7 +57,9 @@ export const PinList = memo(function PinList({
               </button>
               {vehicle ? (
                 <>
-                  <GlyphChip band={bandOf(vehicle.level, vehicle.score)} size={10} />
+                  <span style={{ color: riskStyle(bandOf(vehicle.level, vehicle.score)).color }} aria-hidden="true">
+                    {({ car: '■', van: '▲', truck: '★', bus: '●' } as Record<string, string>)[vehicle.cls ?? ''] ?? '·'}
+                  </span>
                   <span className="muted">{classLabel(vehicle.cls)}</span>
                 </>
               ) : (
