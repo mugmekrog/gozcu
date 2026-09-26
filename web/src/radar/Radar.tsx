@@ -13,6 +13,10 @@
  * to the zone in the zone filter, or to the base when none is chosen, and
  * settles at RECENTRE_KM.
  *
+ * With a zone chosen in the zone filter the map shows only what is in that zone:
+ * the frames taken over it and the vehicles currently inside it, both by
+ * position (see `nearestZoneId`), the same rule the timeline uses.
+ *
  * The mouse wheel is the only zoom control: continuous between MIN_ZOOM_KM and
  * MAX_ZOOM_KM, keeping the ground point under the cursor fixed. Every view
  * change is animated: each wheel notch retargets a short ease-out flight rather
@@ -33,7 +37,13 @@ import { GridLayer } from './GridLayer';
 import { BaseLayer, ZoneLayer } from './ZoneLayer';
 import { FrameLayer } from './FrameLayer';
 import { VehicleLayer } from './VehicleLayer';
-import { framesUpTo, liveVehiclesAt, type LiveVehicle } from '@/domain/live';
+import {
+  framesOverZone,
+  framesUpTo,
+  liveVehiclesAt,
+  nearestZoneId,
+  type LiveVehicle,
+} from '@/domain/live';
 import { MAX_ZOOM_KM, MIN_ZOOM_KM, projectionFor, VIEW } from '@/domain/polar';
 import { useAppStore } from '@/store/useAppStore';
 import './radar.css';
@@ -264,20 +274,30 @@ export const Radar = memo(function Radar() {
 
   const vehicles = useMemo<LiveVehicle[]>(() => {
     if (!dataset) return [];
-    return liveVehiclesAt({
+    const all = liveVehiclesAt({
       tMin,
       tracks,
       frames: dataset.frames,
       alertsByFrame,
       stationaryDispM: dataset.thresholds.stationary_disp_m,
       classFilter,
-      zoneFilter,
+      // The map filters by where a vehicle is, not by which zone its alert names.
+      zoneFilter: 'all',
     });
+    if (zoneFilter === 'all') return all;
+    return all.filter((v) => nearestZoneId(v.sample.enu, dataset.zones) === zoneFilter);
   }, [dataset, tracks, alertsByFrame, tMin, classFilter, zoneFilter]);
 
   const visibleFrames = useMemo(
-    () => (dataset ? framesUpTo(dataset.frames, tMin) : []),
-    [dataset, tMin],
+    () => {
+      if (!dataset) return [];
+      const frames =
+        zoneFilter === 'all'
+          ? dataset.frames
+          : framesOverZone(dataset.frames, dataset.zones, zoneFilter);
+      return framesUpTo(frames, tMin);
+    },
+    [dataset, tMin, zoneFilter],
   );
 
   /** Zones any live ALERT names. Drives the pulse. */

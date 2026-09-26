@@ -30,7 +30,7 @@ import { MotionView } from '@/views/MotionView';
 import { LogsView } from '@/views/LogsView';
 import { api } from '@/api';
 import { assembleBrief } from '@/domain/brief';
-import { liveVehiclesAt } from '@/domain/live';
+import { framesOverZone, liveVehiclesAt } from '@/domain/live';
 import { modalFor } from '@/domain/risk';
 import { windowOf } from '@/domain/tracks';
 import { zoneAssessmentFor } from '@/domain/live';
@@ -236,13 +236,13 @@ function Workspace() {
     store,
   ]);
 
-  /** The timeline follows the zone filter: only that zone's frames are marked. */
+  /** The timeline follows the zone filter: only frames taken over that zone. */
   const timelineFrames = useMemo(
     () =>
       zoneFilter === 'all'
         ? dataset.frames
-        : dataset.frames.filter((frame) => frame.zone_id === zoneFilter),
-    [dataset.frames, zoneFilter],
+        : framesOverZone(dataset.frames, dataset.zones, zoneFilter),
+    [dataset.frames, dataset.zones, zoneFilter],
   );
 
   /** Timeline bands: the selected vehicle's window, then each pinned one's. */
