@@ -83,7 +83,7 @@ export const BriefCard = memo(function BriefCard({
                   <span className="brief__score-max">/100</span>
                 </span>
                 <span className="muted">
-                  {T.agent.confidence}: {brief.confidence}
+                  Jev güveni: {brief.confidence}
                 </span>
               </div>
 
@@ -92,8 +92,8 @@ export const BriefCard = memo(function BriefCard({
 
               {brief.dissent && (
                 <p className="brief__dissent" role="note">
-                  <b>Ajan kural tabanıyla aynı fikirde değil.</b> Kural: {brief.dissent.baseline} ·
-                  Ajan: {brief.dissent.agent}. Gösterilen seviye ikisinin yükseği.
+                  <b>Jev kural tabanıyla aynı fikirde değil.</b> Kural: {brief.dissent.baseline} ·
+                  Jev: {brief.dissent.agent}. Gösterilen seviye ikisinin yükseği.
                   {brief.dissent.note && ` "${brief.dissent.note}"`}
                 </p>
               )}

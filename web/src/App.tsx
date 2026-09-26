@@ -62,6 +62,7 @@ function Workspace() {
   const selectTrack = useAppStore((s) => s.selectTrack);
   const togglePin = useAppStore((s) => s.togglePin);
   const openFrame = useAppStore((s) => s.openFrame);
+  const assess = useAppStore((s) => s.assess);
   const focusMap = useAppStore((s) => s.focusMap);
   const openModal = useAppStore((s) => s.openModal);
   const closeModal = useAppStore((s) => s.closeModal);
@@ -112,7 +113,15 @@ function Workspace() {
   const inspectVehicle = async () => {
     if (!selectedVehicle?.imageId || !selectedVehicle.alert) return;
     await openFrame(selectedVehicle.imageId);
-    openModal(selectedVehicle.alert.level === 'ALERT' ? 'threat' : 'review');
+    try {
+      await assess(selectedVehicle.imageId);
+    } catch (error) {
+      showToast({ message: error instanceof Error ? error.message : String(error) });
+    }
+    const alert = useAppStore.getState().frame?.alerts.find(
+      (item) => item.track_id === selectedVehicle.trackId,
+    ) ?? selectedVehicle.alert;
+    openModal(alert.level === 'ALERT' ? 'threat' : 'review');
   };
   const openCamera = () => {
     setCameraSelectedDetId(frame?.matches.find((match) => match.track_id === selectedTrackId)?.det_id ?? null);

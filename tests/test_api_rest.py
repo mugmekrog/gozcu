@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from fastapi.testclient import TestClient
 
@@ -91,7 +92,21 @@ def test_ask_copilot():
     assert len(data["answer"]) > 0
 
 
-def test_assess_stream():
+def test_assess_stream(monkeypatch):
+    from app.api import rest
+    from app.agents.jev import JevOutcome
+    from app.agents.threat_decisions import resolve_answers
+
+    class FakeJev:
+        def run(self, bundle):
+            return JevOutcome(resolve_answers(bundle, None), fallback_reason="test")
+
+    monkeypatch.setattr(rest, "get_jev_service", lambda cfg: FakeJev())
+    monkeypatch.setattr(
+        rest,
+        "run_situational_report",
+        lambda bundle, cfg: {"source": "rules", "image_summary": "Test report", "assessments": []},
+    )
     response = client.post("/agents/assess/img_000860")
     assert response.status_code == 200
     assert "application/x-ndjson" in response.headers["content-type"]
@@ -101,6 +116,52 @@ def test_assess_stream():
     assert "step" in types
     assert "brief" in types
     assert "done" in types
+
+
+def test_live_assess_stream_keeps_jev_raise_and_chat_report_separate(monkeypatch, tmp_path):
+    from app.api import rest
+    from app.agents.jev import JevOutcome
+    from app.agents.threat_decisions import resolve_answers
+
+    class FakeJev:
+        def run(self, bundle):
+            decisions = resolve_answers(
+                bundle,
+                {
+                    "T0009": {
+                        "type": "choice",
+                        "choice": "ALERT",
+                        "probabilities": {"CLEAR": 0.05, "WATCH": 0.05, "ALERT": 0.9},
+                        "confidence": 0.8,
+                    }
+                },
+            )
+            return JevOutcome(decisions)
+
+    monkeypatch.setattr(rest, "get_jev_service", lambda cfg: FakeJev(), raising=False)
+    monkeypatch.setattr(rest, "FIXTURES_DIR", tmp_path)
+    async def run_inline(func, *args):
+        return func(*args)
+
+    monkeypatch.setattr(rest, "_run_blocking", run_inline)
+    monkeypatch.setattr(
+        rest,
+        "run_situational_report",
+        lambda bundle, cfg: {"source": "llm", "image_summary": "Detailed report", "assessments": []},
+        raising=False,
+    )
+
+    async def collect():
+        response = await rest.assess_frame("img_002256")
+        return [json.loads(chunk) async for chunk in response.body_iterator]
+
+    events = asyncio.run(collect())
+    frame = next(event["frame"] for event in events if event["type"] == "decision")
+    brief = next(event["brief"] for event in events if event["type"] == "brief")
+
+    assert next(a for a in frame["alerts"] if a["track_id"] == "T0009")["level"] == "ALERT"
+    assert next(a for a in frame["alerts"] if a["track_id"] == "T0009")["jev_confidence"] == 0.8
+    assert brief["image_summary"] == "Detailed report"
 
 
 def test_decisions_workflow():

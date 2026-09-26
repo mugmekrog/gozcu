@@ -213,8 +213,10 @@ class Alert(_Model):
     zone_id: Optional[str] = None
     baseline_level: Level
     agent_level: Optional[Level] = None
+    jev_level: Optional[Level] = None
+    jev_confidence: Optional[Probability] = None
     level: Level
-    source: Literal["rules", "agent", "rules_fallback"]
+    source: Literal["rules", "agent", "jev", "rules_floor", "rules_fallback"]
     priority: Probability
     reasons: list[str] = Field(default_factory=list)
     agent_rationale: Optional[list[str]] = None

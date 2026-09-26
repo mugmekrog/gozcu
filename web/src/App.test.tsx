@@ -5,6 +5,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from './App';
 import { setApi } from './api';
+import { useAppStore } from './store/useAppStore';
 import type { AgentEvent, GoruApi } from './api/port';
 import type { Alert, DatasetInfo, Decision, FrameDetail, TrackHistory } from './domain/types';
 
@@ -357,5 +358,36 @@ describe('Harita odaklı arayüz', () => {
     fireEvent.click(vehicle);
     await act(async () => { screen.getByRole('button', { name: 'Uyarıyı incele' }).click(); });
     await waitFor(() => expect(screen.getByRole('alertdialog')).toBeTruthy());
+  });
+
+  it('shows the live Jev confidence and situational report when inspecting a warning', async () => {
+    class LiveFakeApi extends FakeApi {
+      override async *assess(imageId: string): AsyncIterable<AgentEvent> {
+        const live = frameDetail(imageId, true);
+        live.alerts = live.alerts.map((item) => ({
+          ...item,
+          jev_level: 'ALERT' as const,
+          jev_confidence: 0.81,
+          source: 'jev' as const,
+        }));
+        yield { type: 'decision', frame: live };
+        yield {
+          type: 'brief',
+          brief: { ...live.brief, source: 'llm', image_summary: 'Live situational report' },
+        };
+        yield { type: 'done', elapsedMs: 12, toolCalls: 0 };
+      }
+    }
+    setApi(new LiveFakeApi());
+    useAppStore.getState().closeModal();
+    useAppStore.getState().selectTrack(null);
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole('img', { name: /Bölge haritası/ })).toBeTruthy());
+    fireEvent.click(screen.getAllByRole('button', { name: /T0001, kamyon/ })[0]!);
+    await act(async () => { screen.getByRole('button', { name: 'Uyarıyı incele' }).click(); });
+
+    const modal = await screen.findByRole('alertdialog');
+    expect(modal.textContent).toContain('Jev güveni: %81');
+    expect(modal.textContent).toContain('Live situational report');
   });
 });

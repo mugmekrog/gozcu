@@ -202,7 +202,8 @@ export const AlertModal = memo(function AlertModal({
             </h2>
             <p className="modal__subtitle muted">
               {frame.image_id} · {brief.lead?.zone?.name ?? '—'} · {frame.capture_hhmm} ·{' '}
-              {threat ? `${T.band.critical} ${fmt.count(brief.score)}/100` : `${T.agent.confidence}: ${brief.confidence}`}
+              {threat ? `${T.band.critical} ${fmt.count(brief.score)}/100` : T.band.review}
+              {` · Jev güveni: ${brief.confidence}`}
             </p>
           </div>
           <div className="spacer" />
@@ -316,7 +317,7 @@ export const AlertModal = memo(function AlertModal({
 
               <div className="modal__readings">
                 <Reading
-                  label={T.modal.confidenceLevel}
+                  label="TESPİT GÜVENİ"
                   value={fmt.percent(target.score)}
                   caption={
                     target.score >= 0.7

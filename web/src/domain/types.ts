@@ -15,7 +15,7 @@ export type Level = 'ALERT' | 'WATCH' | 'CLEAR';
 export type VehicleClass = 'car' | 'van' | 'truck' | 'bus';
 export type ReportSource = 'official' | 'third_party';
 export type ReportConsistency = 'agrees' | 'contradicts' | 'unrelated';
-export type AlertSource = 'rules' | 'agent' | 'rules_fallback';
+export type AlertSource = 'rules' | 'agent' | 'jev' | 'rules_floor' | 'rules_fallback';
 export type DropReason = 'score<thr' | 'nms_suppressed' | 'area<min_m2';
 
 /** East/north metres from the base. The whole UI works in this frame. */
@@ -208,6 +208,8 @@ export interface Alert {
   stationary: boolean | null;
   baseline_level: Level;
   agent_level: Level | null;
+  jev_level?: Level | null;
+  jev_confidence?: number | null;
   level: Level;
   source: AlertSource;
   priority: number;
@@ -268,8 +270,9 @@ export interface ExpectedNotSeen {
 
 export interface BriefAssessment {
   track_id: string;
-  level: Level;
-  needs_attention: boolean;
+  /** Legacy fixture fields; live chat reports have no threat authority. */
+  level?: Level;
+  needs_attention?: boolean;
   rationale: string[];
   cited_ids: string[];
   report_conflicts: { report_id: string; why: string }[];
@@ -303,6 +306,8 @@ export interface DetectionFunnel {
 /** Everything one frame's evaluation produced. Fetched on demand, ~130 KB. */
 export interface FrameDetail {
   image_id: string;
+  /** Present for a live all CLEAR Jev decision, which has no alert row. */
+  jev_confidence?: number | null;
   capture_hhmm: string;
   width_px: number;
   height_px: number;

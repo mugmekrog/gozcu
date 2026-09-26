@@ -226,6 +226,31 @@ def test_valid_answer_is_accepted_and_audited(offline_cfg, bundle, tmp_path):
     assert json.loads(logged[0])["run_id"] == outcome.run.run_id
 
 
+def test_situational_report_cannot_assign_threat_levels(offline_cfg, bundle, tmp_path):
+    from app.agents.situational_report import SituationalReportPolicy
+
+    answer = {
+        "image_summary": "One vehicle needs closer review.",
+        "assessments": [
+            {
+                "track_id": bundle.vehicles[0].track_id,
+                "rationale": ["Detection and movement record agree."],
+                "cited_ids": [bundle.vehicles[0].track_id],
+                "report_conflicts": [],
+            }
+        ],
+    }
+    gateway = ScriptedGateway([json.dumps(answer)])
+    outcome = make_runner(offline_cfg, gateway, tmp_path).run(
+        SituationalReportPolicy(offline_cfg), bundle
+    )
+
+    assert not outcome.used_fallback
+    assert outcome.value.assessments[0].track_id == bundle.vehicles[0].track_id
+    assert "level" not in outcome.value.model_dump_json()
+    assert "level" not in json.dumps(gateway.requests[0].response_schema)
+
+
 def test_the_prompt_puts_evidence_in_a_data_block(offline_cfg, bundle, tmp_path):
     gateway = ScriptedGateway([valid_answer(bundle)])
     runner = make_runner(offline_cfg, gateway, tmp_path)

@@ -151,6 +151,17 @@ class AgentsConfig(_Frozen):
         return value
 
 
+class JevConfig(_Frozen):
+    enabled: bool = True
+    model: str = "jev-latest"
+    api_key_env: str = "TYPESAFE_API_KEY"
+    timeout_s: float = Field(10.0, gt=0)
+    budget_cap_usd: float = Field(5.0, gt=0)
+    input_usd_per_mtok: float = Field(0.042, ge=0)
+    cache_dir: str = "data/processed/jev_cache"
+    budget_file: str = "data/processed/jev_budget.json"
+
+
 class SecurityConfig(_Frozen):
     jwt_ttl_h: int = Field(8, gt=0)
     retention_days: int = Field(7, gt=0)
@@ -170,6 +181,7 @@ class Config(_Frozen):
     warning: WarningConfig = WarningConfig()
     sim: SimConfig = SimConfig()
     agents: AgentsConfig
+    jev: JevConfig = JevConfig()
     security: SecurityConfig = SecurityConfig()
 
     # Set by load_config; not read from the file.
@@ -201,6 +213,10 @@ class Config(_Frozen):
         model dump, a log line, a prompt or an audit payload.
         """
         value = os.environ.get(self.agents.api_key_env, "").strip()
+        return value or None
+
+    def jev_api_key(self) -> str | None:
+        value = os.environ.get(self.jev.api_key_env, "").strip()
         return value or None
 
 
