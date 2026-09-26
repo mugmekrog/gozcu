@@ -18,8 +18,8 @@ import type { Enu } from './types';
 
 /** Visible radius in kilometres; continuous zoom is clamped to this range. */
 export type ScaleKm = number;
-export const MIN_SCALE = 2;
-export const MAX_SCALE = 16;
+export const MIN_SCALE = 1;
+export const MAX_SCALE = 12;
 export function zoomScale(current: number, direction: -1 | 1): number {
   const next = direction < 0 ? current / 1.15 : current * 1.15;
   return Math.min(MAX_SCALE, Math.max(MIN_SCALE, Math.round(next * 10) / 10));

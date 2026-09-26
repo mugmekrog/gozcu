@@ -42,13 +42,22 @@
   cursor: pointer;
 }
 
-.radar-zone--interactive:hover circle:nth-child(2) {
+.radar-zone--interactive:hover .radar-zone__core {
   fill-opacity: 0.24;
 }
 
-.radar-zone:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
+/* A zone group's bounding box includes its buffer ring and label, so the
+ * browser's rectangular outline boxes half the map. Focus is shown on the
+ * zone's own buffer circle instead, and only for keyboard focus. */
+.radar-zone:focus {
+  outline: none;
+}
+
+.radar-zone:focus-visible .radar-zone__buffer {
+  stroke: var(--terrain-deep);
+  stroke-opacity: 1;
+  stroke-width: 2;
+  stroke-dasharray: none;
 }
 
 .radar-zone__pulse {
@@ -74,6 +83,11 @@
 .radar-frame,
 .radar-vehicle {
   cursor: pointer;
+}
+
+.radar-frame:focus:not(:focus-visible),
+.radar-vehicle:focus:not(:focus-visible) {
+  outline: none;
 }
 
 .radar-frame:focus-visible,

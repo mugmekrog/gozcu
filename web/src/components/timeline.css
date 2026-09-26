@@ -35,9 +35,13 @@
   background: var(--ink);
 }
 
+/* Above the ticks and the scrubber so the diamonds take the click; the layer
+ * itself lets clicks through to the scrubber between them. */
 .timeline__markers {
   position: absolute;
   inset: 0;
+  z-index: 2;
+  pointer-events: none;
 }
 
 .timeline__frame {
@@ -49,6 +53,7 @@
   transform: rotate(45deg);
   outline: 1px solid var(--surface);
   cursor: pointer;
+  pointer-events: auto;
   background: var(--ink-faint);
 }
 
@@ -58,7 +63,6 @@
 
 .timeline__frame--selected {
   outline: 2px solid var(--ink);
-  background: var(--ink);
 }
 
 .timeline__frame:focus-visible {
@@ -69,6 +73,7 @@
 .timeline__ticks {
   position: absolute;
   inset: 0;
+  pointer-events: none;
 }
 
 .timeline__tick {

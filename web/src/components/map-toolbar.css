@@ -36,9 +36,13 @@
 .map-toolbar__risk i[data-risk="watch"] { background: var(--risk-review); }
 .map-toolbar__risk i[data-risk="alert"] { background: var(--risk-threat); }
 .map-toolbar__zoom { display: flex; align-items: center; border: 1px solid var(--rule); border-radius: 9px; overflow: hidden; white-space: nowrap; }
-.map-toolbar__zoom button { width: 29px; height: 33px; border: 0; background: var(--surface-sunken); cursor: pointer; font: inherit; font-size: 17px; }
+.map-toolbar__zoom button { width: 32px; height: 33px; display: grid; place-items: center; padding: 0; border: 0; background: var(--surface-sunken); color: var(--ink); cursor: pointer; }
+.map-toolbar__zoom button:first-child { border-right: 1px solid var(--rule); }
+.map-toolbar__zoom button:last-child { border-left: 1px solid var(--rule); }
+.map-toolbar__zoom button:hover:not(:disabled) { background: var(--surface-active); }
+.map-toolbar__zoom button svg { display: block; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
 .map-toolbar__zoom button:disabled { opacity: .35; cursor: default; }
-.map-toolbar__zoom output { min-width: 62px; padding: 0 4px; text-align: center; font-size: 11px; font-weight: 700; }
+.map-toolbar__zoom output { min-width: 62px; padding: 0 4px; text-align: center; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .map-toolbar__camera { min-height: 36px; padding: 0 12px; border: 1px solid var(--ink); border-radius: 9px; background: var(--ink); color: white; cursor: pointer; font: inherit; font-weight: 700; white-space: nowrap; }
 .map-toolbar__camera:disabled { opacity: .5; cursor: default; }
 .map-toolbar[data-view="logs"] .map-toolbar__filters,

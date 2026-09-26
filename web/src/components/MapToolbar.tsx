@@ -78,10 +78,14 @@ export const MapToolbar = memo(function MapToolbar({
     </div>
     <div className="map-toolbar__zoom" role="group" aria-label="Harita ölçeği">
       <button type="button" aria-label="Yakınlaştır" disabled={scaleKm <= MIN_SCALE}
-        onClick={() => onScale(zoomScale(scaleKm, -1))}>+</button>
+        onClick={() => onScale(zoomScale(scaleKm, -1))}>
+        <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1 6h10M6 1v10" /></svg>
+      </button>
       <output>{scaleKm.toFixed(1)} km</output>
       <button type="button" aria-label="Uzaklaştır" disabled={scaleKm >= MAX_SCALE}
-        onClick={() => onScale(zoomScale(scaleKm, 1))}>−</button>
+        onClick={() => onScale(zoomScale(scaleKm, 1))}>
+        <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1 6h10" /></svg>
+      </button>
     </div>
     <button type="button" className="map-toolbar__camera" disabled={!selectedFrame} onClick={onCamera}>
       <span aria-hidden="true">▣</span> {selectedFrame?.image_id ?? 'Kare seçin'} · Görüntü

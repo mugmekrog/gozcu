@@ -37,6 +37,7 @@ export const ZoneLayer = memo(function ZoneLayer({
         const [x, y] = projection.project(zone.enu);
         const side = labelSide(zone.bearing_deg);
         const dimmed = focus !== 'all' && focus !== zone.zone_id;
+        const selected = focus === zone.zone_id;
         const pulsing = alerting.has(zone.zone_id);
         const radius = Math.max(projection.radius(zone.radius_m), 4);
         const buffer = Math.max(projection.radius(zone.radius_m + zone.buffer_m), radius + 3);
@@ -62,23 +63,40 @@ export const ZoneLayer = memo(function ZoneLayer({
               : {})}
           >
             <circle
+              className="radar-zone__buffer"
               cx={x}
               cy={y}
               r={buffer}
               fill="var(--terrain)"
-              fillOpacity={0.05}
-              stroke="var(--terrain)"
-              strokeOpacity={0.4}
-              strokeDasharray="2 3"
+              fillOpacity={selected ? 0.1 : 0.05}
+              // The zone in the zone filter: its dashed buffer turns into a solid
+              // ring in the deeper terrain green, with a soft halo behind it.
+              stroke={selected ? 'var(--terrain-deep)' : 'var(--terrain)'}
+              strokeOpacity={selected ? 1 : 0.4}
+              strokeWidth={selected ? 2 : 1}
+              strokeDasharray={selected ? undefined : '2 3'}
             />
+            {selected && (
+              <circle
+                cx={x}
+                cy={y}
+                r={buffer}
+                fill="none"
+                stroke="var(--terrain)"
+                strokeOpacity={0.18}
+                strokeWidth={8}
+                pointerEvents="none"
+              />
+            )}
             <circle
+              className="radar-zone__core"
               cx={x}
               cy={y}
               r={radius}
               fill="var(--terrain)"
-              fillOpacity={0.14}
-              stroke="var(--terrain)"
-              strokeOpacity={0.75}
+              fillOpacity={selected ? 0.24 : 0.14}
+              stroke={selected ? 'var(--terrain-deep)' : 'var(--terrain)'}
+              strokeOpacity={selected ? 1 : 0.75}
             />
             {pulsing && (
               <circle

@@ -1,6 +1,7 @@
-/* A neutral timeline: frame markers, manual scrubber and clock.
- * Frame markers carry capture time only; risk is shown on the map and in the
- * selected vehicle panel.
+/* The timeline: frame markers, manual scrubber and clock.
+ * Each frame marker sits at its capture time and is coloured by the frame's
+ * risk level, in the same colours the map uses, so the day's shape is readable
+ * before anything is clicked.
  *
  * The scrubber is a real range input. A div with pointer handlers would look the
  * same and would lose keyboard stepping, Home/End, and the screen-reader value
@@ -9,6 +10,7 @@
 
 import { memo, useMemo } from 'react';
 import * as fmt from '@/domain/format';
+import { bandOf, riskStyle } from '@/domain/risk';
 import { T } from '@/domain/strings';
 import type { FrameSummary } from '@/domain/types';
 import './timeline.css';
@@ -63,7 +65,10 @@ export const Timeline = memo(function Timeline({
               type="button"
               className={frame.image_id === selectedFrameId
                 ? 'timeline__frame timeline__frame--selected' : 'timeline__frame'}
-              style={{ left: pct(frame.capture_min) }}
+              style={{
+                left: pct(frame.capture_min),
+                background: riskStyle(bandOf(frame.level, frame.score)).color,
+              }}
               title={`${frame.image_id} · ${frame.capture_hhmm} · ${frame.vehicle_count} araç`}
               aria-label={`${T.transport.frameMarker} ${frame.image_id}, ${frame.capture_hhmm}`}
               onClick={() => onSelectFrame(frame.image_id)}
