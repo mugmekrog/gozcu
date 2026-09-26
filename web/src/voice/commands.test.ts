@@ -167,7 +167,8 @@ describe('performing a command', () => {
     const { ctx, calls } = fakeContext();
     const result = await performCommand('set_clock', { hhmm: '13:50' }, ctx);
     expect(result.ok).toBe(true);
-    expect(calls.some((call) => call.startsWith('setTime:'))).toBe(true);
+    // 13:50 Istanbul is 340 minutes after the 08:10 origin (05:10Z).
+    expect(calls).toContain('setTime:340');
   });
 
   it('refuses something that is not a clock', async () => {

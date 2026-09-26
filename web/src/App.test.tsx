@@ -364,9 +364,9 @@ describe('Harita odaklı arayüz', () => {
     render(<App />);
     await waitFor(() => expect(screen.getByRole('img', { name: /Bölge haritası/ })).toBeTruthy());
     screen.getByRole('button', { name: 'Yakınlaştır' }).click();
-    await waitFor(() => expect(document.querySelector('.map-toolbar__zoom output')?.textContent).toContain('7.0 km'));
+    await waitFor(() => expect(document.querySelector('.map-toolbar__zoom output')?.textContent).toContain('7.00 km'));
     fireEvent.wheel(screen.getByRole('img', { name: /Bölge haritası/ }), { deltaY: -100 });
-    await waitFor(() => expect(document.querySelector('.map-toolbar__zoom output')?.textContent).toContain('6.1 km'));
+    await waitFor(() => expect(document.querySelector('.map-toolbar__zoom output')?.textContent).toContain('6.09 km'));
     const vehicle = screen.getByRole('button', { name: /T0001, kamyon/ });
     fireEvent.click(vehicle);
     await act(async () => { screen.getByRole('button', { name: 'Uyarıyı incele' }).click(); });

@@ -41,15 +41,18 @@ describe('speed', () => {
 describe('clockOf and minutesOf', () => {
   const origin = '2026-09-26T05:10:00+00:00'; // 08:10 Istanbul
 
-  it('converts minutes from the origin to the exercise clock', () => {
-    expect(fmt.clockOf(origin, 0)).toBe('05:10');
-    expect(fmt.clockOf(origin, 120)).toBe('07:10');
+  it('converts minutes from the origin to the Istanbul exercise clock', () => {
+    // The capture times in the data are local: the first frame is 10:10, not 07:10.
+    expect(fmt.clockOf(origin, 0)).toBe('08:10');
+    expect(fmt.clockOf(origin, 120)).toBe('10:10');
+    expect(fmt.clockOf(origin, 460)).toBe('15:50');
   });
 
   it('round-trips against minutesOf', () => {
-    const minutes = fmt.minutesOf(origin, '07:10');
+    expect(fmt.minutesOf(origin, '08:10')).toBe(0);
+    const minutes = fmt.minutesOf(origin, '10:10');
     expect(minutes).toBe(120);
-    expect(fmt.clockOf(origin, minutes)).toBe('07:10');
+    expect(fmt.clockOf(origin, minutes)).toBe('10:10');
   });
 });
 

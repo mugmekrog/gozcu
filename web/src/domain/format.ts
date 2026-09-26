@@ -54,19 +54,30 @@ export function minutes(count: number | null | undefined): string {
   return `${NF_0.format(Math.round(count))} dk`;
 }
 
-/** Minutes from the exercise origin to a wall clock. */
+/**
+ * The exercise's wall-clock zone, the same value as `tz` in goru.yaml. The origin
+ * is stored in UTC (05:10Z); the operator's clock, the frame capture times and the
+ * field reports all read local time (08:10), so every clock goes through this.
+ */
+export const EXERCISE_TZ = 'Europe/Istanbul';
+
+const CLOCK = new Intl.DateTimeFormat('en-GB', {
+  timeZone: EXERCISE_TZ,
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+/** Minutes from the exercise origin to a wall clock, in the exercise zone. */
 export function clockOf(originIso: string, minutesFromOrigin: number): string {
-  const ms = Date.parse(originIso) + minutesFromOrigin * 60_000;
-  const d = new Date(ms);
-  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+  return CLOCK.format(new Date(Date.parse(originIso) + minutesFromOrigin * 60_000));
 }
 
-/** A wall clock back to minutes from the exercise origin. */
+/** A wall clock in the exercise zone back to minutes from the exercise origin. */
 export function minutesOf(originIso: string, hhmm: string): number {
   const [h, m] = hhmm.split(':').map(Number);
-  const origin = new Date(Date.parse(originIso));
-  const base = origin.getUTCHours() * 60 + origin.getUTCMinutes();
-  return (h ?? 0) * 60 + (m ?? 0) - base;
+  const [oh, om] = clockOf(originIso, 0).split(':').map(Number);
+  return (h ?? 0) * 60 + (m ?? 0) - ((oh ?? 0) * 60 + (om ?? 0));
 }
 
 export function percent(fraction: number | null | undefined): string {

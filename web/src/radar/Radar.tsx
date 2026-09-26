@@ -154,7 +154,8 @@ export const Radar = memo(function Radar() {
         // timestamps run on another clock, and a flight must always finish.
         const t = Math.min(1, Math.max(0, (performance.now() - f.start) / f.ms));
         const e = easeOutCubic(t);
-        const s = f.fromScale * (f.toScale / f.fromScale) ** e;
+        // The last frame lands exactly on the target, so 2.25 km reads 2.25.
+        const s = t === 1 ? f.toScale : f.fromScale * (f.toScale / f.fromScale) ** e;
         const k = kmPerUnit(s);
         const p: Pan = f.anchor
           ? { eKm: f.anchor.eKm - f.anchor.dx * k, nKm: f.anchor.nKm + f.anchor.dy * k }

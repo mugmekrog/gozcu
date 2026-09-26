@@ -81,7 +81,7 @@ export const MapToolbar = memo(function MapToolbar({
         onClick={() => onScale(zoomScale(scaleKm, -1))}>
         <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1 6h10M6 1v10" /></svg>
       </button>
-      <output>{scaleKm.toFixed(1)} km</output>
+      <output>{scaleKm.toFixed(2)} km</output>
       <button type="button" aria-label="Uzaklaştır" disabled={scaleKm >= MAX_SCALE}
         onClick={() => onScale(zoomScale(scaleKm, 1))}>
         <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1 6h10" /></svg>
