@@ -3,6 +3,7 @@
 # ------------------------------------------------------------------------------
 # Runs the exact production containers:
 # - backend: Cloud Run production image
+# - stt:     separate Turkish speech service
 # - frontend: Built static assets previewed via Vite preview container
 # ------------------------------------------------------------------------------
 
@@ -28,17 +29,46 @@ services:
       start_period: 5s
     restart: unless-stopped
 
+  stt:
+    build:
+      context: .
+      dockerfile: Dockerfile.stt
+    container_name: goru-stt-prod
+    ports:
+      - "127.0.0.1:8800:8800"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - HF_TOKEN
+    volumes:
+      - stt-model-cache:/app/data/huggingface
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8800/stt/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15m
+    restart: unless-stopped
+
   frontend:
+    image: goru-frontend-preview
     build:
       context: ./web
       dockerfile: Dockerfile
       target: preview
       args:
         - VITE_API_BASE_URL=http://localhost:8080
+        - VITE_STT_URL=http://127.0.0.1:8800
     container_name: goru-frontend-prod
     ports:
       - "5173:5173"
     depends_on:
       backend:
         condition: service_healthy
+      stt:
+        condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  stt-model-cache:

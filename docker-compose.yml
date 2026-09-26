@@ -3,6 +3,7 @@
 # ------------------------------------------------------------------------------
 # Mirrors production architecture:
 # - backend:  Google Cloud Run container simulation on port 8080
+# - stt:      Turkish speech service on localhost port 8800
 # - frontend: React / Vite development on port 5173 (pointing to backend)
 # ------------------------------------------------------------------------------
 
@@ -33,7 +34,34 @@ services:
       start_period: 5s
     restart: unless-stopped
 
+  stt:
+    build:
+      context: .
+      dockerfile: Dockerfile.stt
+    container_name: goru-stt
+    ports:
+      - "127.0.0.1:8800:8800"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - HF_TOKEN
+    volumes:
+      - stt-model-cache:/app/data/huggingface
+      - ./libs:/app/libs:ro
+      - ./services:/app/services:ro
+      - ./contracts:/app/contracts:ro
+      - ./goru.yaml:/app/goru.yaml:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8800/stt/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15m
+    restart: unless-stopped
+
   frontend:
+    image: goru-frontend-dev
     build:
       context: ./web
       dockerfile: Dockerfile
@@ -43,6 +71,7 @@ services:
       - "5173:5173"
     environment:
       - VITE_API_BASE_URL=http://localhost:8080
+      - VITE_STT_URL=http://127.0.0.1:8800
     volumes:
       - ./web/src:/app/src
       - ./web/public:/app/public
@@ -50,4 +79,9 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+      stt:
+        condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  stt-model-cache:

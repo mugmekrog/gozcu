@@ -100,6 +100,25 @@ microphone is disabled and says why, which is the shipped default:
 cd web && echo "VITE_STT_URL=http://127.0.0.1:8800" > .env.local && npm run dev
 ```
 
+**Docker Compose** starts the API, the speech service, and the frontend together:
+
+```bash
+docker compose up --build
+curl http://127.0.0.1:8800/stt/status
+```
+
+The speech container uses CPU when Docker has no NVIDIA GPU access. For GPU
+inference on a host with the NVIDIA Container Toolkit, run
+`docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build`.
+Its first start downloads the Turkish Whisper model into the persistent
+`stt-model-cache` volume; the frontend waits for the speech service to finish
+starting. The production preview uses
+`docker compose -f docker-compose.prod.yml up --build` (add the same GPU override
+when available). Check that `/stt/status` reports `"ready": true` before using
+dictation. If the first model download is rate-limited by Hugging Face, retry
+after the limit clears or export `HF_TOKEN` in your shell and restart `stt`.
+Do not put that token in the committed `.env` file.
+
 ## Secrets
 
 `.env` is **committed** in this repo by team decision, so a fresh clone can run the
