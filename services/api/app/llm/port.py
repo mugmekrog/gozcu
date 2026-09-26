@@ -28,7 +28,7 @@ __all__ = [
     "AgentKind",
 ]
 
-AgentKind = Literal["assess", "parse", "copilot"]
+AgentKind = Literal["assess", "parse", "copilot", "voice"]
 
 Message = dict[str, Any]
 

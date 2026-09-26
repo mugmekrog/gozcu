@@ -39,6 +39,9 @@ export const T = {
     motionDesc: 'Üsse mesafe – zaman grafiği ve araç tablosu',
     logsName: 'Kayıtlar',
     logsDesc: 'Kareler, saha raporları, operatör kararları',
+    voice: 'SESLE KONTROL',
+    voiceName: 'Sesle kontrol',
+    voiceDesc: 'Türkçe sesli komut, duyulanlar ve yapılanlar',
     openMenu: 'Görünüm menüsünü aç',
   },
 
@@ -266,6 +269,131 @@ export const T = {
     saved: '✓ Operatör kararı kaydedildi',
     goToLog: 'Kayda git',
     operator: 'nöbetçi-1',
+  },
+
+  /* Sesle kontrol. Every line an operator can be shown about speech.
+   *
+   * Written as an operator would say it back: the confirmations are in the past
+   * tense because by the time one is read the thing has happened, and the
+   * refusals name what to do instead of apologising. The failure lines matter
+   * more than the successes -- a command that worked is visible on the map, and a
+   * command that did not is only visible here. */
+  voice: {
+    panel: 'SESLE KONTROL',
+    hint: 'Mikrofona basın, Türkçe komutu söyleyin.',
+    hintKey: 'V',
+    start: '🎙 Dinle',
+    stop: '■ Bitir',
+    cancel: 'Vazgeç',
+    idle: 'hazır',
+    calibrating: 'ortam ölçülüyor…',
+    listening: 'dinliyor…',
+    hearing: 'duyuyorum',
+    trailing: 'bitmesini bekliyorum…',
+    transcribing: 'çözümleniyor…',
+    routing: 'komut anlaşılıyor…',
+    working: 'uygulanıyor…',
+    level: 'SES DÜZEYİ',
+    levelQuiet: 'ses çok düşük · mikrofona yaklaşın',
+    clipping: 'ses kırpılıyor · mikrofondan uzaklaşın',
+    heldSeconds: (s: string) => `${s} sn`,
+    remaining: (s: string) => `kalan ${s} sn`,
+
+    history: 'DUYULANLAR',
+    historyEmpty: 'Henüz sesli komut verilmedi.',
+    historyHint: 'Mikrofona basıp "kayıtlar sayfasına geç" deyin.',
+    heard: 'duyulan',
+    understood: 'anlaşılan',
+    modelSaid: 'model şunu yazdı',
+    normalised: 'düzeltilen',
+    commandLabel: 'komut',
+    cached: 'önbellekten · ücretsiz',
+    latency: (ms: number) => `${ms} ms`,
+
+    examples: 'ÖRNEK KOMUTLAR',
+    examplesNote: 'Sesle yapılabilecek her şey burada listelidir.',
+    effectView: 'görünüm',
+    effectCompute: 'işlem',
+    effectAudit: 'kayda geçer',
+
+    confirmTitle: 'SESLİ KARAR ONAYI',
+    confirmBody: (what: string) => `"${what}" kaydedilecek. Bu karar kayda geçer ve geri alınamaz.`,
+    confirmHeard: 'duyulan komut',
+    confirmYes: 'Evet, kaydet',
+    confirmNo: 'Vazgeç',
+    confirmTimeout: 'Onay verilmedi; karar kaydedilmedi.',
+    adminNote:
+      'Ses yönetici seviyesindedir: kayıttaki her komutu çalıştırabilir. Karar kaydeden komutlar için onay istenir.',
+
+    // --- what happened ---------------------------------------------------- //
+    didView: (name: string) => `${name} görünümüne geçildi`,
+    didFrame: (id: string) => `${id} karesi seçildi`,
+    didAssess: (id: string) => `${id} değerlendirmesi başlatıldı`,
+    didSelect: (id: string) => `${id} seçildi`,
+    didPin: (id: string, pinned: boolean) =>
+      pinned ? `${id} sabitlendi` : `${id} sabitlemesi kaldırıldı`,
+    pinAlready: (id: string, pinned: boolean) =>
+      pinned ? `${id} zaten sabitli` : `${id} zaten sabitli değil`,
+    didClock: (hhmm: string) => `saat ${hhmm} yapıldı`,
+    didPlay: 'oynatılıyor',
+    didPause: 'duraklatıldı',
+    didSpeed: (speed: number) => `hız ${speed}×`,
+    didZone: (zone: string) => `bölge filtresi: ${zone}`,
+    didClass: (cls: string) => `sınıf filtresi: ${cls}`,
+    didScale: (km: number) => `ölçek ${km} km`,
+    didCameraOpen: 'kamera açıldı',
+    didCameraClose: 'kamera kapatıldı',
+    didDismiss: 'uyarı kapatıldı',
+    didDecision: (verdict: string) => `karar kaydedildi: ${verdict}`,
+    didAsk: 'kopilota soruldu',
+    noteBySpeech: 'sesle verildi',
+
+    // --- why it did not --------------------------------------------------- //
+    needFrame: 'Önce bir kare seçin.',
+    needTrack: 'Hangi araç olduğunu anlayamadım.',
+    needQuestion: 'Soruyu anlayamadım.',
+    needFilter: 'Hangi filtreyi değiştireceğimi anlayamadım.',
+    needPlayback: 'Oynat, duraklat ya da bir hız söyleyin.',
+    noSuchFrame: (id: string) => `${id} diye bir kare yok.`,
+    noSuchTrack: (id: string) => `${id} diye bir araç yok.`,
+    noSuchZone: (zone: string) => `${zone} diye bir bölge yok.`,
+    noSuchClass: (cls: string) => `${cls} diye bir sınıf yok.`,
+    noModal: 'Kapatılacak bir uyarı yok.',
+    badView: (view: string) => `${view || 'Bu'} diye bir görünüm yok.`,
+    badClock: (hhmm: string) => `${hhmm || 'Bu'} bir saat değil.`,
+    badSpeed: (speed: number) => `${speed}× bir hız seçeneği değil.`,
+    badScale: (km: number) => `${km} km bir ölçek seçeneği değil.`,
+    badVerdict: (verdict: string) => `${verdict || 'Bu'} bir karar değil.`,
+    unknownCommand: (name: string) => `${name} komutu bu ekranda yok.`,
+
+    // --- speech itself is unavailable ------------------------------------- //
+    unavailable: 'Sesli kontrol şu an kullanılamıyor.',
+    offline:
+      'Konuşma servisi çalışmıyor. Depo kökünde başlatın: python services/api/app/cli.py serve-stt',
+    err: {
+      STT_DISABLED: 'Sesli kontrol goru.yaml içinde kapalı.',
+      STT_UNAVAILABLE: 'Konuşma servisine ulaşılamıyor.',
+      CUDA_UNAVAILABLE: 'GPU bulunamadı; konuşma modeli çalıştırılamıyor.',
+      GPU_OUT_OF_MEMORY: 'GPU belleği yetmedi. compute_type: int8_float16 deneyin.',
+      MODEL_UNAVAILABLE: 'Konuşma modeli yüklenemedi.',
+      AUDIO_INVALID: 'Ses kaydı okunamadı.',
+      AUDIO_TOO_LONG: 'Komut çok uzun. Daha kısa söyleyin.',
+      AUDIO_TOO_SHORT: 'Çok kısa sürdü; komut duyulmadı.',
+      NO_SPEECH: 'Konuşma duyulmadı, yalnızca ortam gürültüsü.',
+      EMPTY_TRANSCRIPT: 'Söylenen çözümlenemedi. Tekrar söyleyin.',
+      WORKER_CRASHED: 'Konuşma işlemi beklenmedik şekilde durdu.',
+      ROUTER_UNAVAILABLE:
+        'Komut yönlendirici erişilemiyor. Duyulan metin aşağıda; işlemi elle yapabilirsiniz.',
+      VOICE_DISABLED: 'Sesli komut goru.yaml içinde kapalı.',
+      NO_MICROPHONE: 'Mikrofon bulunamadı.',
+      PERMISSION_DENIED: 'Mikrofon izni verilmedi. Adres çubuğundaki izinleri açın.',
+      DEVICE_BUSY: 'Mikrofon başka bir uygulamada kullanılıyor.',
+      UNSUPPORTED: 'Bu tarayıcı mikrofon yakalamayı desteklemiyor.',
+      CAPTURE_FAILED: 'Mikrofon açılamadı.',
+      TOO_SHORT: 'Çok kısa sürdü; komut duyulmadı.',
+      NO_SPEECH_HEARD: 'Hiç konuşma duyulmadı.',
+      CANCELLED: 'Vazgeçildi.',
+    } as Record<string, string>,
   },
 
   cls: {

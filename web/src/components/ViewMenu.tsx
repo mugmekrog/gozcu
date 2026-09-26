@@ -22,6 +22,7 @@ const ITEMS: { view: ViewName; icon: string; name: string; description: string }
   { view: 'map', icon: '🗺', name: T.view.mapName, description: T.view.mapDesc },
   { view: 'motion', icon: '📈', name: T.view.motionName, description: T.view.motionDesc },
   { view: 'logs', icon: '🗂', name: T.view.logsName, description: T.view.logsDesc },
+  { view: 'voice', icon: '🎙', name: T.view.voiceName, description: T.view.voiceDesc },
 ];
 
 export const ViewMenu = memo(function ViewMenu({ current, onSelect, onClose }: ViewMenuProps) {

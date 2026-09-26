@@ -24,6 +24,7 @@ warning.
 | [PLAN.md](PLAN.md) | The full plan: data, contracts, algorithms, four workstreams, demo script. Every number in it was measured from the shipped data. |
 | [logs/step_agentic_development_logs.md](logs/step_agentic_development_logs.md) | Agent layer + deterministic engine. Findings **F1–F6**. |
 | [logs/step_frontend_development_logs.md](logs/step_frontend_development_logs.md) | Tactical display and review UI. Findings **W1–W11**. |
+| [logs/step_stt_development_logs.md](logs/step_stt_development_logs.md) | Local Turkish speech-to-text and voice control. Findings **S1–S9**. |
 | [web/README.md](web/README.md) | How to run the frontend. |
 
 Both step logs end with a *decisions needed* list. Those are the open items.
@@ -40,10 +41,13 @@ services/api/app/
   agents/ llm/            the agent layer, gateway port and adapters
   pipeline.py             wiring: dataset in, evidence and alerts out
   cli.py                  runs all of it
+  stt/ voice/              local Turkish speech-to-text, and what a transcript may do
+  api/stt_server.py        the loopback speech service the display calls
 web/                      React tactical display (see web/README.md)
+contracts/                voice_commands.json: what speech may do, read by both sides
 stage2/                   organizer files, read-only
 bounding_boxes.csv        our Stage-1 detector's output, read-only
-tests/                    123 Python tests
+tests/                    171 Python tests
 logs/                     step logs, one per stage
 ```
 
@@ -62,6 +66,17 @@ python app/cli.py assess img_000860                    # agent verdict (spends ~
 python app/cli.py budget                               # spend vs the $15 cap
 ```
 
+**Speech** — optional, needs a CUDA GPU and a 3.1 GB model download:
+
+```bash
+.venv/Scripts/python -m pip install -r requirements-stt.txt
+cd services/api
+python app/cli.py stt-probe                            # does the model load here?
+python app/cli.py stt-file command.wav                 # transcribe one clip
+python app/cli.py voice-route "kayitlar sayfasina gec" # transcript -> command
+python app/cli.py serve-stt                            # the service the display calls
+```
+
 **Frontend** — Node 20:
 
 ```bash
@@ -72,6 +87,13 @@ npm test                                               # 87 tests, no network
 
 The frontend runs on static fixtures by default so it works with the network off.
 Set `VITE_API_BASE_URL` to point it at the live REST API instead.
+
+For voice control, point it at the speech service as well — without this the
+microphone is disabled and says why, which is the shipped default:
+
+```bash
+cd web && echo "VITE_STT_URL=http://127.0.0.1:8800" > .env.local && npm run dev
+```
 
 ## Secrets
 
@@ -99,7 +121,8 @@ them for real before auth is built (that stream has not started).
 |---|---|
 | Deterministic engine | built, 123 tests |
 | Agent layer | built — assessor, report parser, reviewer copilot, guardrails, budget ledger |
-| Frontend | built, 87 tests |
+| Frontend | built, 149 tests |
+| Speech-to-text + voice control | built — `whisper-large-v3-tr` on the GPU, admin-level Turkish commands, 48 Python + 62 web tests. Four open decisions in the step log, **S5 first**. |
 | REST + WebSocket API | **not built** — `web/src/api/http.ts` specifies what it must serve |
 | Auth, RBAC, audit hash chain | **not built** |
 | Simulation clock (server side) | **not built** — the frontend runs its own over the fixed dataset |

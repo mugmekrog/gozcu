@@ -1,0 +1,78 @@
+/* The level meter.
+ *
+ * Ink only. `tokens.css` reserves colour for risk, so a meter that reached for
+ * amber as it got louder would put a warning hue on the screen for a reason that
+ * is not a warning. Loudness is carried by height and by ink weight instead, which
+ * is the same encoding the rest of the chrome uses.
+ *
+ * Square columns, no radius, on the 2px space step: this is the wireframes' dense
+ * monospace chrome, not a consumer audio widget.
+ */
+
+.levels {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.levels__label {
+  font-size: var(--text-micro);
+  letter-spacing: var(--tracking-label);
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.levels__track {
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 20px;
+  flex: 1;
+  min-width: 0;
+  /* A baseline rule, so the meter reads as a meter when it is silent rather than
+     as an empty gap where something should be. */
+  border-bottom: 1px solid var(--hairline);
+  padding-bottom: 1px;
+}
+
+.levels__bar {
+  --fill: 0;
+  flex: 1;
+  min-width: 2px;
+  /* 12% keeps a visible floor: a bar of zero height would make a quiet moment
+     look like a broken widget. */
+  height: calc(12% + 88% * var(--fill));
+  background: var(--ink-faint);
+  transition: height var(--dur-quick) linear;
+}
+
+/* An open microphone draws in body ink, a closed one in rule grey. Together with
+   the height that is two encodings of the same reading, which is what should let it
+   survive a projector at three metres -- the case the frontend log flags as still
+   untested on real hardware. */
+.levels[data-active='true'] .levels__bar {
+  background: var(--ink-body);
+}
+
+.levels[data-active='false'] .levels__bar {
+  background: var(--rule);
+  height: 12%;
+}
+
+.levels__readout {
+  font-size: var(--text-micro);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-faint);
+  min-width: 2.2em;
+  text-align: right;
+}
+
+/* Reduced motion: the bars stop sliding but keep their heights, because the
+   height is the information. The frontend log's rule -- the ALERT zone pulse
+   degrades to a solid ring rather than disappearing -- applied to a meter. */
+@media (prefers-reduced-motion: reduce) {
+  .levels__bar {
+    transition: none;
+  }
+}

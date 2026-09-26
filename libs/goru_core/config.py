@@ -28,7 +28,7 @@ from zoneinfo import ZoneInfo
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
-__all__ = ["Config", "load_config", "ConfigError"]
+__all__ = ["Config", "load_config", "ConfigError", "SttConfig", "VoiceConfig"]
 
 DEFAULT_CONFIG_PATH = "goru.yaml"
 
@@ -130,6 +130,7 @@ class AgentsConfig(_Frozen):
     assess: AgentCallConfig = AgentCallConfig(reasoning_effort="low", max_tokens=4000)
     parse: AgentCallConfig = AgentCallConfig(reasoning_effort="low", max_tokens=1500)
     copilot: AgentCallConfig = AgentCallConfig(reasoning_effort="high", max_tokens=6000)
+    voice: AgentCallConfig = AgentCallConfig(reasoning_effort="low", max_tokens=1200)
     max_concurrency: int = Field(4, ge=1)
     requests_per_min: int = Field(55, ge=1)
     timeout_s: float = Field(45.0, gt=0)
@@ -144,11 +145,57 @@ class AgentsConfig(_Frozen):
     pricing: PricingConfig = PricingConfig()
 
     def call_config(self, kind: str) -> AgentCallConfig:
-        """Per-agent sampling settings. `kind` is one of assess|parse|copilot."""
+        """Per-agent sampling settings. `kind` is one of assess|parse|copilot|voice."""
         value = getattr(self, kind, None)
         if not isinstance(value, AgentCallConfig):
             raise ConfigError(f"unknown agent kind {kind!r}")
         return value
+
+
+class SttConfig(_Frozen):
+    """Local speech-to-text (stt.md phases 1-11).
+
+    Every number a transcription depends on lives here, for the same reason the
+    detection thresholds do: a transcript that reached the agent should be
+    traceable to the exact settings that produced it.
+    """
+
+    enabled: bool = True
+    provider: Literal["local_whisper", "scripted"] = "local_whisper"
+    model: str = "oguzhangokboru/whisper-large-v3-tr"
+    device: Literal["auto", "cuda", "cpu"] = "auto"
+    compute_type: Literal["auto", "float16", "int8_float16", "int8", "float32"] = "float16"
+    language: str = "tr"
+    beam_size: int = Field(1, ge=1, le=10)
+    condition_on_previous_text: bool = False
+    vad_filter: bool = True
+    vad_min_silence_ms: int = Field(500, ge=0, le=5000)
+    vad_speech_pad_ms: int = Field(200, ge=0, le=2000)
+    max_utterance_s: float = Field(15.0, gt=0, le=120)
+    min_utterance_s: float = Field(0.25, ge=0)
+    sample_rate: int = Field(16000, ge=8000, le=48000)
+    warm_on_start: bool = True
+    host: str = "127.0.0.1"
+    port: int = Field(8800, ge=1, le=65535)
+    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
+    metrics_file: str = "data/processed/stt_runs.jsonl"
+
+
+class VoiceConfig(_Frozen):
+    """What a finalised transcript is allowed to do.
+
+    `admin` is a team decision recorded in the step log: speech reaches every
+    command in the registry, including the one that writes an operator decision.
+    `confirm_audit_commands` is the one safeguard left on that path.
+    """
+
+    enabled: bool = True
+    admin: bool = True
+    registry_file: str = "contracts/voice_commands.json"
+    confirm_audit_commands: bool = True
+    confirm_timeout_s: float = Field(20.0, gt=0)
+    router: Literal["llm"] = "llm"
+    max_transcript_chars: int = Field(400, ge=1)
 
 
 class SecurityConfig(_Frozen):
@@ -170,6 +217,8 @@ class Config(_Frozen):
     warning: WarningConfig = WarningConfig()
     sim: SimConfig = SimConfig()
     agents: AgentsConfig
+    stt: SttConfig = SttConfig()
+    voice: VoiceConfig = VoiceConfig()
     security: SecurityConfig = SecurityConfig()
 
     # Set by load_config; not read from the file.
@@ -262,4 +311,12 @@ def load_config(path: str | Path | None = None, *, load_env: bool = True) -> Con
         raise ConfigError("agents.budget_soft_stop_usd must not exceed budget_cap_usd")
     if cfg.matching.low_conf_m > cfg.matching.gate_m:
         raise ConfigError("matching.low_conf_m must not exceed matching.gate_m")
+    if cfg.stt.min_utterance_s >= cfg.stt.max_utterance_s:
+        raise ConfigError("stt.min_utterance_s must be below stt.max_utterance_s")
+    if cfg.stt.language != "tr":
+        # The model is a Turkish fine-tune of large-v3. Asking it for another
+        # language does not fail, it just transcribes badly, which is worse.
+        raise ConfigError(
+            f"stt.language must be 'tr' for {cfg.stt.model!r}; got {cfg.stt.language!r}"
+        )
     return cfg

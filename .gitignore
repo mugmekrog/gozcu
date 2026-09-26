@@ -12,6 +12,9 @@ data/processed/
 contracts/openapi.json
 
 # frontend
+# Per-machine Vite config. web/.env.local is where VITE_STT_URL lives, and the
+# speech service's address is a local choice, not a team one.
+web/.env.local
 web/node_modules/
 web/dist/
 # Generated from the real pipeline by web/scripts/export_fixtures.py.

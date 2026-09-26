@@ -24,10 +24,13 @@ import { AskAgent } from '@/components/AskAgent';
 import { AlertModal } from '@/components/AlertModal';
 import { CameraFrame } from '@/components/CameraFrame';
 import { Toast } from '@/components/Toast';
+import { VoiceDock } from '@/components/VoiceDock';
+import { VoiceConfirm } from '@/components/VoiceConfirm';
 import { Radar } from '@/radar/Radar';
 import { PIN_COLOURS } from '@/radar/VehicleLayer';
 import { MotionView } from '@/views/MotionView';
 import { LogsView } from '@/views/LogsView';
+import { VoiceView } from '@/views/VoiceView';
 import { api } from '@/api';
 import { assembleBrief } from '@/domain/brief';
 import { liveVehiclesAt } from '@/domain/live';
@@ -37,6 +40,8 @@ import { zoneAssessmentFor } from '@/domain/live';
 import { T } from '@/domain/strings';
 import { useAppStore } from '@/store/useAppStore';
 import { useSimClock } from '@/store/useSimClock';
+import { useVoice } from '@/store/useVoice';
+import { useVoiceStore } from '@/store/useVoiceStore';
 import './app.css';
 
 export function App() {
@@ -130,6 +135,23 @@ function Workspace() {
   const client = api();
   const llmConnected = client.mode === 'http';
 
+  /* Speech is owned here, not by the voice view. "Kayıtlar sayfasına geç" switches
+   * the view, so a microphone that belonged to the voice screen would be torn down
+   * by the command it had just performed. */
+  const voicePhase = useVoiceStore((s) => s.phase);
+  const voiceOpen = useVoiceStore((s) => s.open);
+  const voiceLevel = useVoiceStore((s) => s.level);
+  const voiceHeldS = useVoiceStore((s) => s.heldS);
+  const voiceError = useVoiceStore((s) => s.error);
+  const voiceQuiet = useVoiceStore((s) => s.quiet);
+  const voiceClipping = useVoiceStore((s) => s.clipping);
+  const voiceHistory = useVoiceStore((s) => s.history);
+  const voicePending = useVoiceStore((s) => s.pending);
+  const voiceStatus = useVoiceStore((s) => s.status);
+
+  const voiceBindings = useMemo(() => ({ setCameraOpen }), []);
+  const voice = useVoice(voiceBindings);
+
   const vehicles = useMemo(
     () =>
       liveVehiclesAt({
@@ -209,11 +231,24 @@ function Workspace() {
         case 'k':
           setView('logs');
           break;
+        case 's':
+          setView('voice');
+          break;
         case 'd':
           if (selectedFrameId) void assess(selectedFrameId);
           break;
+        case 'v':
+          // Push to talk. One key, both directions: pressing it again while the
+          // microphone is open sends the utterance rather than hunting for a
+          // second control.
+          event.preventDefault();
+          if (useVoiceStore.getState().open) voice.stopAndSend();
+          else voice.start();
+          break;
         case 'Escape':
-          if (store().modal) closeModal();
+          if (useVoiceStore.getState().pending) voice.reject();
+          else if (useVoiceStore.getState().open) voice.cancel();
+          else if (store().modal) closeModal();
           else if (cameraOpen) setCameraOpen(false);
           else selectTrack(null);
           break;
@@ -234,6 +269,7 @@ function Workspace() {
     selectTrack,
     cameraOpen,
     store,
+    voice,
   ]);
 
   /** Timeline bands: the selected vehicle's window, then each pinned one's. */
@@ -261,7 +297,13 @@ function Workspace() {
   const onAsk = useCallback((question: string) => client.ask(question), [client]);
 
   const viewName =
-    view === 'motion' ? T.view.motion : view === 'logs' ? T.view.logs : T.view.map;
+    view === 'motion'
+      ? T.view.motion
+      : view === 'logs'
+        ? T.view.logs
+        : view === 'voice'
+          ? T.view.voice
+          : T.view.map;
 
   return (
     <div className="app">
@@ -324,6 +366,15 @@ function Workspace() {
 
             {view === 'motion' && <MotionView vehicles={vehicles} />}
             {view === 'logs' && <LogsView />}
+            {view === 'voice' && (
+              <VoiceView
+                available={voice.available}
+                unavailableReason={voice.unavailableReason}
+                onStart={voice.start}
+                onStop={voice.stopAndSend}
+                onCancel={voice.cancel}
+              />
+            )}
 
             {cameraOpen && frame && (
               <div className="app__camera">
@@ -421,6 +472,24 @@ function Workspace() {
           />
 
           <AskAgent available={llmConnected} onAsk={onAsk} />
+
+          <VoiceDock
+            available={voice.available}
+            unavailableReason={voice.unavailableReason}
+            phase={voicePhase}
+            open={voiceOpen}
+            level={voiceLevel}
+            heldS={voiceHeldS}
+            maxUtteranceS={voiceStatus.audio.max_utterance_s}
+            quiet={voiceQuiet}
+            clipping={voiceClipping}
+            error={voiceError}
+            last={voiceHistory[0] ?? null}
+            onStart={voice.start}
+            onStop={voice.stopAndSend}
+            onCancel={voice.cancel}
+            onOpenView={() => setView('voice')}
+          />
         </aside>
       </div>
 
@@ -441,6 +510,14 @@ function Workspace() {
           onShowSuppressed={setShowSuppressed}
           onDecide={(verdict, note) => void record(verdict, note)}
           onClose={closeModal}
+        />
+      )}
+
+      {voicePending && (
+        <VoiceConfirm
+          pending={voicePending}
+          onConfirm={voice.confirm}
+          onReject={voice.reject}
         />
       )}
 

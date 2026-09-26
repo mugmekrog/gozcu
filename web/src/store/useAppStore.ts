@@ -27,7 +27,11 @@ import type {
   VehicleClass,
 } from '@/domain/types';
 
-export type ViewName = 'map' | 'motion' | 'logs';
+/* `voice` is the fourth view, added for the speech assistant. The wireframes have
+ * no screen for it -- that divergence is recorded as S3 in
+ * logs/step_stt_development_logs.md, the same way the frontend log records the
+ * screens it declined to invent. */
+export type ViewName = 'map' | 'motion' | 'logs' | 'voice';
 export type ModalKind = 'threat' | 'review';
 export type AssessPhase = 'idle' | 'running' | 'done' | 'error';
 

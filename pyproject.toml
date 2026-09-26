@@ -18,6 +18,14 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+# Local Turkish speech-to-text. Optional because it is ~300 MB installed plus a
+# 3.1 GB model, and every test runs without it.
+stt = [
+    "faster-whisper>=1.1",
+    "fastapi>=0.115",
+    "uvicorn>=0.32",
+    "python-multipart>=0.0.9",
+]
 
 [tool.setuptools]
 package-dir = { goru_core = "libs/goru_core", app = "services/api/app" }

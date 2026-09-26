@@ -1,0 +1,24 @@
+# Speech-to-text extras. Kept out of requirements.txt on purpose.
+#
+# These pull in CTranslate2, ONNX Runtime, PyAV and the Hugging Face client --
+# roughly 300 MB installed, plus a 3.1 GB model download on first use. The
+# deterministic engine, the agent layer, the frontend fixtures and all 171 Python
+# tests run without any of it, so a teammate who is not working on speech should
+# not have to install it, and CI should not have to download a Whisper model to
+# run the suite.
+#
+#   .venv/Scripts/python -m pip install -r requirements-stt.txt
+#
+# GPU inference additionally needs the CUDA 12 runtime libraries. On this box they
+# came with the driver and CTranslate2 found them; if `stt-probe` reports
+# CUDA_UNAVAILABLE with a cuDNN or cuBLAS message, install them into the venv:
+#
+#   pip install nvidia-cublas-cu12 nvidia-cudnn-cu12
+#
+# and if there is no usable GPU at all, set `stt.device: cpu` in goru.yaml. It is
+# several times slower but it works.
+
+faster-whisper>=1.1      # CTranslate2 Whisper runtime, with Silero VAD bundled
+fastapi>=0.115           # the loopback speech service
+uvicorn>=0.32            # its ASGI server
+python-multipart>=0.0.9  # multipart upload parsing for the audio endpoint

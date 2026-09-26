@@ -68,6 +68,9 @@ agents:
   assess:  { reasoning_effort: low,  max_tokens: 4000 }
   parse:   { reasoning_effort: low,  max_tokens: 1500 }
   copilot: { reasoning_effort: high, max_tokens: 6000 }
+  # The voice router does one tiny classification per utterance and sits on the
+  # operator's critical path, so it gets the smallest budget of the four.
+  voice:   { reasoning_effort: low,  max_tokens: 1200 }
   max_concurrency: 4        # gateway hard limit
   requests_per_min: 55      # gateway limit is 60
   timeout_s: 45             # GLM always thinks first; 10-15 s typical at low effort
@@ -87,6 +90,72 @@ agents:
   # is always the gateway's `spend` from GET /key/info, which the ledger
   # reconciles against and prefers whenever it is reachable.
   pricing: { input_usd_per_mtok: 0.60, output_usd_per_mtok: 2.20 }
+
+stt:                        # local Turkish speech-to-text (stt.md phases 1-11)
+  enabled: true
+  provider: local_whisper   # local_whisper | scripted. Phase 7: the seam, not the model.
+  model: "oguzhangokboru/whisper-large-v3-tr"
+  device: auto              # auto | cuda | cpu
+  # MEASURED 2026-09-26 on this box (RTX 2060, 6144 MiB -- NOT the RTX 4070 stt.md
+  # assumes), on the same three Turkish clips, both precisions transcribing them
+  # identically and correctly:
+  #                  load      VRAM peak    latency (~1 s clip)
+  #   float16        6.1 s     4001 MiB     391 ms
+  #   int8_float16   11.4 s    2073 MiB     412 ms
+  # float16 wins on every axis that matters and still leaves 2.1 GB spare, and it
+  # is the only configuration the model's author smoke-tested
+  # (training_summary.json: compute_type float16, status passed), so it is the
+  # default. int8_float16 is the fallback when something else wants the VRAM --
+  # Chrome's own compositor takes a few hundred MB while the display is open.
+  # A card too small for the chosen type is detected at load and downgraded.
+  compute_type: float16          # float16 | int8_float16 | int8 | auto
+  language: "tr"            # the model is Turkish-only; never send it anything else
+  beam_size: 1              # phase 8: commands are short and independent
+  condition_on_previous_text: false
+  vad_filter: true          # faster-whisper's bundled Silero VAD, server side
+  vad_min_silence_ms: 500   # phase 3: speech-end confirmation
+  vad_speech_pad_ms: 200
+  max_utterance_s: 15.0     # phase 8 cap; longer audio is refused, not truncated
+  min_utterance_s: 0.25     # shorter than this is a click or a cough
+  sample_rate: 16000        # phase 2: 16 kHz mono float32 is what Whisper wants
+  warm_on_start: true       # phase 1: load once, keep resident, never per request
+  host: "127.0.0.1"         # loopback only: the mic service is not a network service
+  port: 8800
+  # Vite takes the next free port when 5173 is busy and only prints which one it
+  # got, so pinning a single origin here breaks the display on any machine that
+  # already has something on 5173 -- which is most of them. The dev range is
+  # listed instead. Still an allow-list, not "*": this service can route a
+  # command that records an operator decision.
+  cors_origins:
+    - "http://localhost:5173"
+    - "http://127.0.0.1:5173"
+    - "http://localhost:5174"
+    - "http://127.0.0.1:5174"
+    - "http://localhost:5175"
+    - "http://127.0.0.1:5175"
+    - "http://localhost:5176"
+    - "http://127.0.0.1:5176"
+    - "http://localhost:4173"   # vite preview, for a production-bundle check
+    - "http://127.0.0.1:4173"
+  metrics_file: "data/processed/stt_runs.jsonl"   # phase 11 observability
+
+voice:                      # what a finalised transcript is allowed to do
+  enabled: true
+  # Team decision: speech is admin-level and may reach every command in
+  # contracts/voice_commands.json, including the one that writes an operator
+  # decision. See logs/step_stt_development_logs.md S6 for the argument against
+  # and why it was overruled.
+  admin: true
+  registry_file: "contracts/voice_commands.json"
+  # The one safeguard left on the audit-writing commands: the operator has to say
+  # yes before the decision is recorded. Set false to remove it entirely.
+  confirm_audit_commands: true
+  confirm_timeout_s: 20.0
+  # Every transcript is routed by the LLM (team decision: no deterministic
+  # matcher in front of it). With the gateway unreachable the transcript is still
+  # shown and the operator acts by hand -- speech never silently does nothing.
+  router: llm               # llm only, today
+  max_transcript_chars: 400
 
 security:
   jwt_ttl_h: 8

@@ -1,0 +1,320 @@
+/* SESLE KONTROL. Same density and the same palette discipline as the other views:
+ * ink for everything, and the one coloured thing on the page is the marker on a
+ * command that writes to the record -- which genuinely is a warning. */
+
+.voice-view {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-6);
+  overflow: auto;
+  background: var(--surface-map);
+}
+
+/* --- the microphone stage ------------------------------------------------ */
+
+.voice-view__stage {
+  flex: none;
+  background: var(--surface);
+  border: var(--rule-width) solid var(--rule);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.voice-view__control {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.voice-view__mic {
+  flex: none;
+  min-width: 140px;
+  height: 44px;
+  font-size: var(--text-body);
+}
+
+.voice-view__mic.is-open {
+  background: var(--ink);
+  color: var(--ink-inverse);
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink-faint);
+}
+
+.voice-view__mic:disabled {
+  background: var(--surface-sunken);
+  color: var(--ink-faint);
+  border-color: var(--rule);
+  cursor: not-allowed;
+}
+
+.voice-view__readout {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.voice-view__phase {
+  font-size: var(--text-body);
+  letter-spacing: var(--tracking-label);
+}
+
+.voice-view__held {
+  font-size: var(--text-micro);
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.voice-view__error,
+.voice-view__hint,
+.voice-view__admin,
+.voice-view__note {
+  margin: 0;
+  font-size: var(--text-dense);
+  text-wrap: pretty;
+}
+
+.voice-view__error {
+  color: var(--risk-threat-deep);
+}
+
+.voice-view__hint {
+  color: var(--ink-muted);
+}
+
+.voice-view__admin {
+  color: var(--ink-body);
+  border-left: 2px solid var(--hairline);
+  padding-left: var(--space-4);
+}
+
+/* The provenance row, built like the header's honesty pills. */
+.voice-view__provenance {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: var(--text-micro);
+  color: var(--ink-muted);
+}
+
+.voice-view__provenance span {
+  border: 1px solid var(--rule);
+  padding: var(--space-1) var(--space-3);
+  white-space: nowrap;
+}
+
+/* --- the two columns ----------------------------------------------------- */
+
+.voice-view__columns {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 260px;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.voice-view__history,
+.voice-view__commands {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.voice-view__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--rule);
+}
+
+.voice-view__count {
+  font-size: var(--text-micro);
+  font-variant-numeric: tabular-nums;
+}
+
+.voice-view__empty {
+  padding: var(--space-8) var(--space-5);
+  text-align: center;
+}
+
+.voice-view__empty b {
+  display: block;
+  font-size: var(--text-body);
+  margin-bottom: var(--space-3);
+}
+
+.voice-view__empty p {
+  margin: 0;
+  font-size: var(--text-dense);
+}
+
+.voice-view__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* --- one heard utterance ------------------------------------------------- */
+
+.voice-row {
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.voice-row:last-child {
+  border-bottom: 0;
+}
+
+.voice-row__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.voice-row__clock {
+  font-size: var(--text-micro);
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.voice-row__command {
+  font-size: var(--text-micro);
+  background: var(--surface-sunken);
+  border: 1px solid var(--rule);
+  padding: var(--space-1) var(--space-3);
+}
+
+.voice-row__effect {
+  font-size: var(--text-micro);
+  letter-spacing: var(--tracking-label);
+  color: var(--ink-muted);
+  text-transform: uppercase;
+}
+
+/* The only coloured thing on this page: a command that wrote to the record.
+   That is a warning, so it may have the warning's ink. */
+.voice-row__effect[data-effect='audit'] {
+  color: var(--risk-threat-deep);
+  font-weight: 700;
+}
+
+.voice-row__meta {
+  font-size: var(--text-micro);
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.voice-row__text {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: 700;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+
+.voice-row__raw,
+.voice-row__normalised,
+.voice-row__done,
+.voice-row__failed,
+.voice-row__answer {
+  margin: 0;
+  font-size: var(--text-dense);
+  text-wrap: pretty;
+}
+
+.voice-row__raw,
+.voice-row__normalised {
+  color: var(--ink-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.voice-row__tag {
+  font-size: var(--text-micro);
+  letter-spacing: var(--tracking-label);
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+
+.voice-row__done {
+  color: var(--ink-body);
+}
+
+.voice-row__failed {
+  color: var(--ink-muted);
+}
+
+.voice-row__answer {
+  color: var(--ink-body);
+  border-left: 2px solid var(--rule);
+  padding-left: var(--space-4);
+  margin-top: var(--space-2);
+}
+
+/* --- the command list ---------------------------------------------------- */
+
+.voice-view__commands {
+  padding-bottom: var(--space-5);
+}
+
+.voice-view__note {
+  padding: var(--space-4) var(--space-5) 0;
+  color: var(--ink-muted);
+}
+
+.voice-view__commandlist {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.voice-view__commandlist code {
+  font-size: var(--text-micro);
+  background: var(--surface-sunken);
+  border: 1px solid var(--rule);
+  padding: var(--space-1) var(--space-3);
+}
+
+.voice-view__commands .btn {
+  margin: 0 var(--space-5);
+}
+
+/* The command list drops below the history before the history gets narrow: the
+   history is what an operator came to read. */
+@media (max-width: 900px) {
+  .voice-view__columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .voice-view {
+    padding: var(--space-4);
+  }
+
+  .voice-view__control {
+    flex-wrap: wrap;
+    gap: var(--space-4);
+  }
+
+  .voice-view__mic {
+    width: 100%;
+  }
+}

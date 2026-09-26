@@ -1,0 +1,85 @@
+/* The one dialog in the voice path.
+ *
+ * It is allowed a red accent where the rest of the voice UI is not, because this
+ * one genuinely is a warning: it guards the only irreversible action in the system.
+ * That is the same licence the alert modal takes, and for the same reason.
+ */
+
+.voice-confirm__scrim {
+  position: fixed;
+  inset: 0;
+  background: var(--scrim);
+  z-index: 60;
+}
+
+.voice-confirm {
+  position: fixed;
+  z-index: 61;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(440px, calc(100vw - 2 * var(--space-8)));
+  background: var(--surface);
+  border: var(--rule-width) solid var(--risk-threat-deep);
+  box-shadow: var(--lift-modal);
+  padding: var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.voice-confirm__title {
+  margin: 0;
+  font-size: var(--text-lead);
+  font-weight: 700;
+  letter-spacing: var(--tracking-title);
+  color: var(--risk-threat-deep);
+}
+
+.voice-confirm__body {
+  margin: 0;
+  font-size: var(--text-body);
+  line-height: var(--leading);
+  color: var(--ink);
+  text-wrap: pretty;
+}
+
+.voice-confirm__heard {
+  margin: 0;
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface-sunken);
+  border-left: 2px solid var(--hairline);
+  font-size: var(--text-dense);
+  color: var(--ink-body);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  text-wrap: pretty;
+}
+
+.voice-confirm__tag {
+  font-size: var(--text-micro);
+  letter-spacing: var(--tracking-label);
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+
+.voice-confirm__actions {
+  display: flex;
+  gap: var(--space-4);
+  justify-content: flex-end;
+}
+
+@media (max-width: 480px) {
+  .voice-confirm {
+    padding: var(--space-6);
+  }
+
+  .voice-confirm__actions {
+    flex-direction: column-reverse;
+  }
+
+  .voice-confirm__actions .btn {
+    width: 100%;
+  }
+}

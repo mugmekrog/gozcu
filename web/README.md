@@ -27,7 +27,7 @@ still works; the camera view shows a placeholder and says why.
 
 ```bash
 npm run typecheck   # tsc, no emit
-npm test            # 87 tests, no network
+npm test            # 149 tests, no network
 npm run build       # production bundle
 ```
 
@@ -45,17 +45,41 @@ VITE_API_BASE_URL=http://localhost:8000 npm run dev
 `src/api/http.ts` marks the four places where PLAN's REST surface does not yet
 cover what the screens need, each tagged `NEEDS-BACKEND`.
 
+## Voice control
+
+The microphone is in the agent column and works from every view; **SESLE KONTROL**
+(the fourth entry in the GÖRÜNÜM menu, or `S`) is where you see what was heard.
+
+It needs the local speech service running — see the speech section of the root
+README. Point the display at it with a Vite variable:
+
+```bash
+echo "VITE_STT_URL=http://127.0.0.1:8800" > .env.local
+npm run dev
+```
+
+Without it the app boots exactly as before with the microphone disabled and a line
+saying how to start the service, the same way AJANA SOR behaves with no gateway.
+
+`V` pushes to talk and again sends; the utterance also ends itself after about half
+a second of silence, or at 15 seconds. Speech is **admin-level** — it can reach every
+command in `contracts/voice_commands.json`, including the one that records an
+operator decision, and that one asks first. The reasoning and the open decisions are
+in `logs/step_stt_development_logs.md`.
+
 ## Layout
 
 ```
 src/
 ├── api/         the data seam: port + fixture and http adapters
+├── voice/       capture, endpointing, the speech seam, the command executor
 ├── domain/      pure logic — risk bands, polar projection, track sampling,
 │                brief assembly, formatting, the Turkish string table
-├── store/       Zustand state and the simulation clock
+├── store/       Zustand state, the simulation clock, and the speech session
 ├── radar/       the SVG tactical display, one file per layer
 ├── components/  panels and controls
-├── views/       Harita / Hareket / Kayıtlar
+├── views/       Harita / Hareket / Kayıtlar / Sesle kontrol
+├── test/        the fake data seam the shell tests share
 └── styles/      tokens.css is the single source of visual truth
 ```
 

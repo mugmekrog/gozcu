@@ -9,9 +9,15 @@
     python -m app.cli ask "why is T0187 red?"  # reviewer copilot
     python -m app.cli budget                   # spend against the $15 cap
     python -m app.cli smoke                    # gateway reachability and key info
+    python -m app.cli stt-probe                # load the speech model, report placement
+    python -m app.cli stt-file cmd.wav         # transcribe one WAV, with timings
+    python -m app.cli voice-route "kayitlara gec"   # transcript -> display command
+    python -m app.cli serve-stt                # the speech service the display calls
 
-Nothing here needs a network except `assess`, `parse-reports`, `ask` and `smoke`,
-and those degrade to the deterministic baseline when the gateway is unavailable.
+Nothing here needs a network except `assess`, `parse-reports`, `ask`, `smoke` and
+`voice-route`, and those degrade to the deterministic baseline when the gateway is
+unavailable. `stt-probe` and `stt-file` need the speech model in the Hugging Face
+cache, but no network once it is there.
 """
 
 from __future__ import annotations
@@ -493,6 +499,189 @@ def cmd_smoke(args: argparse.Namespace) -> int:
 # --------------------------------------------------------------------------- #
 
 
+def cmd_stt_probe(args: argparse.Namespace) -> int:
+    """Phase 1: does the speech model load on this machine, and at what cost."""
+    from app.stt.model import resolve_placement, total_vram_mb, vram_used_mb
+    from app.stt.service import SpeechToTextService
+
+    cfg = load_config(args.config)
+    total = total_vram_mb()
+    before = vram_used_mb()
+
+    print(f"configured : {cfg.stt.model}")
+    print(f"requested  : device={cfg.stt.device} compute_type={cfg.stt.compute_type}")
+    try:
+        placement = resolve_placement(cfg.stt)
+    except Exception as exc:
+        print(f"placement  : FAILED - {exc}")
+        return 1
+    print(f"resolved   : device={placement.device} compute_type={placement.compute_type}")
+    if placement.note:
+        print(f"note       : {placement.note}")
+    if total is not None:
+        print(f"gpu memory : {total:.0f} MiB total, {before or 0.0:.0f} MiB used before load")
+
+    service = SpeechToTextService(cfg)
+    status = service.warm()
+    if not status.ready:
+        code = status.error.value if status.error else "unknown"
+        print()
+        print(f"NOT READY  : {code}")
+        print(f"             {status.detail}")
+        return 1
+
+    after = vram_used_mb()
+    print()
+    print(f"loaded in  : {status.model_load_ms} ms")
+    if status.vram_used_mb is not None:
+        print(f"vram used  : {status.vram_used_mb:.0f} MiB by the model")
+    if after is not None and total is not None:
+        print(f"gpu memory : {after:.0f} / {total:.0f} MiB used now")
+    print(f"language   : {status.language} (pinned; the model is a Turkish fine-tune)")
+    print(f"max command: {status.max_utterance_s:.0f} s")
+    print()
+    print("ready. Transcribe a file with: python app/cli.py stt-file <path.wav>")
+    return 0
+
+
+def cmd_stt_file(args: argparse.Namespace) -> int:
+    """Phase 1.3: transcribe one file and show every measurement."""
+    from app.stt.schemas import Transcript
+    from app.stt.service import SpeechToTextService
+
+    cfg = load_config(args.config)
+    path = Path(args.path)
+    if not path.exists():
+        print(f"no such file: {path}", file=sys.stderr)
+        return 2
+
+    service = SpeechToTextService(cfg)
+    status = service.warm()
+    if not status.ready:
+        code = status.error.value if status.error else "unknown"
+        print(f"speech unavailable ({code}): {status.detail}", file=sys.stderr)
+        return 1
+    print(
+        f"model loaded in {status.model_load_ms} ms "
+        f"on {status.device}/{status.compute_type}",
+        file=sys.stderr,
+    )
+
+    result = service.transcribe_wav(path.read_bytes(), source="file")
+    if not isinstance(result, Transcript):
+        print()
+        print(f"REFUSED : {result.code.value}")
+        print(f"          {result.detail}")
+        if result.heard:
+            print(f"   heard: {result.heard!r}")
+        return 1
+
+    print()
+    print(f"transcript : {result.text}")
+    if result.raw_text.strip() != result.text:
+        print(f"model said : {result.raw_text.strip()}")
+    for change in result.normalised:
+        print(f"normalised : {change}")
+
+    metrics = result.metrics
+    print()
+    if metrics is not None:
+        print(
+            f"audio {metrics.audio_duration_ms} ms -> stt {metrics.stt_latency_ms} ms "
+            f"(rtf {metrics.real_time_factor:.3f})"
+        )
+        if metrics.vram_used_mb is not None:
+            print(f"vram in use : {metrics.vram_used_mb:.0f} MiB")
+        if metrics.speech_ratio is not None:
+            print(f"speech      : {metrics.speech_ratio * 100:.0f}% of the clip passed the VAD gate")
+    if result.confidence is not None:
+        print(f"confidence  : {result.confidence:.3f} (uncalibrated; mean token logprob)")
+    return 0
+
+
+def cmd_voice_route(args: argparse.Namespace) -> int:
+    """Phase 6: turn a transcript into the command the display would perform."""
+    from datetime import datetime, timezone
+
+    from app.stt.schemas import Transcript
+    from app.stt.transcripts import (
+        clean_text,
+        normalise_domain_terms,
+        spoken_numbers_to_digits,
+    )
+    from app.voice.registry import load_registry
+    from app.voice.router import RoutedCommand, VoiceRouter
+
+    cfg = load_config(args.config)
+    stack = build_agent_stack(cfg, interactive=True)
+    print(stack.describe(), file=sys.stderr)
+
+    digits, number_changes = spoken_numbers_to_digits(clean_text(args.text))
+    normalised, term_changes = normalise_domain_terms(digits)
+    normalised = clean_text(normalised)
+    for change in [*number_changes, *term_changes]:
+        print(f"normalised : {change}", file=sys.stderr)
+
+    registry = load_registry(cfg)
+    router = VoiceRouter(stack.runner, cfg, registry)
+    outcome = router.route(
+        Transcript(
+            id="cli_00001",
+            text=normalised,
+            raw_text=args.text,
+            language=cfg.stt.language,
+            duration=0.0,
+            timestamp=datetime.now(timezone.utc),
+        )
+    )
+
+    print()
+    print(f"heard   : {args.text}")
+    if normalised != args.text:
+        print(f"routed  : {normalised}")
+    if not isinstance(outcome, RoutedCommand):
+        print(f"FAILED  : {outcome.code}")
+        print(f"          {outcome.detail}")
+        return 1
+
+    print(f"command : {outcome.command}")
+    print(f"args    : {json.dumps(outcome.args, ensure_ascii=False)}")
+    print(f"effect  : {outcome.effect}")
+    if outcome.requires_confirmation:
+        print("CONFIRM : the display will ask before performing this")
+    if outcome.reason:
+        print(f"note    : {outcome.reason}")
+    cached = " (cached, free)" if outcome.from_cache else ""
+    print(
+        f"cost    : ${outcome.cost_usd:.5f}  {outcome.latency_ms} ms{cached}",
+        file=sys.stderr,
+    )
+    return 0
+
+
+def cmd_serve_stt(args: argparse.Namespace) -> int:
+    """Run the speech service the display talks to."""
+    try:
+        import uvicorn
+    except ImportError:
+        print(
+            "uvicorn is not installed. Install the speech extra: "
+            "pip install -r requirements-stt.txt",
+            file=sys.stderr,
+        )
+        return 1
+
+    from app.api.stt_server import create_app
+
+    cfg = load_config(args.config)
+    host = args.host or cfg.stt.host
+    port = args.port or cfg.stt.port
+    print(f"speech service on http://{host}:{port}", file=sys.stderr)
+    print(f"the display needs VITE_STT_URL=http://{host}:{port}", file=sys.stderr)
+    uvicorn.run(create_app(cfg), host=host, port=port, log_level="info")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="goru", description=__doc__.split("\n")[0])
     parser.add_argument("--config", default="goru.yaml", help="path to goru.yaml")
@@ -534,6 +723,23 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("budget", help="spend against the cap").set_defaults(func=cmd_budget)
     sub.add_parser("smoke", help="gateway reachability and key info").set_defaults(func=cmd_smoke)
+
+    sub.add_parser(
+        "stt-probe", help="load the speech model and report its placement"
+    ).set_defaults(func=cmd_stt_probe)
+
+    p = sub.add_parser("stt-file", help="transcribe one WAV file, with timings")
+    p.add_argument("path")
+    p.set_defaults(func=cmd_stt_file)
+
+    p = sub.add_parser("voice-route", help="turn a transcript into a display command")
+    p.add_argument("text")
+    p.set_defaults(func=cmd_voice_route)
+
+    p = sub.add_parser("serve-stt", help="run the speech service for the display")
+    p.add_argument("--host", default=None, help="override stt.host")
+    p.add_argument("--port", type=int, default=None, help="override stt.port")
+    p.set_defaults(func=cmd_serve_stt)
     return parser
 
 

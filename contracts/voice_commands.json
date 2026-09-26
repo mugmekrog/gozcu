@@ -1,0 +1,152 @@
+{
+  "version": "1",
+  "note": [
+    "The voice command registry: the one place the Python router and the browser",
+    "executor agree on what speech may do. The router turns this into the tool",
+    "schemas it offers the model; the browser turns it into the executor's switch.",
+    "A test on each side asserts its own half covers exactly these names, so a",
+    "command added here fails loudly on whichever side forgot it rather than",
+    "silently becoming an intent nothing performs.",
+    "",
+    "`effect` is the operator-visible consequence, and it is what decides whether",
+    "a spoken confirmation is required -- not the command's name:",
+    "  view    changes what is on screen and nothing else; freely reversible.",
+    "  compute spends from the gateway budget or GPU time; reversible but costly.",
+    "  audit   writes an operator decision into the record. NOT reversible.",
+    "",
+    "Voice is admin-level by team decision (see logs/step_stt_development_logs.md",
+    "S6): every command here is reachable by speech. `confirm` is the single",
+    "safeguard left, and `voice.confirm_audit_commands: false` in goru.yaml turns",
+    "even that off."
+  ],
+  "commands": [
+    {
+      "name": "set_view",
+      "effect": "view",
+      "confirm": false,
+      "summary": "Görünümü değiştir: harita, hareket, kayıtlar veya sesle kontrol.",
+      "args": {
+        "view": { "type": "string", "enum": ["map", "motion", "logs", "voice"], "required": true }
+      },
+      "utterances": [
+        "kayıtlar sayfasına geç",
+        "haritaya dön",
+        "hareket görünümünü aç",
+        "sesle kontrol ekranına git"
+      ]
+    },
+    {
+      "name": "select_frame",
+      "effect": "view",
+      "confirm": false,
+      "summary": "Bir drone karesini seç ve saati o kareye taşı.",
+      "args": {
+        "image_id": { "type": "string", "pattern": "^img_[0-9]{6}$", "required": true }
+      },
+      "utterances": ["img_000860 karesini seç", "sekiz yüz altmış numaralı kareyi aç"]
+    },
+    {
+      "name": "assess_frame",
+      "effect": "compute",
+      "confirm": false,
+      "summary": "Seçili kareyi değerlendir. Ajan katmanını çalıştırır ve bütçeden harcar.",
+      "args": {
+        "image_id": { "type": "string", "pattern": "^img_[0-9]{6}$", "required": false }
+      },
+      "utterances": ["bu kareyi değerlendir", "img_004388'i değerlendir", "değerlendirmeyi başlat"]
+    },
+    {
+      "name": "select_vehicle",
+      "effect": "view",
+      "confirm": false,
+      "summary": "Bir aracı haritada seç ve bilgi kutusunu aç.",
+      "args": { "track_id": { "type": "string", "pattern": "^T[0-9]{4}$", "required": true } },
+      "utterances": ["T0132'yi seç", "te yüz otuz iki numaralı aracı göster"]
+    },
+    {
+      "name": "pin_vehicle",
+      "effect": "view",
+      "confirm": false,
+      "summary": "Aracı sabitle veya sabitlemeyi kaldır. En fazla altı araç.",
+      "args": {
+        "track_id": { "type": "string", "pattern": "^T[0-9]{4}$", "required": true },
+        "pinned": { "type": "boolean", "required": false }
+      },
+      "utterances": ["T0029'u sabitle", "T0029'un sabitlemesini kaldır"]
+    },
+    {
+      "name": "set_clock",
+      "effect": "view",
+      "confirm": false,
+      "summary": "Tatbikat saatini belirli bir saate al.",
+      "args": { "hhmm": { "type": "string", "pattern": "^[0-9]{2}:[0-9]{2}$", "required": true } },
+      "utterances": ["saati 13:50'ye al", "on üç elliye git"]
+    },
+    {
+      "name": "set_playback",
+      "effect": "view",
+      "confirm": false,
+      "summary": "Tatbikat saatini oynat, duraklat veya hızını değiştir.",
+      "args": {
+        "playing": { "type": "boolean", "required": false },
+        "speed": { "type": "integer", "enum": [1, 30, 120, 300], "required": false }
+      },
+      "utterances": ["oynat", "duraklat", "hızı üç yüze al"]
+    },
+    {
+      "name": "set_filter",
+      "effect": "view",
+      "confirm": false,
+      "summary": "Bölge veya sınıf filtresini ayarla, ya da ölçeği değiştir.",
+      "args": {
+        "zone": { "type": "string", "required": false },
+        "vehicle_class": {
+          "type": "string",
+          "enum": ["car", "van", "truck", "bus", "all"],
+          "required": false
+        },
+        "scale_km": { "type": "integer", "enum": [3, 5, 8, 12], "required": false }
+      },
+      "utterances": ["sadece kamyonları göster", "ölçeği sekiz kilometreye al", "filtreyi temizle"]
+    },
+    {
+      "name": "open_camera",
+      "effect": "view",
+      "confirm": false,
+      "summary": "Seçili karenin drone görüntüsünü aç veya kapat.",
+      "args": { "open": { "type": "boolean", "required": false } },
+      "utterances": ["kamerayı aç", "görüntüyü kapat"]
+    },
+    {
+      "name": "dismiss_alert",
+      "effect": "view",
+      "confirm": false,
+      "summary": "Ekrandaki uyarı penceresini karar vermeden kapat.",
+      "args": {},
+      "utterances": ["uyarıyı kapat", "pencereyi kapat"]
+    },
+    {
+      "name": "record_decision",
+      "effect": "audit",
+      "confirm": true,
+      "summary": "Operatör kararını kaydet. Karar kayda geçer ve geri alınamaz.",
+      "args": {
+        "verdict": {
+          "type": "string",
+          "enum": ["confirmed", "false_alarm", "not_threat", "marked_threat"],
+          "required": true
+        },
+        "note": { "type": "string", "required": false }
+      },
+      "utterances": ["tehdidi onayla ve bildir", "yanlış alarm olarak kaydet", "tehdit değil"]
+    },
+    {
+      "name": "ask_copilot",
+      "effect": "compute",
+      "confirm": false,
+      "summary": "Soruyu salt-okunur kopilota sor. Komut olmayan her söz buraya düşer.",
+      "args": { "question": { "type": "string", "required": true } },
+      "utterances": ["T0029 neden iki kez durdu", "bu bölgede kaç araç var"]
+    }
+  ]
+}
