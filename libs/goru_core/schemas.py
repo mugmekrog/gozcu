@@ -162,12 +162,31 @@ class TrackProfile(_Model):
 
     n_steps: int
     total_distance_m: float
+    # speed
     speed_mean_mps: float
     speed_max_mps: float
     speed_p95_mps: float
     speed_std_mps: float
     accel_max_mps2: float
+    # stop structure
     moving_fraction: float = Field(ge=0, le=1)
+    stop_count: int = 0
+    longest_stop_min: float = 0.0
+    # path shape
+    net_displacement_m: float = 0.0
+    straightness: float = Field(default=0.0, ge=0, le=1, description="net / path length; 1 = beeline")
+    heading_change_deg: float = 0.0
+    reversals: int = 0
+    # range to base
+    base_range_start_m: float = 0.0
+    base_range_min_m: float = 0.0
+    base_closing_rate_mps: float = Field(default=0.0, description="positive = closing on base")
+    closing_step_fraction: float = Field(default=0.0, ge=0, le=1)
+    behaviour: list[str] = Field(
+        default_factory=list,
+        description="named behaviours the scalars support: waited_then_moved, "
+        "sustained_approach_to_base, doubled_back, direct_run",
+    )
 
 
 class TrackState(_Model):
