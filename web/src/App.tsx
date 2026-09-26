@@ -232,9 +232,13 @@ function Workspace() {
                   onShowSuppressed={setShowSuppressed} onSelectDetection={setCameraSelectedDetId} />
               </div>
             </div>}
-            <PhoneAlert critical={critical} clock={fmt.clockOf(dataset.origin_ts, tMin)}
-              date={lockDate(dataset.origin_ts, tMin)} enabled={notifyEnabled}
-              onSelect={(trackId) => { setView('map'); selectTrack(trackId); }} />
+            {/* Hidden, not unmounted, in Kayıtlar: the phone keeps track of what it
+                has announced, so coming back to the map does not replay it. */}
+            <div className="app__phone" hidden={view === 'logs'}>
+              <PhoneAlert critical={critical} clock={fmt.clockOf(dataset.origin_ts, tMin)}
+                date={lockDate(dataset.origin_ts, tMin)} enabled={notifyEnabled}
+                onSelect={(trackId) => { setView('map'); selectTrack(trackId); }} />
+            </div>
           </div>
           <Timeline originIso={dataset.origin_ts} startMin={dataset.sim.start_min} endMin={dataset.sim.end_min}
             tMin={tMin} frames={timelineFrames} selectedFrameId={selectedFrameId}

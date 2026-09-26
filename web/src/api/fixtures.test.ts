@@ -188,6 +188,21 @@ suite('reports.json', () => {
     expect(reports[0]!.report_id).toBe('R001');
     expect(reports[reports.length - 1]!.report_id).toBe('R137');
   });
+  it('carries the verdict each report got from the frames that could judge it', () => {
+    // Consistency is computed per frame; the export folds it back in, so the
+    // Kayıtlar view can show and filter it without loading all 40 frames.
+    const judged = reports.filter((r) => r.consistency != null);
+    expect(judged.length).toBeGreaterThan(0);
+    const frameIds = new Set(
+      (read<DatasetInfo>('dataset.json').frames ?? []).map((f) => f.image_id),
+    );
+    for (const report of judged) {
+      expect(frameIds.has(report.checked_in ?? ''), report.report_id).toBe(true);
+    }
+    for (const report of reports.filter((r) => r.consistency == null)) {
+      expect(report.checked_in ?? null, report.report_id).toBeNull();
+    }
+  });
 });
 
 suite('frames/*.json', () => {

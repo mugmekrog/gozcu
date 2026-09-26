@@ -627,14 +627,36 @@ def export(cfg_path: Path, with_images: bool) -> dict[str, Any]:
         json.dumps(tracks_payload, separators=(",", ":")), encoding="utf-8"
     )
 
+    # Consistency is judged per frame, against that frame's detections, so the
+    # dataset-level reports carry none of their own. Fold the frame verdicts back
+    # in: the most decisive one wins (a contradiction outranks agreement, which
+    # outranks "nothing nearby"), and `checked_in` names the frame that judged it.
+    verdict_rank = {"contradicts": 3, "agrees": 2, "unrelated": 1}
+    judged: dict[str, tuple[str, str | None, str]] = {}
+    for analysis in analyses:
+        for rep in analysis.reports:
+            if rep.consistency is None:
+                continue
+            best = judged.get(rep.report_id)
+            if best is None or verdict_rank[rep.consistency] > verdict_rank[best[0]]:
+                judged[rep.report_id] = (
+                    rep.consistency,
+                    rep.consistency_note,
+                    analysis.image.image_id,
+                )
+
+    def report_with_verdict(rep: FieldReport) -> dict[str, Any]:
+        out = {**report_json(rep), "t_min": minutes_from(origin, rep.ts), "checked_in": None}
+        if rep.report_id in judged:
+            consistency, note, image_id = judged[rep.report_id]
+            out.update(consistency=consistency, consistency_note=note, checked_in=image_id)
+        return out
+
     (OUT_DIR / "reports.json").write_text(
         json.dumps(
             {
                 "origin_ts": origin.isoformat(),
-                "reports": [
-                    {**report_json(rep), "t_min": minutes_from(origin, rep.ts)}
-                    for rep in dataset.reports
-                ],
+                "reports": [report_with_verdict(rep) for rep in dataset.reports],
             },
             separators=(",", ":"),
         ),
