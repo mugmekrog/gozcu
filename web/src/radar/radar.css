@@ -4,7 +4,36 @@
   display: block;
   /* The map does not scroll or select; dragging it should feel like a map. */
   user-select: none;
-  touch-action: manipulation;
+  touch-action: none;
+  cursor: grab;
+}
+
+.radar[data-dragging] {
+  cursor: grabbing;
+}
+
+/* --- recentre: shown only while the map is panned off the base ------------ */
+
+.radar-recentre {
+  cursor: pointer;
+}
+
+.radar-recentre rect {
+  fill: var(--surface-map);
+  stroke: var(--hairline);
+}
+
+.radar-recentre text {
+  fill: var(--ink);
+}
+
+.radar-recentre:hover rect {
+  stroke: var(--ink);
+}
+
+.radar-recentre:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
 }
 
 /* --- the sweep: the only unprompted motion on the display ----------------- */

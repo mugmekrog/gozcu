@@ -17,7 +17,7 @@
 import type { Enu } from './types';
 
 /** The scale options in the map toolbar, in kilometres of visible radius. */
-export const SCALE_OPTIONS = [3, 5, 8, 12] as const;
+export const SCALE_OPTIONS = [2, 3, 5, 8, 12] as const;
 export type ScaleKm = (typeof SCALE_OPTIONS)[number];
 
 /**
@@ -29,12 +29,19 @@ export type ScaleKm = (typeof SCALE_OPTIONS)[number];
  */
 export const DEFAULT_SCALE: ScaleKm = 8;
 
+/**
+ * The wheel zooms continuously between these radii, in kilometres. 1 km is the
+ * closest look the map offers; 12 km matches the widest scale option.
+ */
+export const MIN_ZOOM_KM = 1;
+export const MAX_ZOOM_KM = 12;
+
 /** SVG user-space extent. Fixed, so the viewBox is stable and text is crisp. */
 export const VIEW = { w: 960, h: 680, cx: 480, cy: 340 } as const;
 
 export interface Projection {
-  /** Visible radius in kilometres. */
-  scaleKm: ScaleKm;
+  /** Visible radius in kilometres. Any value: the wheel zooms continuously. */
+  scaleKm: number;
   /** SVG units per kilometre. */
   unitsPerKm: number;
   /** ENU metres to an SVG point. North is up, so north maps to -y. */
@@ -54,7 +61,7 @@ export interface Projection {
  * outermost ring is always fully on screen and the horizontal margin carries
  * the range labels.
  */
-export function projectionFor(scaleKm: ScaleKm): Projection {
+export function projectionFor(scaleKm: number): Projection {
   const usable = VIEW.h / 2 - 20;
   const unitsPerKm = usable / scaleKm;
   const limitM = scaleKm * 1000 * 1.02;
@@ -82,11 +89,15 @@ export function projectionFor(scaleKm: ScaleKm): Projection {
   };
 }
 
-/** Ring ranges in kilometres for a scale: whole kilometres, up to the edge. */
-export function ringsFor(scaleKm: ScaleKm): number[] {
-  const step = scaleKm <= 5 ? 1 : scaleKm <= 8 ? 1 : 2;
+/**
+ * Ring ranges in kilometres for a scale: whole kilometres (half kilometres at
+ * 2 km and closer), up to the edge.
+ * `extentKm` carries the rings further out once the map is panned off the base.
+ */
+export function ringsFor(scaleKm: number, extentKm: number = scaleKm): number[] {
+  const step = scaleKm <= 2 ? 0.5 : scaleKm <= 8 ? 1 : 2;
   const out: number[] = [];
-  for (let k = step; k <= scaleKm; k += step) out.push(k);
+  for (let k = step; k <= Math.max(scaleKm, extentKm); k += step) out.push(k);
   return out;
 }
 

@@ -86,7 +86,7 @@ function Workspace() {
   const menuOpen = useAppStore((s) => s.menuOpen);
   const zoneFilter = useAppStore((s) => s.zoneFilter);
   const classFilter = useAppStore((s) => s.classFilter);
-  const scaleKm = useAppStore((s) => s.scaleKm);
+  const scalePreset = useAppStore((s) => s.scalePreset);
   const selectedTrackId = useAppStore((s) => s.selectedTrackId);
   const pins = useAppStore((s) => s.pins);
   const selectedFrameId = useAppStore((s) => s.selectedFrameId);
@@ -278,7 +278,7 @@ function Workspace() {
             zones={dataset.zones}
             zoneFilter={zoneFilter}
             classFilter={classFilter}
-            scaleKm={scaleKm}
+            scalePreset={scalePreset}
             menuOpen={menuOpen}
             onMenuToggle={() => setMenuOpen(!menuOpen)}
             onZoneFilter={setZoneFilter}

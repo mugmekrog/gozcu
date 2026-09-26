@@ -75,7 +75,10 @@ interface State {
   // --- filters ------------------------------------------------------------- //
   zoneFilter: string | 'all';
   classFilter: VehicleClass | 'all';
-  scaleKm: ScaleKm;
+  /** Visible map radius in kilometres; continuous under the mouse wheel. */
+  scaleKm: number;
+  /** The toolbar option in force, or null once the wheel has zoomed off it. */
+  scalePreset: ScaleKm | null;
   showSuppressed: boolean;
   showAllInMotion: boolean;
 
@@ -121,6 +124,8 @@ interface Actions {
   setZoneFilter(zoneId: string | 'all'): void;
   setClassFilter(cls: VehicleClass | 'all'): void;
   setScale(scaleKm: ScaleKm): void;
+  /** Continuous zoom from the wheel; clears the toolbar's selection. */
+  setZoom(scaleKm: number): void;
   setShowSuppressed(show: boolean): void;
   setShowAllInMotion(show: boolean): void;
 
@@ -179,6 +184,7 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   zoneFilter: 'all',
   classFilter: 'all',
   scaleKm: DEFAULT_SCALE,
+  scalePreset: DEFAULT_SCALE,
   showSuppressed: false,
   showAllInMotion: false,
 
@@ -297,7 +303,10 @@ export const useAppStore = create<State & Actions>((set, get) => ({
     set({ classFilter });
   },
   setScale(scaleKm) {
-    set({ scaleKm });
+    set({ scaleKm, scalePreset: scaleKm });
+  },
+  setZoom(scaleKm) {
+    set({ scaleKm, scalePreset: null });
   },
   setShowSuppressed(showSuppressed) {
     set({ showSuppressed });
