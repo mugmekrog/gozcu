@@ -342,9 +342,22 @@ describe('Harita odaklı arayüz', () => {
     expect(screen.getByRole('heading', { name: /GÖZCÜ/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Harita' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Kayıtlar' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /Değerlendir|OYNAT|Hareket/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /Değerlendir/ })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /OYNAT|Hareket/ })).toBeNull();
     expect(document.querySelector('[data-vehicle-class="truck"] polygon')).toBeTruthy();
     expect(document.querySelector('[data-risk-level="ALERT"]')).toBeTruthy();
+  });
+
+  it('shows the assessment side panel and evaluates the selected frame', async () => {
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole('complementary', { name: 'AGENT OUTPUTS' })).toBeTruthy());
+    expect(screen.getByRole('button', { name: /Değerlendir/ })).toBeTruthy();
+
+    await act(async () => {
+      screen.getByRole('button', { name: /Değerlendir/ }).click();
+    });
+
+    await waitFor(() => expect(screen.getByRole('complementary', { name: 'AGENT OUTPUTS' }).textContent).toContain('kural tabanlı'));
   });
 
   it('ölçeği düğmelerle değiştirir ve uyarıyı araç kartından açar', async () => {
