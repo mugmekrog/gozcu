@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppHeader } from '@/components/AppHeader';
 import { MapToolbar } from '@/components/MapToolbar';
 import { Timeline } from '@/components/Timeline';
 import { VehicleInfobox } from '@/components/VehicleInfobox';
 import { PinList } from '@/components/PinList';
 import { TargetFrame } from '@/components/TargetFrame';
+import { TargetCrop } from '@/components/TargetCrop';
+import { PhoneAlert } from '@/components/PhoneAlert';
 import { AgentSteps } from '@/components/AgentSteps';
 import { BriefCard } from '@/components/BriefCard';
 import { AskAgent } from '@/components/AskAgent';
@@ -17,6 +19,7 @@ import { api } from '@/api';
 import { assembleBrief } from '@/domain/brief';
 import { framesOverZone, liveVehiclesAt, nearestZoneId, zoneAssessmentFor } from '@/domain/live';
 import { T } from '@/domain/strings';
+import * as fmt from '@/domain/format';
 import { useAppStore } from '@/store/useAppStore';
 import './app.css';
 
@@ -85,7 +88,10 @@ function Workspace() {
 
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraSelectedDetId, setCameraSelectedDetId] = useState<string | null>(null);
+  const [notifyEnabled, setNotifyEnabled] = useState(true);
   const client = api();
+  const loadFrame = useCallback((imageId: string) => client.frame(imageId), [client]);
+  const imageUrlOf = useCallback((imageId: string) => client.imageUrl(imageId), [client]);
 
   const vehicles = useMemo(() => {
     const all = liveVehiclesAt({
@@ -97,6 +103,11 @@ function Workspace() {
   }, [tMin, tracks, dataset, alertsByFrame, classFilter, zoneFilter]);
   const timelineFrames = useMemo(() => zoneFilter === 'all' ? dataset.frames
     : framesOverZone(dataset.frames, dataset.zones, zoneFilter), [dataset.frames, dataset.zones, zoneFilter]);
+  /* The phone is the system's push, not the map's view: it ignores the filters. */
+  const critical = useMemo(() => liveVehiclesAt({
+    tMin, tracks, frames: dataset.frames, alertsByFrame,
+    stationaryDispM: dataset.thresholds.stationary_disp_m, classFilter: 'all', zoneFilter: 'all',
+  }).filter((vehicle) => vehicle.level === 'ALERT'), [tMin, tracks, dataset, alertsByFrame]);
   const selectedVehicle = vehicles.find((vehicle) => vehicle.trackId === selectedTrackId) ?? null;
   const selectedSummary = dataset.frames.find((item) => item.image_id === selectedFrameId) ?? null;
   const stepsDone = steps.filter((step) => step.state === 'done' && step.index !== null).length;
@@ -143,7 +154,7 @@ function Workspace() {
 
   return (
     <div className="app">
-      <AppHeader />
+      <AppHeader notifyEnabled={notifyEnabled} onNotifyEnabledChange={setNotifyEnabled} />
       <div className="app__body">
         <main className="app__map panel">
           <MapToolbar view={view === 'logs' ? 'logs' : 'map'} onView={setView}
@@ -181,6 +192,9 @@ function Workspace() {
                   onShowSuppressed={setShowSuppressed} onSelectDetection={setCameraSelectedDetId} />
               </div>
             </div>}
+            <PhoneAlert critical={critical} clock={fmt.clockOf(dataset.origin_ts, tMin)}
+              date={lockDate(dataset.origin_ts, tMin)} enabled={notifyEnabled}
+              onSelect={(trackId) => { setView('map'); selectTrack(trackId); }} />
           </div>
           <Timeline originIso={dataset.origin_ts} startMin={dataset.sim.start_min} endMin={dataset.sim.end_min}
             tMin={tMin} frames={timelineFrames} selectedFrameId={selectedFrameId}
@@ -200,6 +214,7 @@ function Workspace() {
             onSelect={(imageId) => void openFrame(imageId)}
             onAssess={() => selectedFrameId && void assess(selectedFrameId)}
             onCamera={openCamera} />
+          {selectedVehicle && <TargetCrop vehicle={selectedVehicle} loadFrame={loadFrame} imageUrl={imageUrlOf} />}
           <AgentSteps steps={steps} phase={assessPhase} elapsedMs={assessElapsedMs}
             toolCalls={assessToolCalls} expanded={stepsExpanded} onExpandedChange={setStepsExpanded} />
           <BriefCard brief={brief} phase={assessPhase} imageId={selectedFrameId}
@@ -217,4 +232,12 @@ function Workspace() {
       {selectedSummary && <p className="sr-only" aria-live="polite">Seçili kare {selectedSummary.image_id}, {selectedSummary.capture_hhmm}, {selectedSummary.vehicle_count} araç.</p>}
     </div>
   );
+}
+
+/** "26 Eylül Cumartesi" for the phone's lock screen, in the clock's UTC frame. */
+function lockDate(originIso: string, tMin: number): string {
+  const d = new Date(Date.parse(originIso) + tMin * 60_000);
+  return new Intl.DateTimeFormat('tr-TR', {
+    day: 'numeric', month: 'long', weekday: 'long', timeZone: 'UTC',
+  }).format(d);
 }
