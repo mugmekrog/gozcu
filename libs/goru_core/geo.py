@@ -164,6 +164,26 @@ class Footprint:
         lat = self.lat_top + (v / self.height_px) * (self.lat_bottom - self.lat_top)
         return lat, lon
 
+    def latlon_to_pixel(self, lat: float, lon: float) -> tuple[float, float]:
+        """Project a GPS fix onto this image, including fixes outside its bounds.
+
+        This is the inverse of the image's top-left/top-right/bottom-left affine
+        transform. Returning out-of-frame coordinates lets the caller distinguish
+        an expected track outside the footprint from a missing detection.
+        """
+        lat0, lon0 = self.top_left
+        latx, lonx = self.top_right
+        laty, lony = self.bottom_left
+        ax, bx = latx - lat0, laty - lat0
+        ay, by = lonx - lon0, lony - lon0
+        determinant = ax * by - ay * bx
+        if abs(determinant) < 1e-15:
+            raise GeometryError(f"{self.image_id}: non-invertible image footprint")
+        dlat, dlon = lat - lat0, lon - lon0
+        u = (dlat * by - dlon * bx) / determinant
+        v = (ax * dlon - ay * dlat) / determinant
+        return u * self.width_px, v * self.height_px
+
     def contains_latlon(self, lat: float, lon: float) -> bool:
         """True when a ground point falls inside this footprint."""
         lo_lat, hi_lat = sorted((self.lat_top, self.lat_bottom))

@@ -16,9 +16,14 @@
 
 import type { Enu } from './types';
 
-/** The scale options in the map toolbar, in kilometres of visible radius. */
-export const SCALE_OPTIONS = [3, 5, 8, 12] as const;
-export type ScaleKm = (typeof SCALE_OPTIONS)[number];
+/** Visible radius in kilometres; continuous zoom is clamped to this range. */
+export type ScaleKm = number;
+export const MIN_SCALE = 2;
+export const MAX_SCALE = 16;
+export function zoomScale(current: number, direction: -1 | 1): number {
+  const next = direction < 0 ? current / 1.15 : current * 1.15;
+  return Math.min(MAX_SCALE, Math.max(MIN_SCALE, Math.round(next * 10) / 10));
+}
 
 /**
  * The default scale.
@@ -82,11 +87,11 @@ export function projectionFor(scaleKm: ScaleKm): Projection {
   };
 }
 
-/** Ring ranges in kilometres for a scale: whole kilometres, up to the edge. */
-export function ringsFor(scaleKm: ScaleKm): number[] {
-  const step = scaleKm <= 5 ? 1 : scaleKm <= 8 ? 1 : 2;
+/** Ring ranges extend past the viewport when the map is panned. */
+export function ringsFor(scaleKm: ScaleKm, extentKm = scaleKm): number[] {
+  const step = scaleKm <= 2 ? 0.5 : scaleKm <= 8 ? 1 : 2;
   const out: number[] = [];
-  for (let k = step; k <= scaleKm; k += step) out.push(k);
+  for (let k = step; k <= Math.max(scaleKm, extentKm); k += step) out.push(k);
   return out;
 }
 

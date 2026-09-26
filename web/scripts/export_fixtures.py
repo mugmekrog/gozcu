@@ -46,7 +46,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(REPO_ROOT / "libs"), str(REPO_ROOT / "services" / "api")]
 
 from goru_core.config import Config, load_config  # noqa: E402
-from goru_core.geo import bearing_deg  # noqa: E402
+from goru_core.geo import Footprint, bearing_deg  # noqa: E402
 from goru_core.schemas import (  # noqa: E402
     Alert,
     Detection,
@@ -299,6 +299,19 @@ def track_state_json(state: TrackState, destination: str | None) -> dict[str, An
     }
 
 
+def track_position_json(state: TrackState, footprint: Footprint) -> dict[str, Any]:
+    """Project the recorded GPS fix into the source image's pixel coordinates."""
+    lat, lon = state.pos_geo.lat, state.pos_geo.lon
+    x, y = footprint.latlon_to_pixel(lat, lon)
+    return {
+        "track_id": state.track_id,
+        "lat": lat,
+        "lon": lon,
+        "pixel": [r(x, 2), r(y, 2)],
+        "in_frame": footprint.contains_latlon(lat, lon),
+    }
+
+
 def zone_assessment_json(za: ZoneAssessment) -> dict[str, Any]:
     return {
         "zone_id": za.zone_id,
@@ -344,6 +357,8 @@ def alert_json(
         "stationary": state.stationary if state else None,
         "baseline_level": alert.baseline_level,
         "agent_level": alert.agent_level,
+        "jev_level": alert.jev_level,
+        "jev_confidence": alert.jev_confidence,
         "level": alert.level,
         "source": alert.source,
         "priority": shipped_priority(alert),
@@ -432,6 +447,7 @@ def build_frame_payload(
 ) -> dict[str, Any]:
     bundle = pipeline.bundle_of(analysis)
     brief = brief_json(policy.fallback(bundle), analysis)
+    footprint = pipeline.dataset.footprints[analysis.image.image_id]
 
     assessment_by_key: dict[tuple[str, str], ZoneAssessment] = {
         (track_id, za.zone_id): za
@@ -469,6 +485,10 @@ def build_frame_payload(
         "track_states": [
             track_state_json(state, analysis.destinations.get(track_id))
             for track_id, state in sorted(analysis.track_states.items())
+        ],
+        "track_positions": [
+            track_position_json(state, footprint)
+            for _, state in sorted(analysis.track_states.items())
         ],
         "zone_assessments": {
             track_id: [zone_assessment_json(za) for za in zas]

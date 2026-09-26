@@ -292,13 +292,14 @@ export function assembleBrief(frame: FrameDetail, opts: AssembleOptions): Assemb
   const reportLines = buildReportLines(frame);
   const level = alert?.level ?? 'CLEAR';
   const score = alert?.breakdown.score ?? 0;
+  const jevConfidence = alert?.jev_confidence ?? frame.jev_confidence;
 
   return {
     level,
     score,
     band: frame.track_states.length === 0 ? 'empty' : bandOf(level, score),
     source: frame.brief.source,
-    confidence: frame.brief.source === 'rules' ? '—' : T.agent.confidenceMid,
+    confidence: jevConfidence == null ? '—' : fmt.percent(jevConfidence),
     headline: buildHeadline(lead, frame),
     summary: frame.brief.image_summary || buildSummary(lead, reportLines),
     findings: buildFindings(
@@ -313,11 +314,11 @@ export function assembleBrief(frame: FrameDetail, opts: AssembleOptions): Assemb
     breakdown: alert?.breakdown ?? null,
     lead,
     dissent:
-      alert && alert.agent_level && alert.agent_level !== alert.baseline_level
+      alert && alert.source === 'rules_floor' && alert.jev_level
         ? {
             baseline: alert.baseline_level,
-            agent: alert.agent_level,
-            note: alert.agent_dissent,
+            agent: alert.jev_level,
+            note: null,
           }
         : null,
     vehicleCount: frame.track_states.length,

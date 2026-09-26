@@ -210,6 +210,17 @@ export function frameDetail(imageId: string, withVehicles: boolean): FrameDetail
           },
         ]
       : [],
+    track_positions: withVehicles
+      ? [
+          {
+            track_id: 'T0001',
+            lat: 39.92184,
+            lon: 32.87,
+            pixel: [454, 328] as [number, number],
+            in_frame: true,
+          },
+        ]
+      : [],
     zone_assessments: withVehicles
       ? {
           T0001: [

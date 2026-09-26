@@ -209,12 +209,39 @@ suite('frames/*.json', () => {
       expect(frame.capture_hhmm).toBe(summary.capture_hhmm);
       expect(frame.width_px).toBe(summary.width_px);
       expect(frame.track_states).toHaveLength(summary.vehicle_count);
+      expect(frame.track_positions).toHaveLength(frame.track_states.length);
       expect(frame.detections.filter((d) => d.kept)).toHaveLength(summary.kept_boxes);
       if (frame.funnel) {
         expect(frame.funnel.raw).toBe(frame.detections.length);
         expect(frame.funnel.kept).toBe(summary.kept_boxes);
       }
     }
+  });
+
+  it('projects each recorded GPS fix onto the image and preserves outside tracks', () => {
+    let outside = 0;
+    for (const summary of dataset.frames) {
+      const frame = read<FrameDetail>(join('frames', `${summary.image_id}.json`));
+      const stateIds = new Set(frame.track_states.map((state) => state.track_id));
+      const positionIds = new Set(frame.track_positions.map((position) => position.track_id));
+      expect(positionIds).toEqual(stateIds);
+      for (const match of frame.matches) {
+        expect(positionIds.has(match.track_id)).toBe(true);
+      }
+      for (const position of frame.track_positions) {
+        const [x, y] = position.pixel;
+        expect(Number.isFinite(x) && Number.isFinite(y)).toBe(true);
+        if (position.in_frame) {
+          expect(x).toBeGreaterThanOrEqual(-0.01);
+          expect(x).toBeLessThanOrEqual(frame.width_px + 0.01);
+          expect(y).toBeGreaterThanOrEqual(-0.01);
+          expect(y).toBeLessThanOrEqual(frame.height_px + 0.01);
+        } else {
+          outside += 1;
+        }
+      }
+    }
+    expect(outside).toBe(20);
   });
 
   it('gives every dropped box a reason and every kept box none', () => {

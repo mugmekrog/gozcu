@@ -129,7 +129,8 @@ export function useVoice(bindings: VoiceHostBindings): UseVoiceResult {
         return match?.zone_id ?? null;
       },
       setClassFilter: (cls: VehicleClass | 'all') => store().setClassFilter(cls),
-      setScale: (scale: ScaleKm) => store().setScale(scale),
+      // The store calls this one setZoom; the command vocabulary calls it scale.
+      setScale: (scale: ScaleKm) => store().setZoom(scale),
       setCameraOpen: bindings.setCameraOpen,
       closeModal: () => store().closeModal(),
       get hasModal() {

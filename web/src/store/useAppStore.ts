@@ -14,13 +14,14 @@
 import { create } from 'zustand';
 import { api } from '@/api';
 import type { AgentStep } from '@/api';
-import { DEFAULT_SCALE, type ScaleKm } from '@/domain/polar';
+import { DEFAULT_SCALE } from '@/domain/polar';
 import { minutesOf } from '@/domain/format';
 import type {
   Alert,
   Brief,
   DatasetInfo,
   Decision,
+  Enu,
   FieldReport,
   FrameDetail,
   TrackHistory,
@@ -79,7 +80,8 @@ interface State {
   // --- filters ------------------------------------------------------------- //
   zoneFilter: string | 'all';
   classFilter: VehicleClass | 'all';
-  scaleKm: ScaleKm;
+  /** Visible map radius in kilometres; set continuously by the mouse wheel. */
+  scaleKm: number;
   showSuppressed: boolean;
   showAllInMotion: boolean;
 
@@ -98,6 +100,11 @@ interface State {
   modal: ModalKind | null;
   modalInfoOpen: boolean;
   modalTargetDetId: string | null;
+  /**
+   * A request for the map to centre on a ground point. `seq` makes a repeat
+   * request for the same point still move a map the operator has panned since.
+   */
+  mapFocus: { enu: Enu; seq: number } | null;
 
   // --- record -------------------------------------------------------------- //
   decisions: Decision[];
@@ -124,12 +131,14 @@ interface Actions {
 
   setZoneFilter(zoneId: string | 'all'): void;
   setClassFilter(cls: VehicleClass | 'all'): void;
-  setScale(scaleKm: ScaleKm): void;
+  /** Continuous zoom from the mouse wheel. */
+  setZoom(scaleKm: number): void;
   setShowSuppressed(show: boolean): void;
   setShowAllInMotion(show: boolean): void;
 
   /** Open a frame: loads its detail and moves the clock to its capture time. */
   openFrame(imageId: string, opts?: { seek?: boolean }): Promise<void>;
+  focusMap(enu: Enu): void;
   assess(imageId: string): Promise<void>;
   setStepsExpanded(expanded: boolean): void;
 
@@ -199,6 +208,7 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   modal: null,
   modalInfoOpen: false,
   modalTargetDetId: null,
+  mapFocus: null,
 
   decisions: [],
   toast: null,
@@ -300,7 +310,7 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   setClassFilter(classFilter) {
     set({ classFilter });
   },
-  setScale(scaleKm) {
+  setZoom(scaleKm) {
     set({ scaleKm });
   },
   setShowSuppressed(showSuppressed) {
@@ -348,6 +358,10 @@ export const useAppStore = create<State & Actions>((set, get) => ({
     }
   },
 
+  focusMap(enu) {
+    set({ mapFocus: { enu, seq: (get().mapFocus?.seq ?? 0) + 1 } });
+  },
+
   async assess(imageId) {
     if (get().assessPhase === 'running') return;
     set({
@@ -361,6 +375,7 @@ export const useAppStore = create<State & Actions>((set, get) => ({
       selectedFrameId: imageId,
     });
 
+    let hasLiveFrame = false;
     for await (const event of api().assess(imageId)) {
       if (get().selectedFrameId !== imageId) return;
 
@@ -376,7 +391,16 @@ export const useAppStore = create<State & Actions>((set, get) => ({
           break;
         }
         case 'brief':
-          set({ brief: event.brief });
+          set({
+            brief: event.brief,
+            frame: get().frame?.image_id === imageId
+              ? { ...get().frame!, brief: event.brief }
+              : get().frame,
+          });
+          break;
+        case 'decision':
+          hasLiveFrame = true;
+          set({ frame: event.frame, frameLoading: false });
           break;
         case 'done': {
           set({
@@ -387,8 +411,10 @@ export const useAppStore = create<State & Actions>((set, get) => ({
           });
           // The frame detail is cached by the adapter, so this is free, and it
           // guarantees the brief and the map agree on which frame is open.
-          const detail = await api().frame(imageId);
-          if (get().selectedFrameId === imageId) set({ frame: detail, frameLoading: false });
+          if (!hasLiveFrame) {
+            const detail = await api().frame(imageId);
+            if (get().selectedFrameId === imageId) set({ frame: detail, frameLoading: false });
+          }
           break;
         }
         case 'error':

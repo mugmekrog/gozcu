@@ -58,6 +58,26 @@ def test_golden_pixel_to_geo(dataset):
     assert math.isclose(lon, 32.871430, abs_tol=1e-6)
 
 
+def test_recorded_gps_fixes_project_to_photo_pixels(dataset, analyses):
+    """The camera overlay uses the GPS fix, including 20 points outside a frame."""
+    outside = 0
+    for analysis in analyses:
+        footprint = dataset.footprints[analysis.image.image_id]
+        for state in analysis.track_states.values():
+            lat, lon = state.pos_geo.lat, state.pos_geo.lon
+            x, y = footprint.latlon_to_pixel(lat, lon)
+            restored_lat, restored_lon = footprint.pixel_to_latlon(x, y)
+            assert math.isclose(restored_lat, lat, abs_tol=1e-8)
+            assert math.isclose(restored_lon, lon, abs_tol=1e-8)
+            if footprint.contains_latlon(lat, lon):
+                assert 0 <= x <= footprint.width_px
+                assert 0 <= y <= footprint.height_px
+            else:
+                outside += 1
+                assert x < 0 or x > footprint.width_px or y < 0 or y > footprint.height_px
+    assert outside == 20
+
+
 def test_golden_image_gsd(dataset):
     footprint = dataset.footprints["img_000860"]
     assert math.isclose(footprint.gsd_x_m, 0.1248, abs_tol=5e-4)

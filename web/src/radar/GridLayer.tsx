@@ -1,9 +1,8 @@
-/* The polar grid: roads, range rings, the sweep and the north mark.
+/* The polar grid: roads and range rings. The north mark stays fixed in Radar.
  *
  * Memoised on the scale alone, because none of it moves with the clock. That is
  * the single biggest thing keeping the map cheap during playback: roughly 40
- * static nodes are built once per scale change and React skips the whole subtree
- * on every tick after that.
+ * static nodes are built once per scale change.
  */
 
 import { memo } from 'react';
@@ -12,16 +11,19 @@ import { MAJOR_BEARINGS, ringsFor, VIEW, type Projection } from '@/domain/polar'
 /** Ring labels sit off the 022.5 bearing so they never collide with a spoke. */
 const LABEL_BEARING = 22.5;
 
-export const GridLayer = memo(function GridLayer({ projection }: { projection: Projection }) {
-  const rings = ringsFor(projection.scaleKm);
-  const edge = projection.scaleKm * 1.02;
+export const GridLayer = memo(function GridLayer({ projection, extentKm = projection.scaleKm }: {
+  projection: Projection;
+  extentKm?: number;
+}) {
+  const rings = ringsFor(projection.scaleKm, extentKm);
+  const roadEdge = Math.max(projection.scaleKm, extentKm) * 1.02;
 
   return (
     <g aria-hidden="true">
       {/* The eight approach roads, drawn as broad pale bands rather than lines:
           the zones sit on them, so they read as terrain, not as graticule. */}
       {MAJOR_BEARINGS.map((bearing) => {
-        const [x, y] = projection.polar(bearing, edge);
+        const [x, y] = projection.polar(bearing, roadEdge);
         return (
           <line
             key={`road-${bearing}`}
@@ -55,37 +57,6 @@ export const GridLayer = memo(function GridLayer({ projection }: { projection: P
         );
       })}
 
-      {/* The sweep. The one piece of unprompted motion in the interface, and it
-          earns its place: it is the only thing that says the display is live
-          rather than a still. Suppressed under prefers-reduced-motion. */}
-      <g className="radar-sweep">
-        <path
-          d={sweepPath(projection, edge)}
-          fill="var(--terrain)"
-          fillOpacity={0.07}
-          stroke="var(--terrain)"
-          strokeOpacity={0.35}
-        />
-      </g>
-
-      <text
-        x={VIEW.w - 20}
-        y={26}
-        fontSize={13}
-        fontWeight={700}
-        textAnchor="end"
-        fill="var(--ink)"
-      >
-        K ↑
-      </text>
     </g>
   );
 });
-
-/** A 30-degree wedge from north, which the CSS animation rotates. */
-function sweepPath(projection: Projection, edgeKm: number): string {
-  const [x0, y0] = projection.polar(0, edgeKm);
-  const [x1, y1] = projection.polar(30, edgeKm);
-  const r = projection.radius(edgeKm * 1000);
-  return `M${VIEW.cx} ${VIEW.cy} L${x0} ${y0} A${r} ${r} 0 0 1 ${x1} ${y1} Z`;
-}

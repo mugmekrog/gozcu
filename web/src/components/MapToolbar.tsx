@@ -1,127 +1,90 @@
-/* The map card's toolbar: view menu, filters, legend, scale.
- *
- * The legend sits here rather than floating over the map because it has to be
- * readable from across a room during the demo (PLAN F3.4) and because a legend
- * that overlaps the display competes with the thing it explains.
- */
-
 import { memo } from 'react';
-import { GlyphChip } from '@/radar/Glyph';
-import { SCALE_OPTIONS, type ScaleKm } from '@/domain/polar';
 import { T } from '@/domain/strings';
-import type { VehicleClass, Zone } from '@/domain/types';
+import { MAX_SCALE, MIN_SCALE, zoomScale } from '@/domain/polar';
+import type { FrameSummary, VehicleClass, Zone } from '@/domain/types';
+import type { ViewName } from '@/store/useAppStore';
 import './map-toolbar.css';
 
 const CLASSES: VehicleClass[] = ['car', 'van', 'truck', 'bus'];
+const SYMBOLS: Record<VehicleClass, string> = { car: '■', van: '▲', truck: '★', bus: '●' };
 
 export interface MapToolbarProps {
-  viewName: string;
+  view: 'map' | 'logs';
+  onView: (view: ViewName) => void;
   zones: readonly Zone[];
   zoneFilter: string | 'all';
   classFilter: VehicleClass | 'all';
-  scaleKm: ScaleKm;
-  menuOpen: boolean;
-  onMenuToggle: () => void;
+  scaleKm: number;
+  selectedFrame: FrameSummary | null;
   onZoneFilter: (value: string | 'all') => void;
   onClassFilter: (value: VehicleClass | 'all') => void;
-  onScale: (value: ScaleKm) => void;
+  onScale: (value: number) => void;
+  onCamera: () => void;
 }
 
 export const MapToolbar = memo(function MapToolbar({
-  viewName,
-  zones,
-  zoneFilter,
-  classFilter,
-  scaleKm,
-  menuOpen,
-  onMenuToggle,
-  onZoneFilter,
-  onClassFilter,
-  onScale,
+  view, onView, zones, zoneFilter, classFilter, scaleKm, selectedFrame,
+  onZoneFilter, onClassFilter, onScale, onCamera,
 }: MapToolbarProps) {
-  return (
-    <div className="map-toolbar">
-      <button
-        type="button"
-        className={menuOpen ? 'btn btn--icon btn--primary' : 'btn btn--icon'}
-        aria-label={T.view.openMenu}
-        aria-expanded={menuOpen}
-        onClick={onMenuToggle}
-      >
-        ☰
-      </button>
+  const zoneName = zones.find((zone) => zone.zone_id === zoneFilter)?.name ?? T.filter.all;
+  const className = classFilter === 'all' ? T.filter.all : T.cls[classFilter];
+  const choose = (event: React.MouseEvent<HTMLButtonElement>, action: () => void) => {
+    action();
+    event.currentTarget.closest('details')?.removeAttribute('open');
+  };
 
-      <label className="chip-select" data-active={zoneFilter !== 'all'}>
-        <span className="chip-select__label">{T.filter.zone}</span>
-        <select
-          value={zoneFilter}
-          onChange={(event) => onZoneFilter(event.target.value)}
-          aria-label={T.filter.zone}
-        >
-          <option value="all">{T.filter.all}</option>
-          {zones.map((zone) => (
-            <option key={zone.zone_id} value={zone.zone_id}>
-              {zone.name}
-            </option>
-          ))}
-        </select>
-      </label>
+  return <div className="map-toolbar" data-view={view}>
+    <nav className="map-toolbar__nav" aria-label="Görünümler">
+      <button type="button" className="map-toolbar__tab" aria-current={view === 'map' ? 'page' : undefined}
+        onClick={() => onView('map')}>{T.view.mapName}</button>
+      <button type="button" className="map-toolbar__tab" aria-current={view === 'logs' ? 'page' : undefined}
+        onClick={() => onView('logs')}>{T.view.logsName}</button>
+    </nav>
 
-      <label className="chip-select" data-active={classFilter !== 'all'}>
-        <span className="chip-select__label">{T.filter.class}</span>
-        <select
-          value={classFilter}
-          onChange={(event) => onClassFilter(event.target.value as VehicleClass | 'all')}
-          aria-label={T.filter.class}
-        >
-          <option value="all">{T.filter.all}</option>
-          {CLASSES.map((cls) => (
-            <option key={cls} value={cls}>
-              {T.cls[cls]}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <p className="map-toolbar__view">
-        <span className="label">{T.view.kicker}</span>
-        <span className="map-toolbar__view-name">{viewName}</span>
-      </p>
-
-      <div className="spacer" />
-
-      <ul className="map-toolbar__legend">
-        <li>
-          <GlyphChip band="low" /> {T.legend.safe}
-        </li>
-        <li>
-          <GlyphChip band="review" /> {T.legend.review}
-        </li>
-        <li>
-          <GlyphChip band="critical" /> {T.legend.threat}
-        </li>
-        <li>
-          <span className="map-toolbar__swatch" aria-hidden="true" /> {T.legend.zones}
-        </li>
-      </ul>
-
-      <div className="map-toolbar__scale">
-        <span className="label">{T.filter.scale}</span>
-        <div className="seg" role="group" aria-label={T.filter.scale}>
-          {SCALE_OPTIONS.map((option) => (
-            <button
-              key={option}
-              type="button"
-              className="seg__opt"
-              aria-pressed={option === scaleKm}
-              onClick={() => onScale(option)}
-            >
-              {option}
-              {option === SCALE_OPTIONS[SCALE_OPTIONS.length - 1] ? ` ${T.filter.scaleUnit}` : ''}
-            </button>
-          ))}
+    <div className="map-toolbar__filters">
+      <details className="filter-popover">
+        <summary aria-label={`${T.filter.zone}: ${zoneName}`}>
+          <span className="filter-popover__caption">{T.filter.zone}</span>
+          <strong>{zoneName}</strong><span className="filter-popover__chevron" aria-hidden="true">⌄</span>
+        </summary>
+        <div className="filter-popover__options" role="group" aria-label={T.filter.zone}>
+          <button type="button" aria-pressed={zoneFilter === 'all'} onClick={(event) => choose(event, () => onZoneFilter('all'))}>{T.filter.all}</button>
+          {zones.map((zone) => <button key={zone.zone_id} type="button" aria-pressed={zoneFilter === zone.zone_id}
+            onClick={(event) => choose(event, () => onZoneFilter(zone.zone_id))}>{zone.name}</button>)}
         </div>
-      </div>
+      </details>
+      <details className="filter-popover">
+        <summary aria-label={`${T.filter.class}: ${className}`}>
+          <span className="filter-popover__caption">{T.filter.class}</span>
+          <strong>{className}</strong><span className="filter-popover__chevron" aria-hidden="true">⌄</span>
+        </summary>
+        <div className="filter-popover__options" role="group" aria-label={T.filter.class}>
+          <button type="button" aria-pressed={classFilter === 'all'} onClick={(event) => choose(event, () => onClassFilter('all'))}>{T.filter.all}</button>
+          {CLASSES.map((cls) => <button key={cls} type="button" aria-pressed={classFilter === cls}
+            onClick={(event) => choose(event, () => onClassFilter(cls))}><span aria-hidden="true">{SYMBOLS[cls]} </span>{T.cls[cls]}</button>)}
+        </div>
+      </details>
     </div>
-  );
+
+    <div className="map-toolbar__spacer" />
+    <div className="map-toolbar__legend" aria-label="Araç işaretleri ve uyarı renkleri">
+      <span className="map-toolbar__class"><b>■</b> Otomobil</span>
+      <span className="map-toolbar__class"><b>▲</b> Minibüs</span>
+      <span className="map-toolbar__class"><b>★</b> Kamyon</span>
+      <span className="map-toolbar__class"><b>●</b> Otobüs</span>
+      <span className="map-toolbar__risk"><i data-risk="safe" />Güvenli</span>
+      <span className="map-toolbar__risk"><i data-risk="watch" />Şüpheli</span>
+      <span className="map-toolbar__risk"><i data-risk="alert" />Tehlike</span>
+    </div>
+    <div className="map-toolbar__zoom" role="group" aria-label="Harita ölçeği">
+      <button type="button" aria-label="Yakınlaştır" disabled={scaleKm <= MIN_SCALE}
+        onClick={() => onScale(zoomScale(scaleKm, -1))}>+</button>
+      <output>{scaleKm.toFixed(1)} km</output>
+      <button type="button" aria-label="Uzaklaştır" disabled={scaleKm >= MAX_SCALE}
+        onClick={() => onScale(zoomScale(scaleKm, 1))}>−</button>
+    </div>
+    <button type="button" className="map-toolbar__camera" disabled={!selectedFrame} onClick={onCamera}>
+      <span aria-hidden="true">▣</span> {selectedFrame?.image_id ?? 'Kare seçin'} · Görüntü
+    </button>
+  </div>;
 });

@@ -4,23 +4,36 @@
   display: block;
   /* The map does not scroll or select; dragging it should feel like a map. */
   user-select: none;
-  touch-action: manipulation;
+  touch-action: none;
+  cursor: grab;
 }
 
-/* --- the sweep: the only unprompted motion on the display ----------------- */
-
-.radar-sweep {
-  transform-origin: 50% 50%;
-  animation: radar-rotate 10s linear infinite;
+.radar[data-dragging] {
+  cursor: grabbing;
 }
 
-@keyframes radar-rotate {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+/* --- recentre: shown only while the map is panned off the base ------------ */
+
+.radar-recentre {
+  cursor: pointer;
+}
+
+.radar-recentre rect {
+  fill: var(--surface-map);
+  stroke: var(--hairline);
+}
+
+.radar-recentre text {
+  fill: var(--ink);
+}
+
+.radar-recentre:hover rect {
+  stroke: var(--ink);
+}
+
+.radar-recentre:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
 }
 
 /* --- zones ---------------------------------------------------------------- */
@@ -73,15 +86,8 @@
   fill: var(--ground);
 }
 
-/* An operator who has asked for less motion gets a still display. The sweep is
- * decoration; the pulse is a warning, so it degrades to a solid ring rather
- * than disappearing. */
+/* The warning pulse becomes a static ring when motion is reduced. */
 @media (prefers-reduced-motion: reduce) {
-  .radar-sweep {
-    animation: none;
-    opacity: 0.5;
-  }
-
   .radar-zone__pulse {
     animation: none;
   }

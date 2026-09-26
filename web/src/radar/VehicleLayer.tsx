@@ -5,16 +5,17 @@
  * trail. SVG has no z-index, so paint order *is* the layering, and doing it in
  * three passes rather than one group per vehicle is what makes that reliable.
  *
- * Labelling is rationed on purpose. At the busiest clock the shipped data puts
+ * Shape identifies vehicle class; colour identifies warning level. Labelling is
+ * rationed on purpose. At the busiest clock the shipped data puts
  * dozens of vehicles on screen, and labelling all of them would bury the display
  * in text; so a label appears only for a vehicle that is selected, pinned, or at
  * threat level. Everything else is identified on hover and in the tables.
  */
 
 import { memo } from 'react';
-import { Glyph } from './Glyph';
+import { VehicleSymbol } from './VehicleSymbol';
 import { bandOf } from '@/domain/risk';
-import { classLabel } from '@/domain/strings';
+import { classLabel, T } from '@/domain/strings';
 import { trailAt } from '@/domain/tracks';
 import type { Projection } from '@/domain/polar';
 import type { LiveVehicle } from '@/domain/live';
@@ -45,7 +46,6 @@ export interface VehicleLayerProps {
   selectedId: string | null;
   hoveredId: string | null;
   pins: readonly string[];
-  playing: boolean;
   onSelect: (trackId: string | null) => void;
   onHover: (trackId: string | null) => void;
 }
@@ -58,7 +58,6 @@ export const VehicleLayer = memo(function VehicleLayer({
   selectedId,
   hoveredId,
   pins,
-  playing,
   onSelect,
   onHover,
 }: VehicleLayerProps) {
@@ -71,7 +70,6 @@ export const VehicleLayer = memo(function VehicleLayer({
 
   for (const vehicle of vehicles) {
     const [x, y] = projection.project(vehicle.sample.enu);
-    const band = bandOf(vehicle.level, vehicle.score);
     const pin = pinIndex.get(vehicle.trackId);
     const selected = vehicle.trackId === selectedId;
     const hovered = vehicle.trackId === hoveredId;
@@ -86,7 +84,7 @@ export const VehicleLayer = memo(function VehicleLayer({
     const dimmed = focusing && !selected && !pinned;
     const history = histories.get(vehicle.trackId);
 
-    if (history && (selected || pinned || (playing && !dimmed))) {
+    if (history && (selected || pinned)) {
       const minutes = pinned || selected ? PIN_TRAIL_MINUTES : TRAIL_MINUTES;
       const points = trailAt(history, tMin, minutes);
       if (points.length > 1) {
@@ -95,7 +93,7 @@ export const VehicleLayer = memo(function VehicleLayer({
             key={`trail-${vehicle.trackId}`}
             points={points.map((p) => projection.project(p).join(',')).join(' ')}
             fill="none"
-            stroke={pinned ? pinColour : selected ? 'var(--risk-threat)' : 'var(--ink-faint)'}
+            stroke={pinned ? pinColour : 'var(--ink)'}
             strokeWidth={selected ? 3.5 : pinned ? 2.5 : 1.5}
             strokeOpacity={selected ? 0.85 : pinned ? 0.8 : 0.4}
             strokeDasharray={selected ? '9 6' : undefined}
@@ -139,9 +137,7 @@ export const VehicleLayer = memo(function VehicleLayer({
         className="radar-vehicle"
         role="button"
         tabIndex={dimmed ? -1 : 0}
-        aria-label={`${vehicle.trackId}, ${classLabel(vehicle.cls)}, ${
-          vehicle.level ?? 'değerlendirilmedi'
-        }`}
+        aria-label={`${vehicle.trackId}, ${classLabel(vehicle.cls)}, ${T.band[bandOf(vehicle.level, vehicle.score)]}`}
         onClick={(event) => {
           event.stopPropagation();
           onSelect(selected ? null : vehicle.trackId);
@@ -158,14 +154,13 @@ export const VehicleLayer = memo(function VehicleLayer({
         {/* A generous invisible hit area: the symbols are 9-14 px and the
             pointer target has to be comfortable without enlarging the mark. */}
         <circle cx={x} cy={y} r={11} fill="transparent" />
-        <Glyph
+        <VehicleSymbol
           x={x}
           y={y}
-          band={band}
+          cls={vehicle.cls}
+          level={vehicle.level}
           size={selected ? 7 : vehicle.level === 'CLEAR' || vehicle.level === null ? 4.5 : 5.5}
-          fill={dimmed ? 'var(--ink-muted)' : undefined}
           opacity={dimmed ? 0.2 : 1}
-          strokeWidth={selected ? 1.5 : 1}
         />
       </g>,
     );

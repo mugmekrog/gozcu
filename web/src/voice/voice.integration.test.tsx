@@ -13,10 +13,11 @@
  * agrees, and nothing is recorded if they decline.
  */
 
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from '@/App';
 import { setApi } from '@/api';
+import { useAppStore } from '@/store/useAppStore';
 import { FakeApi } from '@/test/fake-api';
 import { useVoiceStore, entryFromTranscript } from '@/store/useVoiceStore';
 import {
@@ -140,6 +141,7 @@ beforeEach(() => {
   fake = new FakeApi();
   setApi(fake);
   stubAudioApis();
+  useAppStore.setState({ view: 'map', modal: null, selectedTrackId: null });
   /* The voice store is a module singleton and `useVoice` reads availability once,
    * so `statusLoaded` has to be cleared too -- otherwise a later test inherits the
    * status an earlier one installed and the adapter it sets is never consulted. */
@@ -167,11 +169,11 @@ afterEach(() => {
 
 async function boot() {
   render(<App />);
-  await waitFor(() => expect(screen.getByText('AGENT OUTPUTS')).toBeTruthy());
+  await waitFor(() => expect(screen.getByRole('img', { name: /Bölge haritası/ })).toBeTruthy());
 }
 
 describe('the speech dock', () => {
-  it('is present in the agent column in every view', async () => {
+  it('is present in the shell, whichever view is on stage', async () => {
     setSttApi(new FakeStt(readyStatus()));
     await boot();
     expect(screen.getByText('SESLE KONTROL')).toBeTruthy();
@@ -210,27 +212,22 @@ describe('the speech dock', () => {
 });
 
 describe('the speech view', () => {
-  it('is the fourth entry in the view menu and opens', async () => {
+  it('opens from the dock shortcut and from the S key', async () => {
     setSttApi(new FakeStt(readyStatus()));
     await boot();
 
     await act(async () => {
-      screen.getByRole('button', { name: /Görünüm menüsünü aç/ }).click();
+      screen.getByRole('button', { name: /Sesle kontrol →/ }).click();
     });
+    await waitFor(() => expect(screen.getByText('DUYULANLAR')).toBeTruthy());
 
-    // Scoped to the menu: the dock also carries a "Sesle kontrol →" shortcut.
-    const menu = screen.getByRole('dialog', { name: /GÖRÜNÜM/ });
-    const items = Array.from(menu.querySelectorAll('button')).filter((button) =>
-      button.textContent?.includes('Sesle kontrol'),
-    );
-    expect(items).toHaveLength(1);
-    // It is the fourth, after Harita, Hareket and Kayıtlar.
-    const all = Array.from(menu.querySelectorAll('.view-menu__item'));
-    expect(all).toHaveLength(4);
-    expect(all[3]?.textContent).toContain('Sesle kontrol');
-
+    // Back to the map via the toolbar, then in again with the key the shell binds.
     await act(async () => {
-      items[0]!.click();
+      screen.getByRole('button', { name: 'Harita' }).click();
+    });
+    await waitFor(() => expect(screen.queryByText('DUYULANLAR')).toBeNull());
+    await act(async () => {
+      fireEvent.keyDown(window, { key: 's' });
     });
     await waitFor(() => expect(screen.getByText('DUYULANLAR')).toBeTruthy());
   });
@@ -275,8 +272,9 @@ describe('the confirmation before speech records a decision', () => {
   async function withEvaluatedFrame() {
     setSttApi(new FakeStt(readyStatus()));
     await boot();
+    fireEvent.click(screen.getAllByRole('button', { name: /T0001, kamyon/ })[0]!);
     await act(async () => {
-      screen.getByRole('button', { name: /Değerlendir/ }).click();
+      screen.getByRole('button', { name: 'Uyarıyı incele' }).click();
     });
     await waitFor(() => expect(screen.getByRole('alertdialog')).toBeTruthy());
     // Close the threat modal so only the voice dialog is on screen.

@@ -10,7 +10,6 @@
   flex: 1;
   min-height: 0;
   display: flex;
-  gap: var(--space-6);
   padding: var(--space-6);
 }
 
@@ -32,32 +31,6 @@
   overflow: hidden;
 }
 
-.app__column {
-  width: var(--column-w);
-  flex: none;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-}
-
-.app__column-kicker {
-  margin-bottom: calc(var(--space-3) * -1);
-}
-
-/* The brief is the only panel that grows; the others are their content's height,
- * so a long brief takes the slack instead of every panel stretching. */
-.app__column .brief {
-  flex: 1 1 0;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.app__column .brief__body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
 
 .app__camera {
   position: absolute;
@@ -74,7 +47,8 @@
   align-items: center;
   gap: var(--space-5);
   padding: var(--space-4) var(--space-6);
-  border-bottom: var(--rule-width) solid var(--rule);
+  background: var(--surface-sunken);
+  border-bottom: 1px solid var(--rule);
 }
 
 .app__camera-body {
@@ -101,42 +75,18 @@
   text-wrap: pretty;
 }
 
-/* --- tablet: the column moves below the map ------------------------------- */
-
 @media (max-width: 1100px) {
   .app__body {
-    flex-direction: column;
-    overflow-y: auto;
-    gap: var(--space-5);
     padding: var(--space-5);
   }
 
   .app__map {
-    flex: none;
-    height: 440px;
-  }
-
-  .app__column {
-    width: auto;
-    flex: none;
-  }
-
-  .app__column .brief {
-    flex: none;
-  }
-
-  .app__column .brief__body {
-    overflow: visible;
+    flex: 1;
   }
 }
 
 @media (max-width: 720px) {
   .app__body {
     padding: var(--space-4);
-    gap: var(--space-4);
-  }
-
-  .app__map {
-    height: 360px;
   }
 }

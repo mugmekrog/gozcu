@@ -157,6 +157,16 @@ voice:                      # what a finalised transcript is allowed to do
   router: llm               # llm only, today
   max_transcript_chars: 400
 
+jev:
+  enabled: true
+  model: "jev-latest"
+  api_key_env: TYPESAFE_API_KEY
+  timeout_s: 10.0
+  budget_cap_usd: 5.0
+  input_usd_per_mtok: 0.042
+  cache_dir: "data/processed/jev_cache"
+  budget_file: "data/processed/jev_budget.json"
+
 security:
   jwt_ttl_h: 8
   retention_days: 7

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { liveVehiclesAt } from './live';
-import type { Alert, FrameSummary, TrackHistory } from './types';
+import { framesOverZone, liveVehiclesAt, nearestZoneId } from './live';
+import type { Alert, FrameSummary, TrackHistory, Zone } from './types';
 
 const track: TrackHistory = {
   track_id: 'T0001',
@@ -124,3 +124,51 @@ describe('liveVehiclesAt', () => {
     expect(vehicles[0]!.level).toBe('ALERT');
   });
 });
+
+describe('framesOverZone', () => {
+  const zones = [zoneAt('Z04', 2266, -2257), zoneAt('Z05', 0, -3192)];
+
+  it('goes by where the frame was taken, not by the zone its alert names', () => {
+    const at = (image_id: string, zone_id: string | null, e_m: number, n_m: number) => ({
+      ...frame,
+      image_id,
+      zone_id,
+      centre_enu: { e_m, n_m },
+    });
+    const frames = [
+      at('a', 'Z04', 200, -2900), // taken next to Z05, alert about Z04
+      at('b', 'Z05', 2000, -2000), // taken next to Z04, alert about Z05
+      at('c', null, 2400, -2300), // no alert at all
+    ];
+
+    expect(framesOverZone(frames, zones, 'Z04').map((f) => f.image_id)).toEqual(['b', 'c']);
+    expect(framesOverZone(frames, zones, 'Z05').map((f) => f.image_id)).toEqual(['a']);
+  });
+});
+
+describe('nearestZoneId', () => {
+  const zones = [zoneAt('Z04', 2266, -2257), zoneAt('Z05', 0, -3192)];
+
+  it('puts a position in the zone it is closest to', () => {
+    expect(nearestZoneId({ e_m: 2100, n_m: -2400 }, zones)).toBe('Z04');
+    expect(nearestZoneId({ e_m: 300, n_m: -3000 }, zones)).toBe('Z05');
+  });
+
+  it('has no zone to give when there are none', () => {
+    expect(nearestZoneId({ e_m: 0, n_m: 0 }, [])).toBeNull();
+  });
+});
+
+function zoneAt(zone_id: string, e_m: number, n_m: number): Zone {
+  return {
+    zone_id,
+    name: zone_id,
+    enu: { e_m, n_m },
+    lat: 0,
+    lon: 0,
+    range_m: Math.hypot(e_m, n_m),
+    bearing_deg: 0,
+    radius_m: 250,
+    buffer_m: 750,
+  };
+}

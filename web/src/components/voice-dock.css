@@ -145,3 +145,25 @@
   border-left: 2px solid var(--rule);
   padding-left: var(--space-4);
 }
+
+/* Where the dock lives for now.
+ *
+ * It was written for the 430 px agent column, which the shell no longer has, so
+ * until the voice frontend is redesigned it gets a plain narrow panel beside the
+ * map. Layout only -- nothing here is meant to survive that redesign.
+ */
+.app__voice {
+  flex: none;
+  width: 320px;
+  margin-left: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
+@media (max-width: 1100px) {
+  .app__voice {
+    width: 260px;
+    margin-left: var(--space-5);
+  }
+}

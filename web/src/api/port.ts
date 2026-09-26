@@ -50,6 +50,7 @@ export interface AgentStep {
  */
 export type AgentEvent =
   | { type: 'step'; step: AgentStep }
+  | { type: 'decision'; frame: FrameDetail }
   | { type: 'brief'; brief: Brief }
   | { type: 'done'; elapsedMs: number; toolCalls: number }
   | { type: 'error'; message: string; step?: AgentStep };

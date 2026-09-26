@@ -39,10 +39,10 @@
   --risk-threat: #fc3030;
   --risk-threat-ink: #d42222; /* threat red on white at body sizes: 4.6:1 */
   --risk-threat-deep: #b42318;
-  --risk-review: #f5b753;
-  --risk-review-ink: #9a6212; /* review amber is too light for text; use this */
-  --risk-review-deep: #6b430a;
-  --risk-review-wash: #fef6e7;
+  --risk-review: #f2c94c;
+  --risk-review-ink: #806400;
+  --risk-review-deep: #604b00;
+  --risk-review-wash: #fff9dd;
   --risk-safe: #1981e6;
   --risk-safe-ink: #1467b8;
 
@@ -112,8 +112,13 @@
   --scrim: rgba(15, 23, 42, 0.55);
   --scrim-light: rgba(30, 41, 59, 0.22);
 
-  /* --- radius. Zero, everywhere, on purpose. ------------------------------ */
+  /* --- radius. Soft corners on the chrome: controls, badges and panels. The
+         palette is unchanged; only the shapes read as a conventional console. */
   --radius: 0;
+  --radius-control: 6px;
+  --radius-panel: 8px;
+  --radius-pill: 999px;
+  --lift-bar: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.07);
 
   /* --- motion. Two durations: one for a panel, one for a layout shift. ---- */
   --dur-quick: 160ms;

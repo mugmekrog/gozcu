@@ -17,10 +17,12 @@ import { riskRank } from './risk';
 import { sampleAt, stopsOf, stopTotal, trendOf, type Sample, type Trend } from './tracks';
 import type {
   Alert,
+  Enu,
   FrameSummary,
   Level,
   TrackHistory,
   VehicleClass,
+  Zone,
   ZoneAssessmentRow,
 } from './types';
 
@@ -119,6 +121,39 @@ export function liveVehiclesAt(opts: LiveOptions): LiveVehicle[] {
 /** The frames captured at or before the clock. The rest have not happened yet. */
 export function framesUpTo(frames: readonly FrameSummary[], tMin: number): FrameSummary[] {
   return frames.filter((f) => f.capture_min <= tMin);
+}
+
+/**
+ * The frames the drone captured over a zone: those whose footprint centre is
+ * nearer to that zone than to any other.
+ *
+ * Deliberately not `frame.zone_id`, which names the zone the frame's worst
+ * alert is about -- a vehicle photographed near one zone can be heading for
+ * another, and a frame with no alert has no zone_id at all.
+ */
+export function framesOverZone(
+  frames: readonly FrameSummary[],
+  zones: readonly Zone[],
+  zoneId: string,
+): FrameSummary[] {
+  return frames.filter((f) => nearestZoneId(f.centre_enu, zones) === zoneId);
+}
+
+/**
+ * The zone a ground point belongs to: the nearest one. This partitions the map,
+ * so every frame and every vehicle position falls in exactly one zone.
+ */
+export function nearestZoneId(enu: Enu, zones: readonly Zone[]): string | null {
+  let best: string | null = null;
+  let bestDist = Infinity;
+  for (const zone of zones) {
+    const d = Math.hypot(zone.enu.e_m - enu.e_m, zone.enu.n_m - enu.n_m);
+    if (d < bestDist) {
+      bestDist = d;
+      best = zone.zone_id;
+    }
+  }
+  return best;
 }
 
 /** The zone this vehicle is heading for, if its alert names one. */
