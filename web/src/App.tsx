@@ -4,6 +4,10 @@ import { MapToolbar } from '@/components/MapToolbar';
 import { Timeline } from '@/components/Timeline';
 import { VehicleInfobox } from '@/components/VehicleInfobox';
 import { PinList } from '@/components/PinList';
+import { TargetFrame } from '@/components/TargetFrame';
+import { AgentSteps } from '@/components/AgentSteps';
+import { BriefCard } from '@/components/BriefCard';
+import { AskAgent } from '@/components/AskAgent';
 import { AlertModal } from '@/components/AlertModal';
 import { CameraFrame } from '@/components/CameraFrame';
 import { Toast } from '@/components/Toast';
@@ -48,6 +52,12 @@ function Workspace() {
   const pins = useAppStore((s) => s.pins);
   const selectedFrameId = useAppStore((s) => s.selectedFrameId);
   const frame = useAppStore((s) => s.frame);
+  const steps = useAppStore((s) => s.steps);
+  const assessPhase = useAppStore((s) => s.assessPhase);
+  const assessElapsedMs = useAppStore((s) => s.assessElapsedMs);
+  const assessToolCalls = useAppStore((s) => s.assessToolCalls);
+  const assessError = useAppStore((s) => s.assessError);
+  const stepsExpanded = useAppStore((s) => s.stepsExpanded);
   const modal = useAppStore((s) => s.modal);
   const modalInfoOpen = useAppStore((s) => s.modalInfoOpen);
   const modalTargetDetId = useAppStore((s) => s.modalTargetDetId);
@@ -70,6 +80,7 @@ function Workspace() {
   const setModalTarget = useAppStore((s) => s.setModalTarget);
   const setShowSuppressed = useAppStore((s) => s.setShowSuppressed);
   const record = useAppStore((s) => s.record);
+  const setStepsExpanded = useAppStore((s) => s.setStepsExpanded);
   const showToast = useAppStore((s) => s.showToast);
 
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -88,6 +99,7 @@ function Workspace() {
     : framesOverZone(dataset.frames, dataset.zones, zoneFilter), [dataset.frames, dataset.zones, zoneFilter]);
   const selectedVehicle = vehicles.find((vehicle) => vehicle.trackId === selectedTrackId) ?? null;
   const selectedSummary = dataset.frames.find((item) => item.image_id === selectedFrameId) ?? null;
+  const stepsDone = steps.filter((step) => step.state === 'done' && step.index !== null).length;
   const brief = useMemo(() => frame ? assembleBrief(frame, {
     zones: dataset.zones, histories: trackIndex,
     stationaryDispM: dataset.thresholds.stationary_disp_m, originIso: dataset.origin_ts,
@@ -178,6 +190,22 @@ function Workspace() {
               void openFrame(imageId);
             }} />
         </main>
+        <aside className="app__column" aria-label={T.agent.column}>
+          <p className="kicker app__column-kicker">{T.agent.column}</p>
+          <TargetFrame frames={dataset.frames} selectedId={selectedFrameId}
+            phase={assessPhase} stepsDone={stepsDone} stepsTotal={9}
+            result={brief && assessPhase === 'done'
+              ? { level: brief.level, score: brief.score, vehicleCount: brief.vehicleCount }
+              : null}
+            onSelect={(imageId) => void openFrame(imageId)}
+            onAssess={() => selectedFrameId && void assess(selectedFrameId)}
+            onCamera={openCamera} />
+          <AgentSteps steps={steps} phase={assessPhase} elapsedMs={assessElapsedMs}
+            toolCalls={assessToolCalls} expanded={stepsExpanded} onExpandedChange={setStepsExpanded} />
+          <BriefCard brief={brief} phase={assessPhase} imageId={selectedFrameId}
+            error={assessError} stepsDone={stepsDone} />
+          <AskAgent available={client.mode === 'http'} onAsk={(question) => client.ask(question)} />
+        </aside>
       </div>
       {modal && frame && brief && <AlertModal kind={modal} frame={frame} brief={brief}
         imageUrl={client.imageUrl(frame.image_id)} histories={trackIndex} originIso={dataset.origin_ts}
