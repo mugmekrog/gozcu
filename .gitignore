@@ -2,7 +2,11 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
-.env
+# .env is tracked by team decision: this is a private repo and everyone needs the
+# GLM gateway key to run the agent layer. The key is therefore in this
+# repository's history permanently. If this repo is ever made public, rotate the
+# key with the organizers first -- removing the file will not remove it from history.
+# .env
 data/processed/
 !data/processed/.gitkeep
 contracts/openapi.json

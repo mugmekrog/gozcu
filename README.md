@@ -75,14 +75,23 @@ Set `VITE_API_BASE_URL` to point it at the live REST API instead.
 
 ## Secrets
 
-Copy `.env.example` to `.env` and fill it in. **`.env` is gitignored and must stay
-that way** — `GLM_API_KEY` is the organizers' shared gateway key with a **$15
-lifetime budget that never resets**, so a leaked key is a spent key. Committing it
-would also put it in this repository's history permanently, which a later `git rm`
-does not undo.
+`.env` is **committed** in this repo by team decision, so a fresh clone can run the
+agent layer without anyone passing keys around. `.env.example` documents the same
+variables.
 
-Check spend with `python app/cli.py budget`; the gateway's own `/key/info` is the
-authoritative figure.
+`GLM_API_KEY` is the organizers' shared gateway key with a **$15 lifetime budget
+that never resets** — a leaked key is a spent key, and it cannot be topped up. Two
+consequences to keep in mind:
+
+- **Before this repo is ever made public**, rotate the key with the organizers.
+  Deleting the file will not remove it from git history; every clone and fork
+  already has it.
+- Anyone with read access to this repo can spend the budget. Check what is left
+  with `python app/cli.py budget` — the gateway's own `/key/info` is the
+  authoritative figure, and the ledger prefers it over its local estimate.
+
+The three `GORU_*_PASSWORD` values are still the `change-me-*` placeholders. Set
+them for real before auth is built (that stream has not started).
 
 ## Status
 
