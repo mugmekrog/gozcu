@@ -11,12 +11,15 @@ Designed for Google Cloud Run (free tier) and local Docker development:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import sys
 import time
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, AsyncGenerator
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -38,7 +41,14 @@ for _p in (str(_REPO_ROOT / "libs"), str(_REPO_ROOT / "services" / "api")):
         sys.path.insert(0, _p)
 
 from goru_core.config import Config, load_config
+from app.agents.assessor import ImageAssessorPolicy
+from app.agents.factory import build_agent_stack
+from app.agents.jev import JevService, TypeSafeGateway
+from app.agents.situational_report import SituationalReportPolicy
+from app.agents.threat_decisions import apply_threat_decisions
+from app.ingest.loaders import load_dataset
 from app.llm.budget import BudgetLedger
+from app.pipeline import Pipeline
 
 app = FastAPI(
     title="Gözcü / Sentinel API",
@@ -71,6 +81,62 @@ def get_cfg() -> Config:
     if _CFG is None:
         _CFG = load_config(CONFIG_PATH) if CONFIG_PATH.exists() else Config()
     return _CFG
+
+
+def get_jev_service(cfg: Config) -> JevService:
+    key = cfg.jev_api_key() if cfg.jev.enabled else None
+    return _cached_jev_service(
+        key,
+        str(cfg.resolve(cfg.jev.cache_dir)),
+        str(cfg.resolve(cfg.jev.budget_file)),
+        cfg.jev.model,
+        cfg.jev.timeout_s,
+        cfg.jev.budget_cap_usd,
+        cfg.jev.input_usd_per_mtok,
+    )
+
+
+@lru_cache(maxsize=1)
+def _cached_jev_service(
+    key: str | None,
+    cache_dir: str,
+    budget_path: str,
+    model: str,
+    timeout_s: float,
+    cap_usd: float,
+    input_usd_per_mtok: float,
+) -> JevService:
+    gateway = TypeSafeGateway(key, timeout_s=timeout_s) if key else None
+    return JevService(
+        gateway,
+        cache_dir=cache_dir,
+        budget_path=budget_path,
+        model=model,
+        cap_usd=cap_usd,
+        input_usd_per_mtok=input_usd_per_mtok,
+    )
+
+
+def run_situational_report(bundle: Any, cfg: Config) -> dict[str, Any]:
+    """Chat supplies report prose; its level fields never enter alert decisions."""
+    outcome = build_agent_stack(cfg).runner.run(SituationalReportPolicy(cfg), bundle)
+    return {
+        "source": "rules" if outcome.used_fallback else "llm",
+        "image_summary": outcome.value.image_summary,
+        "assessments": [
+            {
+                "track_id": item.track_id,
+                "rationale": item.rationale,
+                "cited_ids": item.cited_ids,
+                "report_conflicts": [conflict.model_dump() for conflict in item.report_conflicts],
+            }
+            for item in outcome.value.assessments
+        ],
+    }
+
+
+async def _run_blocking(func: Any, *args: Any) -> Any:
+    return await asyncio.to_thread(func, *args)
 
 
 def _ensure_fixtures() -> None:
@@ -223,11 +289,10 @@ def ask_copilot(req: AskRequest) -> dict[str, str]:
     summary="Stream agent evaluation steps for a frame as ndjson",
 )
 async def assess_frame(image_id: str) -> StreamingResponse:
-    frame_path = FIXTURES_DIR / "frames" / f"{image_id}.json"
-    if not frame_path.exists():
+    cfg = get_cfg()
+    pipeline = Pipeline(load_dataset(cfg), cfg)
+    if image_id not in pipeline.dataset.images:
         raise HTTPException(status_code=404, detail=f"Frame {image_id} not found")
-
-    frame_data = json.loads(frame_path.read_text(encoding="utf-8"))
 
     async def event_generator() -> AsyncGenerator[bytes, None]:
         started = time.perf_counter()
@@ -243,7 +308,7 @@ async def assess_frame(image_id: str) -> StreamingResponse:
             ("assess", 9, "Değerlendirme"),
         ]
 
-        for step_id, idx, title in plan:
+        for step_id, idx, title in plan[:-1]:
             step_obj = {
                 "id": step_id,
                 "index": idx,
@@ -254,8 +319,44 @@ async def assess_frame(image_id: str) -> StreamingResponse:
             }
             yield (json.dumps({"type": "step", "step": step_obj}) + "\n").encode("utf-8")
 
-        brief = frame_data.get("brief", {})
+        analysis = await _run_blocking(pipeline.analyse_image, image_id)
+        bundle = pipeline.bundle_of(analysis)
+        outcome = await _run_blocking(get_jev_service(cfg).run, bundle)
+        analysis.alerts = apply_threat_decisions(
+            analysis.alerts,
+            bundle,
+            outcome.decisions,
+            ts=analysis.as_of,
+            rules_version=cfg.rules_version,
+        )
+        from web.scripts import export_fixtures
+
+        export_fixtures._TZ = ZoneInfo(cfg.tz)
+        live_frame = export_fixtures.build_frame_payload(
+            analysis,
+            pipeline,
+            cfg,
+            ImageAssessorPolicy(cfg),
+            {zone.zone_id: zone.name for zone in pipeline.dataset.zones},
+        )
+        # A CLEAR frame has no alert row to carry the typed decision's confidence.
+        if not analysis.alerts and outcome.decisions and all(
+            decision.jev_confidence is not None for decision in outcome.decisions.values()
+        ):
+            live_frame["jev_confidence"] = min(
+                decision.jev_confidence for decision in outcome.decisions.values()
+            )
+        yield (json.dumps({"type": "decision", "frame": live_frame}) + "\n").encode("utf-8")
+
+        brief = await _run_blocking(run_situational_report, bundle, cfg)
         yield (json.dumps({"type": "brief", "brief": brief}) + "\n").encode("utf-8")
+
+        step_id, idx, title = plan[-1]
+        yield (json.dumps({"type": "step", "step": {
+            "id": step_id, "index": idx, "title": title,
+            "detail": f"{title} tamamlandı", "state": "done",
+            "ms": int((time.perf_counter() - started) * 1000),
+        }}) + "\n").encode("utf-8")
 
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         yield (

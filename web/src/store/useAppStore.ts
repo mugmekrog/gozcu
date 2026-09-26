@@ -371,6 +371,7 @@ export const useAppStore = create<State & Actions>((set, get) => ({
       selectedFrameId: imageId,
     });
 
+    let hasLiveFrame = false;
     for await (const event of api().assess(imageId)) {
       if (get().selectedFrameId !== imageId) return;
 
@@ -386,7 +387,16 @@ export const useAppStore = create<State & Actions>((set, get) => ({
           break;
         }
         case 'brief':
-          set({ brief: event.brief });
+          set({
+            brief: event.brief,
+            frame: get().frame?.image_id === imageId
+              ? { ...get().frame!, brief: event.brief }
+              : get().frame,
+          });
+          break;
+        case 'decision':
+          hasLiveFrame = true;
+          set({ frame: event.frame, frameLoading: false });
           break;
         case 'done': {
           set({
@@ -397,8 +407,10 @@ export const useAppStore = create<State & Actions>((set, get) => ({
           });
           // The frame detail is cached by the adapter, so this is free, and it
           // guarantees the brief and the map agree on which frame is open.
-          const detail = await api().frame(imageId);
-          if (get().selectedFrameId === imageId) set({ frame: detail, frameLoading: false });
+          if (!hasLiveFrame) {
+            const detail = await api().frame(imageId);
+            if (get().selectedFrameId === imageId) set({ frame: detail, frameLoading: false });
+          }
           break;
         }
         case 'error':
