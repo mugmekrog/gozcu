@@ -109,9 +109,12 @@
   --route: #1e293b;
   --route-casing: #ffffff;
 
-  /* --- type. One family everywhere: the wireframes are set in the system
-         monospace, and a webfont would break the offline requirement. ------ */
-  --font: ui-monospace, 'Cascadia Mono', Consolas, 'SF Mono', Menlo, monospace;
+  /* --- type. IBM Plex Sans for the interface, IBM Plex Mono for the figures an
+         operator compares column to column (clock, ids, scale). Both are
+         bundled from @fontsource in main.tsx, so the offline requirement
+         holds; the system fonts behind them are only a fallback. ----------- */
+  --font: 'IBM Plex Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
   --text-micro: 10px;
   --text-dense: 10.5px;
   --text-small: 11px;
