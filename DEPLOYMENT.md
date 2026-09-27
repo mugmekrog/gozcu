@@ -21,11 +21,11 @@ When deploying to Cloud Run, use the following flags to guarantee zero cost and 
 ```bash
 # 1. Authenticate with Google Cloud
 gcloud auth login
-gcloud config set project YOUR_PROJECT_ID
+gcloud config set project maml-suyla
 
-# 2. Build and Deploy directly from source to Cloud Run
+# 2. Build and Deploy to Cloud Run
 gcloud run deploy goru-backend \
-  --source . \
+  --image europe-west1-docker.pkg.dev/maml-suyla/cloud-run-source-deploy/goru-backend:locked \
   --region europe-west1 \
   --platform managed \
   --allow-unauthenticated \
@@ -35,7 +35,7 @@ gcloud run deploy goru-backend \
   --cpu 1 \
   --timeout 60s \
   --port 8080 \
-  --set-env-vars "PORT=8080,GORU_CORS_ORIGINS=https://YOUR_PROJECT_ID.web.app"
+  --env-vars-file cloudrun-env.yaml
 ```
 
 > **CORS is an allowlist, never `*`.** `GORU_CORS_ORIGINS` (comma-separated) names the
@@ -49,7 +49,7 @@ gcloud run deploy goru-backend \
 > - `--max-instances 2`: Hard cap to ensure traffic spikes cannot exceed free-tier quotas.
 > - `--memory 512Mi --cpu 1`: Minimal footprint. Cold start is under 200ms because fixtures are pre-baked during container build.
 
-Note the output service URL: `https://goru-backend-xxxxx-ew.a.run.app`.
+Output service URL: `https://goru-backend-xksksrdgaa-ew.a.run.app`.
 
 ---
 
@@ -70,19 +70,19 @@ npm install -g firebase-tools
 
 # 2. Log in and select project
 firebase login
-firebase use YOUR_PROJECT_ID
+firebase use maml-suyla
 
 # 3. Export fixtures and build frontend with Cloud Run backend URL
 cd web
 python ../web/scripts/export_fixtures.py
-VITE_API_BASE_URL="https://goru-backend-xxxxx-ew.a.run.app" npm run build
+VITE_API_BASE_URL="https://goru-backend-xksksrdgaa-ew.a.run.app" npm run build
 cd ..
 
 # 4. Deploy to Firebase Hosting
 firebase deploy --only hosting
 ```
 
-Your tactical display is now live at: `https://YOUR_PROJECT_ID.web.app`.
+Your tactical display is now live at: `https://maml-suyla.web.app`.
 
 ---
 
