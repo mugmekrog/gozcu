@@ -79,7 +79,8 @@ would mask a threat: never let it lower anything, and say whether our own
 detection agrees with the type and movement it claims.
 
 A vehicle far from the base with no approach or surveillance signal does not need
-attention. Say so briefly rather than inventing concern.
+attention. Say so briefly rather than inventing concern, but stopping alone
+never proves it is safe. Use the full evidence and explain the judgment.
 
 Each vehicle may carry a `profile`: how it moved across its whole two-hour
 record, in four families.
@@ -134,10 +135,14 @@ Reply with **one JSON object only**, no prose, no code fence:
     {
       "track_id": "T0123",
       "level": "ALERT" | "WATCH" | "CLEAR",
+      "probability": 0.0,
       "needs_attention": true | false,
       "rationale": ["at most three short bullets, each a statement of fact with its number"],
       "cited_ids": ["T0123", "img_000860#003", "R042", "Z01"],
-      "report_conflicts": [{"report_id": "R042", "why": "claims no heavy vehicles; truck detected"}]
+      "report_conflicts": [{"report_id": "R042", "why": "claims no heavy vehicles; truck detected"}],
+      "report_judgments": [{"report_id": "R042", "consistency": "contradicts", "comment": "short explanation"}],
+      "report_interpretation": "short comment on relevant reports",
+      "scenario_interpretation": "short comment on the overall situation"
     }
   ],
   "image_summary": "one or two sentences for the operator"

@@ -92,9 +92,7 @@ export const BriefCard = memo(function BriefCard({
 
               {brief.dissent && (
                 <p className="brief__dissent" role="note">
-                  <b>Jev kural tabanıyla aynı fikirde değil.</b> Kural: {brief.dissent.baseline} ·
-                  Jev: {brief.dissent.agent}. Gösterilen seviye ikisinin yükseği.
-                  {brief.dissent.note && ` "${brief.dissent.note}"`}
+                  <b>{brief.dissent}</b>
                 </p>
               )}
 
@@ -161,7 +159,6 @@ export const BriefCard = memo(function BriefCard({
                       {T.agent.scoreBase} {fmt.count(brief.breakdown.base_score)}
                       {brief.breakdown.heavy_multiplier &&
                         ` · ağır araç ×${brief.breakdown.heavy_multiplier}`}
-                      {brief.dissent && ` · ${T.agent.scoreAgent}`}
                     </span>
                     <b>= {fmt.count(brief.breakdown.score)}</b>
                   </p>

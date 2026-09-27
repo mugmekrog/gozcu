@@ -965,3 +965,26 @@ def test_copilot_survives_an_unreachable_gateway(offline_cfg, tools, tmp_path):
     answer = ReviewerCopilot(runner, offline_cfg, tools).ask("why is anything red?")
     assert "rule engine" in answer.text
     assert answer.run.fallback_used
+
+
+def test_assessor_cannot_verify_a_contradicting_report(pipeline, cfg):
+    from goru_core.schemas import ImageAssessment
+
+    bundle = next(
+        bundle for image_id in pipeline.dataset.images
+        if (bundle := pipeline.bundle_for(image_id)).reports_in_window
+        and bundle.vehicles
+    )
+    report = bundle.reports_in_window[0]
+    hostile = bundle.model_copy(update={
+        "reports_in_window": [report.model_copy(update={"consistency": "contradicts"}),
+                              *bundle.reports_in_window[1:]]
+    })
+    policy = ImageAssessorPolicy(cfg)
+    data = policy.fallback(hostile).model_dump(mode="json")
+    data["assessments"][0]["report_judgments"] = [{
+        "report_id": report.report_id, "consistency": "agrees", "comment": "verified"
+    }]
+    result = policy.validate(data, hostile)
+    assert not result.ok
+    assert any("cannot be verified" in problem for problem in result.problems)

@@ -154,15 +154,25 @@ def test_ask_copilot(monkeypatch):
 
 
 def test_assess_stream(monkeypatch):
+    from types import SimpleNamespace
     from app.api import rest
     from app.agents.jev import JevOutcome
     from app.agents.threat_decisions import resolve_answers
 
     class FakeJev:
-        def run(self, bundle):
+        def run(self, bundle, assessment):
             return JevOutcome(resolve_answers(bundle, None), fallback_reason="test")
 
+    monkeypatch.setattr(rest, "build_agent_stack", lambda cfg: SimpleNamespace(
+        runner=SimpleNamespace(run=lambda policy, bundle: SimpleNamespace(
+            value=policy.fallback(bundle), run=SimpleNamespace(run_id="test"),
+            extra={}, used_fallback=True,
+        ))
+    ))
     monkeypatch.setattr(rest, "get_jev_service", lambda cfg: FakeJev())
+    async def run_inline(func, *args):
+        return func(*args)
+    monkeypatch.setattr(rest, "_run_blocking", run_inline)
     monkeypatch.setattr(
         rest,
         "run_situational_report",
@@ -180,26 +190,37 @@ def test_assess_stream(monkeypatch):
 
 
 def test_live_assess_stream_keeps_jev_raise_and_chat_report_separate(monkeypatch, tmp_path):
+    from types import SimpleNamespace
     from app.api import rest
     from app.agents.jev import JevOutcome
     from app.agents.threat_decisions import resolve_answers
 
     class FakeJev:
-        def run(self, bundle):
+        def run(self, bundle, assessment):
             decisions = resolve_answers(
                 bundle,
                 {
                     "T0009": {
-                        "type": "choice",
-                        "choice": "ALERT",
-                        "probabilities": {"CLEAR": 0.05, "WATCH": 0.05, "ALERT": 0.9},
-                        "confidence": 0.8,
+                        "type": "score", "score": 0.8,
+                        "probabilities": {"0": 0.2, "1": 0.8},
                     }
                 },
             )
             return JevOutcome(decisions)
 
     monkeypatch.setattr(rest, "get_jev_service", lambda cfg: FakeJev(), raising=False)
+    def assess(policy, bundle):
+        assessment = policy.fallback(bundle)
+        assessment.assessments = [
+            item.model_copy(update={"level": __import__("goru_core.schemas", fromlist=["Level"]).Level.ALERT})
+            if item.track_id == "T0009" else item for item in assessment.assessments
+        ]
+        return SimpleNamespace(value=assessment, run=SimpleNamespace(run_id="test"),
+                               extra={}, used_fallback=False)
+
+    monkeypatch.setattr(rest, "build_agent_stack", lambda cfg: SimpleNamespace(
+        runner=SimpleNamespace(run=assess)
+    ))
     monkeypatch.setattr(rest, "FIXTURES_DIR", tmp_path)
     async def run_inline(func, *args):
         return func(*args)

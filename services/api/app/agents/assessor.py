@@ -121,6 +121,15 @@ class ImageAssessorPolicy:
         if bad_conflicts:
             problems.append(f"report_conflicts cite unknown reports: {', '.join(bad_conflicts)}")
 
+        reports = {r.report_id: r for r in payload.reports_in_window}
+        for item in assessment.assessments:
+            for judgment in item.report_judgments:
+                report = reports.get(judgment.report_id)
+                if report is None:
+                    problems.append(f"{item.track_id}: unknown report {judgment.report_id}")
+                elif report.consistency == "contradicts" and judgment.consistency == "agrees":
+                    problems.append(f"{item.track_id}: contradicting report cannot be verified")
+
         # Reasoning about a zone that was not supplied for this vehicle means the
         # geometry being quoted was not supplied either. Fatal, and worth a retry.
         problems.extend(check_zone_scope(assessment.assessments, payload))
@@ -202,6 +211,7 @@ class ImageAssessorPolicy:
                 AgentAssessment(
                     track_id=vehicle.track_id,
                     level=vehicle.baseline_level,
+                    probability=0.0,
                     needs_attention=vehicle.baseline_level is not Level.CLEAR,
                     rationale=reasons,
                     cited_ids=cited,
@@ -216,6 +226,7 @@ class ImageAssessorPolicy:
                 AgentAssessment(
                     track_id=missing.track_id,
                     level=missing.baseline_level,
+                    probability=0.0,
                     needs_attention=missing.baseline_level is not Level.CLEAR,
                     rationale=[
                         f"movement record present but no detection in this image "
@@ -287,6 +298,7 @@ def apply_assessment_to_alerts(
                     "level": level,
                     "source": "rules_fallback" if fallback_used else "agent",
                     "agent_rationale": list(item.rationale),
+                    "priority": max(alert.priority, item.probability),
                     "agent_dissent": dissents.get(alert.track_id),
                     "agent_run_id": run_id,
                     "evidence": sorted(set(alert.evidence) | set(item.cited_ids)),
@@ -311,7 +323,7 @@ def apply_assessment_to_alerts(
                 agent_level=item.level,
                 level=item.level,
                 source="agent",
-                priority=0.2 if item.level is Level.WATCH else 0.5,
+                priority=item.probability,
                 reasons=[f"raised by the assessment agent above a CLEAR rule baseline"],
                 agent_rationale=list(item.rationale),
                 agent_run_id=run_id,

@@ -62,7 +62,7 @@ export interface AssembledBrief {
   breakdown: ScoreBreakdown | null;
   lead: LeadVehicle | null;
   /** Set when the agent's level differs from the rule baseline. */
-  dissent: { baseline: Level; agent: Level; note: string | null } | null;
+  dissent: string | null;
   vehicleCount: number;
 }
 
@@ -313,14 +313,7 @@ export function assembleBrief(frame: FrameDetail, opts: AssembleOptions): Assemb
     actions: buildActions(lead, reportLines),
     breakdown: alert?.breakdown ?? null,
     lead,
-    dissent:
-      alert && alert.source === 'rules_floor' && alert.jev_level
-        ? {
-            baseline: alert.baseline_level,
-            agent: alert.jev_level,
-            note: null,
-          }
-        : null,
+    dissent: alert?.agent_dissent ?? null,
     vehicleCount: frame.track_states.length,
   };
 }

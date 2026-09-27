@@ -14,7 +14,7 @@ from uuid import uuid4
 
 from goru_core.config import PricingConfig
 from goru_core.provenance import payload_sha256
-from goru_core.schemas import EvidenceBundle
+from goru_core.schemas import EvidenceBundle, ImageAssessment
 
 from app.agents.threat_decisions import JevRequest, ThreatDecision, build_request, resolve_answers
 from app.llm.budget import BudgetLedger
@@ -73,10 +73,12 @@ class JevService:
         model: str = "jev-latest",
         cap_usd: float = 5.0,
         input_usd_per_mtok: float = 0.042,
+        cache_only: bool = False,
     ) -> None:
         self._gateway = gateway
         self._cache_dir = Path(cache_dir)
         self._model = model
+        self._cache_only = cache_only
         self._budget = BudgetLedger(
             budget_path,
             cap_usd=cap_usd,
@@ -86,9 +88,9 @@ class JevService:
         self._lock = threading.Lock()
         self._runs_path = Path(budget_path).with_name("jev_runs.jsonl")
 
-    def run(self, bundle: EvidenceBundle) -> JevOutcome:
-        request = build_request(bundle, model=self._model)
-        key = payload_sha256({"version": 1, "request": asdict(request)})
+    def run(self, bundle: EvidenceBundle, assessment: ImageAssessment | None = None) -> JevOutcome:
+        request = build_request(bundle, model=self._model, assessment=assessment)
+        key = payload_sha256({"version": 2, "request": asdict(request)})
         if not request.questions:
             return self._record(key, JevOutcome(decisions={}))
         cache_path = self._cache_dir / key[:2] / f"{key}.json"
@@ -96,6 +98,8 @@ class JevService:
         if cached is not None:
             self._budget.record_cache_hit()
             return self._record(key, JevOutcome(resolve_answers(bundle, cached), from_cache=True))
+        if self._cache_only:
+            return self._record(key, JevOutcome(resolve_answers(bundle, None), fallback_reason="cache_miss"))
         if self._gateway is None:
             return self._record(
                 key, JevOutcome(resolve_answers(bundle, None), fallback_reason="missing_key")
@@ -125,7 +129,7 @@ class JevService:
             valid_answers = {
                 track_id: answers[track_id]
                 for track_id, decision in decisions.items()
-                if decision.jev_level is not None
+                if decision.jev_confidence is not None
             }
             cache_error = None
             try:
