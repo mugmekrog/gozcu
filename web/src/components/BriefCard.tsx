@@ -38,6 +38,9 @@ export const BriefCard = memo(function BriefCard({
   stepsDone,
   onHoverEvidence,
 }: BriefCardProps) {
+  const alert = brief?.lead?.alert;
+  const linkedReports = brief?.reportLines.filter((line) => alert?.evidence.includes(line.report.report_id)) ?? [];
+  const friendlyClaim = linkedReports.some((line) => line.report.kind === 'identified_friendly');
   return (
     <section className="panel brief">
       <h2 className="panel__head">
@@ -78,6 +81,7 @@ export const BriefCard = memo(function BriefCard({
             <>
               <div className="brief__verdict">
                 <LevelBadge band={brief.band} />
+                <span>Kategori: {brief.level}</span>
                 <span className="brief__score">
                   {fmt.count(brief.score)}
                   <span className="brief__score-max">/100</span>
@@ -86,6 +90,26 @@ export const BriefCard = memo(function BriefCard({
                   Jev güveni: {brief.confidence}
                 </span>
               </div>
+              {alert && (
+                <section className="brief__section">
+                  <h4 className="brief__section-title">Güven kırılımı</h4>
+                  <p>
+                    Assessor olasılığı: {alert.agent_probability == null ? '—' : fmt.percent(alert.agent_probability)}
+                    {' · '}Yaklaşma güveni: {fmt.percent(alert.approach_conf)}
+                    {' · '}Jev desteği: {brief.confidence}
+                  </p>
+                  {friendlyClaim && <p className="brief__chip">Dost iddiası — insan teyidi</p>}
+                  <h4 className="brief__section-title">Kanıt zinciri</h4>
+                  <p>{alert.evidence.length ? alert.evidence.join(' → ') : 'Kanıt kimliği yok'}</p>
+                  {linkedReports.length > 0 && (
+                    <ul>{linkedReports.map((line) => (
+                      <li key={line.report.report_id}>
+                        {line.report.report_id}: {line.verdict}{line.detail && ` — ${line.detail}`}
+                      </li>
+                    ))}</ul>
+                  )}
+                </section>
+              )}
 
               <h3 className="brief__headline">{brief.headline}</h3>
               {brief.summary && <p className="brief__summary">{brief.summary}</p>}

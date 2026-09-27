@@ -41,7 +41,8 @@ RUN mkdir -p /app/web/public/fixtures && \
     python web/scripts/export_fixtures.py
 
 # Create a non-privileged user for Cloud Run security best practices
-RUN useradd -m -u 1000 appuser && \
+RUN mkdir -p /app/data/processed && \
+    useradd -m -u 1000 appuser && \
     chown -R appuser:appuser /app
 
 USER appuser

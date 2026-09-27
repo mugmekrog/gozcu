@@ -28,6 +28,7 @@ services:
       - ./libs:/app/libs:ro
       - ./services:/app/services:ro
       - ./goru.yaml:/app/goru.yaml:ro
+      - operator-decisions:/app/data/processed
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
       interval: 10s
@@ -87,3 +88,4 @@ services:
 
 volumes:
   stt-model-cache:
+  operator-decisions:

@@ -208,6 +208,7 @@ export interface Alert {
   stationary: boolean | null;
   baseline_level: Level;
   agent_level: Level | null;
+  agent_probability?: number | null;
   jev_level?: Level | null;
   jev_confidence?: number | null;
   level: Level;
@@ -333,8 +334,10 @@ export interface FrameDetail {
 /** An operator's decision on one frame. Appended to the decisions log. */
 export interface Decision {
   image_id: string;
+  target_kind: 'alert' | 'scenario';
+  target_id: string;
   hhmm: string;
-  verdict: 'confirmed' | 'false_alarm' | 'not_threat' | 'marked_threat';
+  verdict: 'confirmed' | 'false_alarm' | 'not_threat' | 'marked_threat' | 'watch' | 'invalid' | 'verified';
   note: string;
   operator: string;
   agent_level: Level;

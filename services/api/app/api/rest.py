@@ -16,9 +16,10 @@ import json
 import os
 import sys
 import time
+import threading
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, AsyncGenerator
+from typing import Any, AsyncGenerator, Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
@@ -104,7 +105,8 @@ FIXTURES_DIR = Path(
 STAGE2_IMAGES_DIR = _REPO_ROOT / "stage2" / "images"
 
 _CFG: Config | None = None
-_DECISIONS: list[dict[str, Any]] = []
+DECISIONS_FILE = _REPO_ROOT / "data" / "processed" / "operator_decisions.jsonl"
+_DECISION_LOCK = threading.Lock()
 
 
 def get_cfg() -> Config:
@@ -421,13 +423,17 @@ async def assess_frame(image_id: str) -> StreamingResponse:
 
 
 class DecisionModel(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="forbid")
 
-    image_id: str
-    status: str
-    rationale: str | None = None
-    decided_at: str | None = None
-    decided_by: str | None = None
+    image_id: str = Field(pattern=r"^img_[0-9]{6}$")
+    target_kind: Literal["alert", "scenario"]
+    target_id: str = Field(min_length=1)
+    verdict: Literal["confirmed", "false_alarm", "not_threat", "marked_threat", "watch", "invalid", "verified"]
+    note: str = Field(min_length=1)
+    operator: str = Field(min_length=1)
+    hhmm: str | None = None
+    agent_level: str | None = None
+    agent_score: float | None = None
 
 
 @app.post(
@@ -436,14 +442,28 @@ class DecisionModel(BaseModel):
     dependencies=[Depends(require_client_header)],
 )
 def record_decision(image_id: str, decision: DecisionModel) -> dict[str, Any]:
+    if not decision.note.strip() or not decision.operator.strip() or not decision.target_id.strip():
+        raise HTTPException(status_code=422, detail="Target, rationale and operator are required")
+    if decision.image_id != image_id:
+        raise HTTPException(status_code=422, detail="Image id mismatch")
+    scenario_verdicts = {"watch", "invalid", "verified"}
+    if (decision.verdict in scenario_verdicts) != (decision.target_kind == "scenario"):
+        raise HTTPException(status_code=422, detail="Verdict does not match target kind")
+    if not (FIXTURES_DIR / "frames" / f"{image_id}.json").is_file():
+        raise HTTPException(status_code=404, detail="Frame not found")
     item = decision.model_dump()
     item["image_id"] = image_id
-    if "decided_at" not in item or not item["decided_at"]:
-        item["decided_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    _DECISIONS.append(item)
+    item["decided_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    with _DECISION_LOCK:
+        DECISIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with DECISIONS_FILE.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(item, ensure_ascii=False) + "\n")
     return item
 
 
 @app.get("/decisions", summary="List reviewer decisions recorded so far")
 def list_decisions() -> dict[str, list[dict[str, Any]]]:
-    return {"decisions": _DECISIONS}
+    with _DECISION_LOCK:
+        if not DECISIONS_FILE.exists():
+            return {"decisions": []}
+        return {"decisions": [json.loads(line) for line in DECISIONS_FILE.read_text(encoding="utf-8").splitlines() if line]}

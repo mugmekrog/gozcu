@@ -988,3 +988,15 @@ def test_assessor_cannot_verify_a_contradicting_report(pipeline, cfg):
     result = policy.validate(data, hostile)
     assert not result.ok
     assert any("cannot be verified" in problem for problem in result.problems)
+
+
+def test_rule_fallback_does_not_claim_an_assessor_probability(pipeline, cfg):
+    analysis = pipeline.analyse_image("img_002256")
+    bundle = pipeline.bundle_of(analysis)
+    assessment = ImageAssessorPolicy(cfg).fallback(bundle)
+    alerts = apply_assessment_to_alerts(
+        analysis.alerts, assessment, bundle=bundle, run_id="fallback",
+        fallback_used=True, ts=analysis.as_of, rules_version=cfg.rules_version,
+    )
+    assert alerts
+    assert all(alert.agent_probability is None for alert in alerts)

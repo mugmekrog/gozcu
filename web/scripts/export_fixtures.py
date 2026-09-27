@@ -343,6 +343,7 @@ def alert_json(
         "stationary": state.stationary if state else None,
         "baseline_level": alert.baseline_level,
         "agent_level": alert.agent_level,
+        "agent_probability": alert.agent_probability,
         "jev_level": alert.jev_level,
         "jev_confidence": alert.jev_confidence,
         "level": alert.level,

@@ -246,23 +246,30 @@ def test_live_assess_stream_keeps_jev_raise_and_chat_report_separate(monkeypatch
     assert brief["image_summary"] == "Detailed report"
 
 
-def test_decisions_workflow():
+def test_decisions_workflow(tmp_path, monkeypatch):
+    from app.api import rest
+
+    monkeypatch.setattr(rest, "DECISIONS_FILE", tmp_path / "decisions.jsonl")
     payload = {
         "image_id": "img_000860",
-        "status": "ack",
-        "rationale": "Verified threat by operator",
-        "decided_by": "operator-1",
+        "target_kind": "alert",
+        "target_id": "T0001",
+        "verdict": "confirmed",
+        "note": "Verified threat by operator",
+        "operator": "operator-1",
     }
     post_res = client.post("/frames/img_000860/decision", json=payload, headers=CLIENT)
     assert post_res.status_code == 200
     saved = post_res.json()
-    assert saved["status"] == "ack"
+    assert saved["verdict"] == "confirmed"
     assert saved["image_id"] == "img_000860"
+    assert rest.list_decisions()["decisions"] == [saved]
+    assert json.loads((tmp_path / "decisions.jsonl").read_text().strip()) == saved
 
     list_res = client.get("/decisions")
     assert list_res.status_code == 200
     decisions = list_res.json()["decisions"]
-    assert any(d["image_id"] == "img_000860" and d["status"] == "ack" for d in decisions)
+    assert decisions == [saved]
 
 
 # --------------------------------------------------------------------------- #
@@ -313,3 +320,21 @@ def test_spending_and_writing_posts_need_the_client_header(monkeypatch, path, bo
 
     assert response.status_code == 403
     assert len(client.get("/decisions").json()["decisions"]) == before
+def test_decision_requires_operator_and_rationale():
+    from fastapi import HTTPException
+    import pytest
+    from pydantic import ValidationError
+    from app.api.rest import DecisionModel, record_decision
+
+    payload = {"image_id": "img_000860", "target_kind": "alert", "target_id": "T0001",
+               "verdict": "confirmed", "note": " ", "operator": " "}
+    with pytest.raises(ValidationError):
+        DecisionModel.model_validate({**payload, "note": ""})
+    with pytest.raises(HTTPException) as exc:
+        record_decision("img_000860", DecisionModel.model_validate(payload))
+    assert exc.value.status_code == 422
+    with pytest.raises(HTTPException) as exc:
+        record_decision("img_000860", DecisionModel.model_validate({
+            **payload, "note": "Teyit edildi", "operator": "operator-1", "verdict": "watch"
+        }))
+    assert exc.value.status_code == 422

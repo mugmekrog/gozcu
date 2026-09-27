@@ -259,6 +259,7 @@ class Alert(_Model):
     zone_id: Optional[str] = None
     baseline_level: Level
     agent_level: Optional[Level] = None
+    agent_probability: Optional[Probability] = None
     jev_level: Optional[Level] = None
     jev_confidence: Optional[Probability] = None
     level: Level

@@ -81,7 +81,6 @@ export class FixtureApi implements GoruApi {
   }
 
   private readonly frameCache = new Map<string, Promise<FrameDetail>>();
-  private readonly decisionLog: Decision[] = [];
   private imagesPresent: boolean | null = null;
 
   readonly dataset = once(async () => {
@@ -257,12 +256,11 @@ export class FixtureApi implements GoruApi {
   }
 
   async record(decision: Decision): Promise<Decision> {
-    this.decisionLog.push(decision);
-    return decision;
+    return this.agentApi().record(decision);
   }
 
   async decisions(): Promise<Decision[]> {
-    return [...this.decisionLog];
+    return this.agentApi().decisions();
   }
 }
 

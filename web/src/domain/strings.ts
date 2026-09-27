@@ -56,16 +56,16 @@ export const T = {
   },
 
   heat: {
-    name: 'ISI',
-    title: 'Isı haritası',
+    name: 'SEKTÖR HAREKETLİLİĞİ',
+    title: 'Sektör hareketliliği',
     /* Against the worst pressure any zone carried all day, so the figure means
      * something on its own rather than only in comparison with the map. */
     densest: (zone: string, pct: number) => `EN YOĞUN · ${zone} · %${pct}`,
     quiet: 'YOĞUNLUK YOK',
-    toOn: 'Isı haritasına geç: bölge yoğunluğunu göster',
-    toOff: 'Isı haritasını kapat: araç görünümüne dön',
-    legend: 'Yoğunluk',
-    ramp: 'Yoğunluk: açıktan koyuya',
+    toOn: 'Sektör hareketliliğini göster',
+    toOff: 'Sektör hareketliliğini kapat: araç görünümüne dön',
+    legend: 'Sektör hareketliliği',
+    ramp: 'Sektör hareketliliği: açıktan koyuya',
   },
 
   layers: {
@@ -400,9 +400,11 @@ export const T = {
     false_alarm: 'Yanlış alarm',
     not_threat: 'Tehdit değil',
     marked_threat: 'Tehdit olarak işaretlendi',
+    watch: 'İzlemeye alındı',
+    invalid: 'Geçersiz',
+    verified: 'Doğrulandı',
     saved: '✓ Operatör kararı kaydedildi',
     goToLog: 'Kayda git',
-    operator: 'nöbetçi-1',
   },
 
   /* Sesle kontrol. Every line an operator can be shown about speech.

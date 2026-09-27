@@ -14,7 +14,7 @@
  */
 
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '@/App';
 import { setApi } from '@/api';
 import { useAppStore } from '@/store/useAppStore';
@@ -138,6 +138,12 @@ function unstubAudioApis(): void {
 let fake: FakeApi;
 
 beforeEach(() => {
+  const identity = new Map<string, string>();
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => identity.get(key) ?? null,
+    setItem: (key: string, value: string) => identity.set(key, value),
+    removeItem: (key: string) => identity.delete(key),
+  });
   fake = new FakeApi();
   setApi(fake);
   stubAudioApis();
@@ -308,6 +314,7 @@ describe('the confirmation before speech records a decision', () => {
   });
 
   it('records only once the operator agrees, and marks it as spoken', async () => {
+    localStorage.setItem('goru.operator', 'operator-1');
     await withEvaluatedFrame();
 
     const route = routed('record_decision', { verdict: 'confirmed' }, true);

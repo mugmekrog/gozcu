@@ -9,6 +9,7 @@ import { TargetCrop } from '@/components/TargetCrop';
 import { PhoneAlert } from '@/components/PhoneAlert';
 import { AgentSteps } from '@/components/AgentSteps';
 import { BriefCard } from '@/components/BriefCard';
+import { ScenarioPanel } from '@/components/ScenarioPanel';
 import { AskAgent } from '@/components/AskAgent';
 import { AlertModal } from '@/components/AlertModal';
 import { CameraFrame } from '@/components/CameraFrame';
@@ -79,6 +80,7 @@ function Workspace() {
   const pins = useAppStore((s) => s.pins);
   const selectedFrameId = useAppStore((s) => s.selectedFrameId);
   const frame = useAppStore((s) => s.frame);
+  const decisions = useAppStore((s) => s.decisions);
   const steps = useAppStore((s) => s.steps);
   const assessPhase = useAppStore((s) => s.assessPhase);
   const assessElapsedMs = useAppStore((s) => s.assessElapsedMs);
@@ -301,6 +303,9 @@ function Workspace() {
             toolCalls={assessToolCalls} expanded={stepsExpanded} onExpandedChange={setStepsExpanded} />
           <BriefCard brief={brief} phase={assessPhase} imageId={selectedFrameId}
             error={assessError} stepsDone={stepsDone} />
+          {frame && <ScenarioPanel imageId={frame.image_id} alerts={frame.alerts}
+            decisions={decisions} onDecide={(kind, trackId, verdict, reason, operator) =>
+              record(verdict, reason, operator, { kind, id: trackId })} />}
           <AskAgent onAsk={askAgent} />
           <VoiceDock
             available={voice.available}
