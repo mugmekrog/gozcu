@@ -259,7 +259,7 @@ def get_budget() -> dict[str, float]:
 
 
 @app.post("/agents/ask", summary="Reviewer copilot Q&A")
-def ask_copilot(req: AskRequest) -> dict[str, str]:
+def ask_copilot(req: AskRequest) -> dict[str, Any]:
     cfg = get_cfg()
     try:
         from app.agents.copilot import ReviewerCopilot
@@ -269,19 +269,15 @@ def ask_copilot(req: AskRequest) -> dict[str, str]:
         from app.pipeline import Pipeline
 
         dataset = load_dataset(cfg)
-        pipeline = Pipeline(cfg, dataset)
+        pipeline = Pipeline(dataset, cfg)
         analyses = pipeline.analyse_all()
-        tools = ReadOnlyTools(dataset, analyses, cfg)
+        tools = ReadOnlyTools(analyses, {z.zone_id: z.name for z in dataset.zones}, cfg)
         stack = build_agent_stack(cfg, interactive=False)
-        copilot = ReviewerCopilot(tools, stack.runner, cfg)
-        answer = copilot.answer(req.question)
-        return {"answer": answer.text}
+        copilot = ReviewerCopilot(stack.runner, cfg, tools)
+        answer = copilot.ask(req.question)
+        return {"answer": answer.text, "assessment_image_ids": answer.assessment_image_ids}
     except Exception as e:
-        return {
-            "answer": f"Copilot yanıtı (deterministik mod): '{req.question}' sorusu incelendi. "
-            f"Tüm radar ve iz verileri deterministik kurallara uygun olarak doğrulanmıştır. "
-            f"(Detay: {e})"
-        }
+        raise HTTPException(status_code=503, detail=f"Agent unavailable: {e}") from e
 
 
 @app.post(

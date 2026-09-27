@@ -25,7 +25,8 @@ import type {
   TrackHistory,
 } from '@/domain/types';
 import { T } from '@/domain/strings';
-import { ApiError, type AgentBudget, type AgentEvent, type AgentStep, type GoruApi } from './port';
+import { ApiError, type AgentBudget, type AgentEvent, type AgentReply, type AgentStep, type GoruApi } from './port';
+import { HttpApi } from './http';
 import { loadBasemap } from './basemap';
 
 const BASE = 'fixtures';
@@ -72,6 +73,10 @@ const yieldFrame = () =>
 
 export class FixtureApi implements GoruApi {
   readonly mode = 'fixture' as const;
+  private liveAssessment = false;
+  private agentApi() {
+    return new HttpApi({ baseUrl: import.meta.env.VITE_AGENT_API_BASE_URL ?? 'http://localhost:8000' });
+  }
 
   private readonly frameCache = new Map<string, Promise<FrameDetail>>();
   private readonly decisionLog: Decision[] = [];
@@ -125,6 +130,10 @@ export class FixtureApi implements GoruApi {
    * operator checking that the funnel behaved.
    */
   async *assess(imageId: string, signal?: AbortSignal): AsyncIterable<AgentEvent> {
+    if (this.liveAssessment) {
+      yield* this.agentApi().assess(imageId, signal);
+      return;
+    }
     const started = performance.now();
     const emitted: AgentStep[] = [];
     let toolCalls = 0;
@@ -237,14 +246,16 @@ export class FixtureApi implements GoruApi {
     };
   }
 
-  /**
-   * The copilot needs a gateway, and a static export is not one.
-   *
-   * Refusing is the honest answer: inventing a reply would put words in the
-   * agent's mouth, which is precisely what the guardrail layer exists to stop.
-   */
-  async ask(_question: string): Promise<string> {
-    throw new ApiError(T.agent.askOffline);
+  /** Send questions to the live agent while keeping fixture data as the display source. */
+  async ask(question: string): Promise<AgentReply> {
+    let reply: AgentReply;
+    try {
+      reply = await this.agentApi().ask(question);
+    } catch (cause) {
+      throw new ApiError('Ajan servisine bağlanılamadı. Backend’i başlatın veya VITE_AGENT_API_BASE_URL ayarlayın.', cause);
+    }
+    this.liveAssessment = reply.assessment_image_ids.length > 0;
+    return reply;
   }
 
   async budget(): Promise<AgentBudget | null> {

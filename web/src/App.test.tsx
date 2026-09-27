@@ -312,7 +312,7 @@ class FakeApi implements GoruApi {
     yield { type: 'brief', brief: frameDetail(imageId, imageId === 'img_0001').brief };
     yield { type: 'done', elapsedMs: 12, toolCalls: 1 };
   }
-  async ask(_question: string): Promise<string> {
+  async ask(_question: string): Promise<import('./api/port').AgentReply> {
     throw new Error('offline');
   }
   async budget() {
@@ -346,21 +346,41 @@ describe('Harita odaklı arayüz', () => {
     expect(screen.getByRole('heading', { name: /GÖZCÜ/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Harita' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Kayıtlar' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /Değerlendir/ })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Değerlendir/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /OYNAT|Hareket/ })).toBeNull();
     expect(document.querySelector('[data-vehicle-class="truck"] polygon')).toBeTruthy();
     expect(document.querySelector('[data-risk-level="ALERT"]')).toBeTruthy();
   });
 
-  it('shows the assessment side panel and evaluates the selected frame', async () => {
+  it('starts every agent-selected evaluation from AJANA SOR', async () => {
+    class PlanningApi extends FakeApi {
+      readonly assessed: string[] = [];
+      prompt = '';
+      override async ask(question: string) {
+        this.prompt = question;
+        return { answer: 'İki kare seçildi.', assessment_image_ids: ['img_0001', 'img_0002'] };
+      }
+      override async *assess(imageId: string): AsyncIterable<AgentEvent> {
+        this.assessed.push(imageId);
+        yield* super.assess(imageId);
+      }
+    }
+    const client = new PlanningApi();
+    setApi(client);
     render(<App />);
     await waitFor(() => expect(screen.getByRole('complementary', { name: 'AGENT OUTPUTS' })).toBeTruthy());
-    expect(screen.getByRole('button', { name: /Değerlendir/ })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Değerlendir/ })).toBeNull();
 
     await act(async () => {
-      screen.getByRole('button', { name: /Değerlendir/ }).click();
+      fireEvent.change(screen.getByRole('textbox', { name: 'AJANA SOR' }), { target: { value: 'bölgedeki resimleri değerlendir' } });
+      screen.getByRole('button', { name: 'Gönder' }).click();
     });
 
+    expect(client.assessed).toEqual(['img_0001', 'img_0002']);
+    expect(client.prompt).toContain('bölgedeki resimleri değerlendir');
+    await act(async () => { await useAppStore.getState().openFrame('img_0001'); });
+    expect(useAppStore.getState().assessPhase).toBe('done');
+    expect(client.assessed).toEqual(['img_0001', 'img_0002']);
     await waitFor(() => expect(screen.getByRole('complementary', { name: 'AGENT OUTPUTS' }).textContent).toContain('kural tabanlı'));
   });
 
@@ -439,6 +459,9 @@ describe('Harita odaklı arayüz', () => {
 
   it('shows the live Jev confidence and situational report when inspecting a warning', async () => {
     class LiveFakeApi extends FakeApi {
+      override async ask() {
+        return { answer: 'Kare seçildi.', assessment_image_ids: ['img_0001'] };
+      }
       override async *assess(imageId: string): AsyncIterable<AgentEvent> {
         const live = frameDetail(imageId, true);
         live.alerts = live.alerts.map((item) => ({
@@ -460,6 +483,10 @@ describe('Harita odaklı arayüz', () => {
     useAppStore.getState().selectTrack(null);
     render(<App />);
     await waitFor(() => expect(screen.getByRole('img', { name: /Bölge haritası/ })).toBeTruthy());
+    await act(async () => {
+      fireEvent.change(screen.getByRole('textbox', { name: 'AJANA SOR' }), { target: { value: 'img_0001 karesini değerlendir' } });
+      screen.getByRole('button', { name: 'Gönder' }).click();
+    });
     fireEvent.click(screen.getAllByRole('button', { name: /T0001, kamyon/ })[0]!);
     await act(async () => { screen.getByRole('button', { name: 'Uyarıyı incele' }).click(); });
 
