@@ -26,6 +26,7 @@ import type {
 } from '@/domain/types';
 import { T } from '@/domain/strings';
 import { ApiError, type AgentBudget, type AgentEvent, type AgentStep, type GoruApi } from './port';
+import { loadBasemap } from './basemap';
 
 const BASE = 'fixtures';
 
@@ -112,6 +113,8 @@ export class FixtureApi implements GoruApi {
     if (this.imagesPresent === false) return null;
     return `${BASE}/frames/${imageId}.jpg`;
   }
+
+  readonly basemap = once(() => loadBasemap());
 
   /**
    * Replay one frame's evaluation as a step stream.

@@ -52,6 +52,91 @@ export const T = {
     scaleUnit: 'km',
   },
 
+  heat: {
+    name: 'ISI',
+    title: 'Isı haritası',
+    /* Against the worst pressure any zone carried all day, so the figure means
+     * something on its own rather than only in comparison with the map. */
+    densest: (zone: string, pct: number) => `EN YOĞUN · ${zone} · %${pct}`,
+    quiet: 'YOĞUNLUK YOK',
+    toOn: 'Isı haritasına geç: bölge yoğunluğunu göster',
+    toOff: 'Isı haritasını kapat: araç görünümüne dön',
+    legend: 'Yoğunluk',
+    ramp: 'Yoğunluk: açıktan koyuya',
+  },
+
+  map: {
+    /* The box every track fix, image corner and zone falls inside. */
+    area: (w: string, h: string) => `OPERASYON ALANI · ${w} × ${h}`,
+  },
+
+  /* The route report: a vehicle's movement history read the way a fitness app
+   * reads a run -- distance, moving time, splits, stops -- so it can be put on
+   * paper. It is always "as of" the clock: nothing after it is shown. */
+  report: {
+    open: 'Rota raporu',
+    openLabel: (id: string) => `${id} için rota raporunu aç`,
+    kicker: 'ROTA RAPORU · KONUM GEÇMİŞİ',
+    close: 'Esc · kapat ✕',
+    closeLabel: 'Rota raporunu kapat',
+    print: '⎙ PDF olarak yazdır',
+    place: 'Ankara',
+    asOf: (clock: string) => `${clock} itibarıyla · sonrası gösterilmez`,
+    complete: 'kayıt tamamlandı',
+    ongoing: 'iz sürüyor',
+    headline: {
+      zone: (name: string, clock: string) => `${name} bölgesine giriş · ${clock}`,
+      buffer: (name: string, clock: string) => `${name} tampon alanına giriş · ${clock}`,
+      parked: (minutes: string) => `Uzun süreli bekleme · ${minutes}`,
+      approaching: (base: string, d: string) => `${base} yönünde yaklaşma · ${d}`,
+      receding: (base: string, d: string) => `${base} yönünden uzaklaşma · ${d}`,
+      roaming: (d: string) => `Bölgede dolaşma · ${d}`,
+    },
+    highlight: {
+      threat: (zone: string, eta: string) => `Tehlike · ${zone} yönünde, tahmini giriş ${eta}`,
+      review: (zone: string) => `Şüpheli · ${zone} yakınında, operatör incelemesi bekliyor`,
+      closest: (zone: string, d: string, clock: string) =>
+        `En yakın bölge ${zone} · ${d} · ${clock}`,
+      unassessed: 'Araç henüz bir drone karesinde değerlendirilmedi.',
+    },
+    stat: {
+      distance: 'MESAFE',
+      avgSpeed: 'ORT. HIZ · hareketli',
+      moving: 'HAREKET SÜRESİ',
+      elapsed: 'TOPLAM SÜRE',
+      maxSpeed: 'MAKS. HIZ · 5 dk',
+      stops: 'DURAKLAMA',
+      closestBase: 'ÜSSE EN YAKIN',
+      /* Same sign as the splits' ÜSSE Δ column: negative means it ended closer. */
+      net: 'ÜSSE NET DEĞİŞİM',
+      closestZone: 'EN YAKIN BÖLGE',
+    },
+    chart: 'ÜSSE MESAFE – ZAMAN',
+    splits: 'DİLİMLER · 30 dk',
+    col: {
+      split: '#',
+      time: 'SAAT',
+      distance: 'MESAFE',
+      speed: 'ORT. HIZ',
+      range: 'ÜSSE Δ',
+    },
+    events: 'OLAYLAR',
+    event: {
+      start: (d: string) => `İz başladı · üsse ${d}`,
+      stop: (minutes: string) => `Duraklama · ${minutes}`,
+      buffer: (name: string) => `${name} tampon alanına girdi`,
+      zone: (name: string) => `${name} bölgesine girdi`,
+      closest: (d: string) => `Üsse en yakın nokta · ${d}`,
+      end: (d: string) => `Son konum, drone karesiyle aynı an · üsse ${d}`,
+      now: (d: string) => `Şimdi · üsse ${d}`,
+    },
+    provenance: (fixes: number) => `Kaynak: tracks.csv · ${fixes} konum · 5 dk aralık`,
+    method:
+      'Mesafe yalnız hareketli adımları sayar: park halindeki GPS oynaması (adım başına 25 m altı) mesafe değildir.',
+    outliers: (n: number) => `${n} aykırı adım (40 m/s üstü) maksimumdan hariç tutuldu.`,
+    none: 'Bu aracın bu saate kadar kaydı yok.',
+  },
+
   legend: {
     safe: 'Güvenli',
     review: 'Şüpheli',

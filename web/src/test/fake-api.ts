@@ -8,6 +8,7 @@
 
 import type { AgentEvent, GoruApi } from '@/api/port';
 import type { Alert, DatasetInfo, Decision, FrameDetail, TrackHistory } from '@/domain/types';
+import type { BasemapFile } from '@/domain/basemap';
 
 export const ORIGIN = '2026-09-26T05:10:00+00:00';
 
@@ -139,6 +140,34 @@ export const track: TrackHistory = {
   t: [340, 345, 350, 355, 360],
   e: [7000, 5500, 5500, 3000, 1570],
   n: [0, 0, 0, 0, 0],
+};
+
+/**
+ * A few blocks of city: one named boulevard along the fake track's own road,
+ * a cross street, a park, and two place names. Enough to put every basemap
+ * layer on screen without shipping the 1.4 MB real file into the shell tests.
+ */
+export const basemapFile: BasemapFile = {
+  version: 1,
+  attribution: '© OpenStreetMap katkıda bulunanlar',
+  license: 'ODbL 1.0',
+  baked_at: '2026-09-27T00:00:00+00:00',
+  osm_timestamp: '2026-09-27T00:00:00Z',
+  origin: { lat: 39.92184, lon: 32.85306 },
+  crop_enu: { w: -9000, s: -9000, e: 9000, n: 9000 },
+  roads: [
+    ['primary', 'Dogu Bulvari', 0, [-8000, 0, 16000, 0]],
+    ['minor', null, 0, [2000, -1500, 0, 3000]],
+    ['secondary', null, 1, [-500, -500, 1000, 1000]],
+  ],
+  lines: [['rail', 'Baskentray', [-8000, 3000, 16000, 200]]],
+  areas: [['park', 'Test Parki', [1000, 1000, 800, 0, 0, 600, -800, 0]]],
+  places: [
+    ['district', 'Cankaya', 0, -3000],
+    ['semt', 'Kizilay', -400, 300],
+  ],
+  stations: [['subway', 'Kizilay', -200, -150]],
+  pois: [['park', 'Test Parki', 1400, 1300, 480_000]],
 };
 
 export function frameDetail(imageId: string, withVehicles: boolean): FrameDetail {
@@ -307,6 +336,9 @@ export class FakeApi implements GoruApi {
   }
   imageUrl() {
     return null;
+  }
+  async basemap() {
+    return basemapFile;
   }
   async *assess(imageId: string): AsyncIterable<AgentEvent> {
     yield {

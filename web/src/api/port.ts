@@ -26,6 +26,7 @@ import type {
   FrameDetail,
   TrackHistory,
 } from '@/domain/types';
+import type { BasemapFile } from '@/domain/basemap';
 
 /** One line of the agent step list. */
 export interface AgentStep {
@@ -77,6 +78,12 @@ export interface GoruApi {
   frame(imageId: string): Promise<FrameDetail>;
   /** Where the drone image lives, or null when images were not exported. */
   imageUrl(imageId: string): string | null;
+  /**
+   * The OpenStreetMap basemap under the radar, from the app's own static assets
+   * (`api/basemap.ts`). Null when it was never baked; the map then draws on its
+   * plain ground.
+   */
+  basemap(): Promise<BasemapFile | null>;
 
   /** Run the assessment for one frame, reporting progress as it goes. */
   assess(imageId: string, signal?: AbortSignal): AsyncIterable<AgentEvent>;

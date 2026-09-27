@@ -87,6 +87,31 @@ export function projectionFor(scaleKm: ScaleKm): Projection {
   };
 }
 
+/**
+ * The scale and centre that fit a box of ground (ENU metres) into a window of
+ * the viewBox, `window` SVG units across, with `pad` of it left as margin.
+ *
+ * Used by the route report's map, which is the same projection framed on one
+ * vehicle's route rather than on the base. A parked vehicle's route is a few
+ * metres across, so the scale has a floor: street level, not a close-up of GPS
+ * jitter.
+ */
+export function fitView(
+  box: { w: number; s: number; e: number; n: number },
+  window: { w: number; h: number },
+  pad = 0.22,
+  minScale = 0.6,
+): { scaleKm: ScaleKm; pan: { eKm: number; nKm: number } } {
+  const usable = VIEW.h / 2 - 20;
+  const wKm = Math.max((box.e - box.w) / 1000, 0.01);
+  const hKm = Math.max((box.n - box.s) / 1000, 0.01);
+  const unitsPerKm = Math.min((window.w * (1 - pad)) / wKm, (window.h * (1 - pad)) / hKm);
+  return {
+    scaleKm: Math.min(MAX_SCALE, Math.max(minScale, usable / unitsPerKm)),
+    pan: { eKm: (box.w + box.e) / 2000, nKm: (box.s + box.n) / 2000 },
+  };
+}
+
 /** Ring ranges extend past the viewport when the map is panned. */
 export function ringsFor(scaleKm: ScaleKm, extentKm = scaleKm): number[] {
   const step = scaleKm <= 2 ? 0.5 : scaleKm <= 8 ? 1 : 2;

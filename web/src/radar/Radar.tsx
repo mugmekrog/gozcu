@@ -19,6 +19,11 @@
  * retargets a short ease-out flight rather than jumping, so a run of notches
  * reads as one glide. Scale is interpolated on a log curve, which makes a zoom
  * feel even across the whole range.
+ *
+ * Under everything is the real city (BasemapLayer: OpenStreetMap, baked
+ * offline), framed by the operation area every position in the dataset falls
+ * inside. The selected vehicle draws its whole route so far (RouteLayer), the
+ * map-side half of the route report.
  */
 
 import {
@@ -31,11 +36,24 @@ import {
   type PointerEvent,
 } from 'react';
 import { GridLayer } from './GridLayer';
+import { Attribution, BasemapLabels, BasemapLayer, OperationArea } from './BasemapLayer';
+import { RouteLayer } from './RouteLayer';
+import { HeatLayer } from './HeatLayer';
 import { BaseLayer, ZoneLayer } from './ZoneLayer';
 import { FrameLayer } from './FrameLayer';
 import { VehicleLayer } from './VehicleLayer';
 import { framesOverZone, framesUpTo, liveVehiclesAt, nearestZoneId, type LiveVehicle } from '@/domain/live';
 import { MAX_SCALE, MIN_SCALE, projectionFor, VIEW } from '@/domain/polar';
+import { operationArea, visibleBox } from '@/domain/basemap';
+import { activityOf } from '@/domain/activity';
+import {
+  blobsOf,
+  densestZone,
+  referenceClocks,
+  referencesOf,
+  zonePressures,
+} from '@/domain/pressure';
+import { T } from '@/domain/strings';
 import { useAppStore } from '@/store/useAppStore';
 import './radar.css';
 
@@ -56,6 +74,15 @@ const WHEEL_ZOOM_PER_PX = Math.log(1.15) / 100;
 
 /** The radius the recentre button settles at, in kilometres. */
 const RECENTRE_KM = 2.25;
+
+/**
+ * How long the map counts as still moving after its last frame, in ms. While
+ * it moves, the basemap draws without anti-aliasing (`data-moving`, radar.css):
+ * measured in headless Chrome, that is the difference between a 104 ms and a
+ * 7 ms median frame at 8 km, and the eye does not see jagged edges on a map in
+ * motion. It snaps back to smooth edges the moment the view settles.
+ */
+const SETTLE_MS = 160;
 
 /** Flight lengths: short for a wheel notch, longer for a jump across the map. */
 const WHEEL_FLIGHT_MS = 260;
@@ -95,12 +122,15 @@ export const Radar = memo(function Radar() {
   const pins = useAppStore((s) => s.pins);
   const selectedFrameId = useAppStore((s) => s.selectedFrameId);
   const frame = useAppStore((s) => s.frame);
+  const heatOn = useAppStore((s) => s.heatOn);
+  const basemap = useAppStore((s) => s.basemap);
 
   const selectTrack = useAppStore((s) => s.selectTrack);
   const hoverTrack = useAppStore((s) => s.hoverTrack);
   const openFrame = useAppStore((s) => s.openFrame);
   const setZoneFilter = useAppStore((s) => s.setZoneFilter);
   const setZoom = useAppStore((s) => s.setZoom);
+  const toggleHeat = useAppStore((s) => s.toggleHeat);
   const mapFocus = useAppStore((s) => s.mapFocus);
 
   const projection = useMemo(() => projectionFor(scaleKm), [scaleKm]);
@@ -129,6 +159,18 @@ export const Radar = memo(function Radar() {
   view.current = { pan, scaleKm };
   const flight = useRef<Flight | null>(null);
   const frameReq = useRef(0);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /** Mark the map as moving, straight on the element: no React render per frame. */
+  const markMoving = useCallback(() => {
+    svgRef.current?.setAttribute('data-moving', '');
+    if (settleTimer.current) clearTimeout(settleTimer.current);
+    settleTimer.current = setTimeout(() => svgRef.current?.removeAttribute('data-moving'), SETTLE_MS);
+  }, []);
+  useEffect(() => () => {
+    if (settleTimer.current) clearTimeout(settleTimer.current);
+  }, []);
 
   const stopFlight = useCallback(() => {
     cancelAnimationFrame(frameReq.current);
@@ -164,6 +206,7 @@ export const Radar = memo(function Radar() {
               nKm: f.fromPan.nKm + (f.toPan.nKm - f.fromPan.nKm) * e,
             };
         view.current = { pan: p, scaleKm: s };
+        markMoving();
         setPan(p);
         setZoom(s);
         if (t < 1) frameReq.current = requestAnimationFrame(step);
@@ -171,7 +214,7 @@ export const Radar = memo(function Radar() {
       };
       frameReq.current = requestAnimationFrame(step);
     },
-    [setZoom],
+    [setZoom, markMoving],
   );
 
   useEffect(() => stopFlight, [stopFlight]);
@@ -183,8 +226,6 @@ export const Radar = memo(function Radar() {
     const to = { eKm: mapFocus.enu.e_m / 1000, nKm: mapFocus.enu.n_m / 1000 };
     fly(to, flight.current?.toScale ?? view.current.scaleKm, JUMP_FLIGHT_MS);
   }, [mapFocus, fly]);
-
-  const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
     const svg = svgRef.current;
@@ -260,6 +301,7 @@ export const Radar = memo(function Radar() {
     const pxPerUnit = typeof event.currentTarget.getScreenCTM === 'function'
       ? event.currentTarget.getScreenCTM()?.a || 1 : 1;
     const kmPerPx = 1 / (pxPerUnit * projection.unitsPerKm);
+    markMoving();
     setPan({ eKm: d.start.eKm - dx * kmPerPx, nKm: d.start.nKm + dy * kmPerPx });
   }
 
@@ -296,6 +338,31 @@ export const Radar = memo(function Radar() {
     [dataset, tMin, zoneFilter],
   );
 
+  /** The box every position falls inside: all track fixes, zones and frame centres. */
+  const area = useMemo(
+    () => (dataset
+      ? operationArea(tracks, [...dataset.zones.map((z) => z.enu), ...dataset.frames.map((f) => f.centre_enu)])
+      : null),
+    [dataset, tracks],
+  );
+
+  /**
+   * The selected vehicle's route so far. Only while it is on the map, and not
+   * under the heat view, which turns trails off for the same reason (F5.4).
+   */
+  const route = useMemo(() => {
+    if (!dataset || heatOn || !selectedTrackId) return null;
+    if (!vehicles.some((vehicle) => vehicle.trackId === selectedTrackId)) return null;
+    const history = trackIndex.get(selectedTrackId);
+    return history
+      ? activityOf(history, {
+          toMin: tMin,
+          zones: dataset.zones,
+          stationaryDispM: dataset.thresholds.stationary_disp_m,
+        })
+      : null;
+  }, [dataset, heatOn, selectedTrackId, vehicles, trackIndex, tMin]);
+
   /** Zones any live ALERT names. Drives the pulse. */
   const alertingZones = useMemo(() => {
     const out = new Set<string>();
@@ -305,7 +372,50 @@ export const Radar = memo(function Radar() {
     return out;
   }, [vehicles]);
 
+  /* The density field (PLAN 6.12). Three memos, keyed on purpose.
+   *
+   * `blobs` follows the *filtered* live set, so the field and the glyphs can
+   * never describe different fleets. `heatReference` is the exercise-wide peak
+   * and is computed over the *unfiltered* fleet, so narrowing to one zone
+   * reduces the heat on screen rather than rescaling it -- and normalising
+   * against the whole window rather than the current tick is what stops a lone
+   * parked car at 08:10 rendering as deep as the 13:50 build-up. Both are keyed
+   * off `heatOn`, so a reviewer who never opens the view never pays the pass.
+   */
+  const blobs = useMemo(() => (heatOn ? blobsOf(vehicles) : []), [heatOn, vehicles]);
+
+  const references = useMemo(() => {
+    if (!heatOn || !dataset) return { field: 0, zone: 0 };
+    return referencesOf(
+      dataset.zones,
+      referenceClocks(dataset.sim.start_min, dataset.sim.end_min).map((at) =>
+        blobsOf(
+          liveVehiclesAt({
+            tMin: at,
+            tracks,
+            frames: dataset.frames,
+            alertsByFrame,
+            stationaryDispM: dataset.thresholds.stationary_disp_m,
+            classFilter: 'all',
+            zoneFilter: 'all',
+          }),
+        ),
+      ),
+    );
+  }, [heatOn, dataset, tracks, alertsByFrame]);
+
+  /** The ranking in words, for the toggle's caption and the screen reader. */
+  const densest = useMemo(
+    () => (heatOn && dataset
+      ? densestZone(zonePressures(dataset.zones, blobs, references.zone))
+      : null),
+    [heatOn, dataset, blobs, references.zone],
+  );
+
   if (!dataset) return null;
+
+  /** The ground on screen, for culling basemap tiles and labels. */
+  const ground = visibleBox(projection, pan);
 
   return (
     <svg
@@ -328,11 +438,32 @@ export const Radar = memo(function Radar() {
       onClick={() => selectTrack(null)}
       onDoubleClick={recentre}
     >
-      <rect width={VIEW.w} height={VIEW.h} fill="var(--surface-map)" />
+      {/* Wider than the viewBox: a letterboxed stage shows ground past its sides. */}
+      <rect
+        x={-VIEW.w}
+        y={-VIEW.h}
+        width={VIEW.w * 3}
+        height={VIEW.h * 3}
+        fill={basemap ? 'var(--map-land)' : 'var(--surface-map)'}
+      />
       <g
         transform={`translate(${-pan.eKm * projection.unitsPerKm} ${pan.nKm * projection.unitsPerKm})`}
       >
+        {basemap && <BasemapLayer map={basemap} projection={projection} view={ground} />}
+        {area && <OperationArea area={area} projection={projection} />}
         <GridLayer projection={projection} extentKm={gridExtentKm} />
+        {heatOn && (
+          <HeatLayer blobs={blobs} projection={projection} reference={references.field} />
+        )}
+        {basemap && (
+          <BasemapLabels
+            map={basemap}
+            projection={projection}
+            view={ground}
+            zones={dataset.zones}
+            baseName={dataset.base.name}
+          />
+        )}
         <ZoneLayer
           zones={dataset.zones}
           projection={projection}
@@ -348,19 +479,32 @@ export const Radar = memo(function Radar() {
           footprint={frame?.image_id === selectedFrameId ? frame.footprint_enu : null}
           onSelect={(imageId) => void openFrame(imageId)}
         />
-        <VehicleLayer
-          vehicles={vehicles}
-          histories={trackIndex}
-          projection={projection}
-          tMin={tMin}
-          selectedId={selectedTrackId}
-          hoveredId={hoveredTrackId}
-          pins={pins}
-          onSelect={selectTrack}
-          onHover={hoverTrack}
-        />
+        {route && (
+          <RouteLayer
+            route={route.route}
+            stops={route.stops}
+            projection={projection}
+            originIso={dataset.origin_ts}
+          />
+        )}
+        <g className={heatOn ? 'radar-vehicles radar-vehicles--dimmed' : 'radar-vehicles'}>
+          <VehicleLayer
+            vehicles={vehicles}
+            histories={trackIndex}
+            projection={projection}
+            tMin={tMin}
+            selectedId={selectedTrackId}
+            hoveredId={hoveredTrackId}
+            pins={pins}
+            trails={!heatOn}
+            routedId={route ? selectedTrackId : null}
+            onSelect={selectTrack}
+            onHover={hoverTrack}
+          />
+        </g>
       </g>
 
+      {basemap && <Attribution text={basemap.attribution} />}
       <text
         x={VIEW.w - 20}
         y={26}
@@ -372,6 +516,59 @@ export const Radar = memo(function Radar() {
       >
         K ↑
       </text>
+      {/* The density toggle. Small, semi-transparent, bottom-right -- and it
+          states which view is on and which zone the field is pointing at, so the
+          control explains its own state rather than just holding an icon
+          (PLAN F5.3). A map control, not a view: `view` is untouched. */}
+      <g
+        className="radar-heat-toggle"
+        data-on={heatOn || undefined}
+        role="button"
+        tabIndex={0}
+        aria-pressed={heatOn}
+        aria-label={heatOn ? T.heat.toOff : T.heat.toOn}
+        onClick={(event) => {
+          event.stopPropagation();
+          toggleHeat();
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            toggleHeat();
+          }
+        }}
+      >
+        <title>{heatOn ? T.heat.toOff : T.heat.toOn}</title>
+        {heatOn && (
+          <text
+            className="radar-heat-toggle__caption"
+            x={VIEW.w - 20}
+            y={VIEW.h - 54}
+            fontSize={9}
+            textAnchor="end"
+          >
+            {densest
+              ? T.heat.densest(densest.name, Math.round(densest.value * 100))
+              : T.heat.quiet}
+          </text>
+        )}
+        <rect x={VIEW.w - 82} y={VIEW.h - 46} width={62} height={26} rx={4} />
+        {/* Three rings: the kernel the field is made of, at icon size. */}
+        <g aria-hidden="true" fill="var(--heat)">
+          <circle cx={VIEW.w - 70} cy={VIEW.h - 33} r={6.5} opacity={0.18} />
+          <circle cx={VIEW.w - 70} cy={VIEW.h - 33} r={4} opacity={0.42} />
+          <circle cx={VIEW.w - 70} cy={VIEW.h - 33} r={1.8} opacity={0.85} />
+        </g>
+        <text
+          className="radar-heat-toggle__label"
+          x={VIEW.w - 43}
+          y={VIEW.h - 29}
+          fontSize={10}
+          textAnchor="middle"
+        >
+          {T.heat.name}
+        </text>
+      </g>
       {offCentre && (
         <g
           className="radar-recentre"

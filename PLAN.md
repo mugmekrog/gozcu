@@ -8,6 +8,19 @@
 > service** (detections arrive as a fixed CSV), and the **LLM agent is the required
 > deliverable**, not an optional add-on. Every number below was measured from the shipped
 > data, not estimated. See §2.8 for the measurement log and §15 for the full change list.
+>
+> **Revision 3 (2026-09-27).** Re-aligned with the code that actually shipped, and extended
+> with the density view. Four structural changes. The frontend is a **flat SVG radar in a light
+> workspace**, not a dark deck.gl display with five routes — §7.3 is rewritten from the
+> wireframes and the shipped `web/src/`. A **speech-to-text and voice-control workstream** was
+> designed, built and tested while this plan contained not one word about it — new §7.5. The
+> service tree in §4.3 is replaced by the real one, which grew an `llm/` port layer, an
+> `evidence/` bundler and a `jev` threat-decision agent that revision 2 did not foresee, and
+> never grew the `sim/`, `security/` or `ws.py` modules it promised. And the map gains a
+> **zone-pressure heat view** with a corner toggle — new §6.12, tasks F5.1–F5.4. Where this
+> plan and the repo disagreed, the repo won and the divergence is written down rather than
+> quietly dropped. Evidence: the three step logs in `logs/`, `stt.md`, and the commit history
+> through `3e78af8`. Full list in §15.
 
 ---
 
@@ -66,6 +79,8 @@ should enter.
 | Agent assessment | LLM agent verdict + reasons + evidence citations per vehicle of interest; report/detection consistency check |
 | Review | Alert queue, evidence inspector, acknowledge/dismiss with reason |
 | Access & audit | Three roles, RBAC, hash-chained audit log, provenance |
+| Density view | Risk-weighted zone-pressure heat field over the map at the simulation clock, toggled from the map's bottom-right corner (§6.12, F5.1–F5.4) |
+| Speech & voice control | Local Turkish speech-to-text, LLM-routed admin-level voice commands over a contract both sides read (§7.5) |
 | Demo | Simulation clock with play/pause/seek/speed, scripted scenario |
 
 ### 1.3 Out of scope
@@ -84,6 +99,18 @@ multi-day persistence, mobile clients, production-grade identity provider.
 | Detection↔track extrapolation machinery **removed** | Measured: every track window ends exactly at its image's capture time (§2.6). Matching is an exact-time lookup. |
 | Report trust policy rewritten | The brief's rule is "verify against your own detection, detection wins", not "third-party can never raise" (§6.8). |
 | Intake demo beat re-scripted | The real `zones.json` is clean; the malformed `lon` from the draft does not exist (§2.4). |
+
+### 1.5 Scope change vs. revision 2
+
+| Change | Why |
+|---|---|
+| deck.gl dropped for **plain SVG** | Measured, not assumed: the busiest clock carries 101 vehicles and the per-tick data pass runs 0.291 ms median against a 66 ms budget. A WebGL runtime to draw a hundred triangles costs ≈1 MB against an offline requirement (§7.3.3). |
+| Five routes collapsed to **one workspace, three views** | Four of the five had no wireframe screen and three needed endpoints that do not exist (§7.3.3). |
+| Dark `#0A0F14` palette replaced by the **light wireframe palette** | The wireframe set was handed to the frontend as the authority. Webfonts also break the offline rule. |
+| WebSocket `/ws/stream` **deferred** | The dataset is fixed and fully known at boot, so the simulation clock is client-side. §5.5 still describes the socket; it is unbuilt. |
+| `sim/`, `security/`, `api/ws.py` **not built** | The whole of §7.4 — roles, RBAC, hash-chained audit — does not exist in the repo. This is now the largest gap between this plan and the code, and §4.3 states it plainly. |
+| `llm/`, `stt/`, `voice/`, `evidence/`, `agents/jev.py` **added** | Built without a plan entry. §4.3 and §7.5 give them one. |
+| **Density (heat) view added** | This revision's feature request: the map shows where each vehicle is but never answered which zone is under pressure (§6.12). |
 
 ---
 
@@ -113,7 +140,8 @@ tracks both start before the first image.
 - Computed from the base latitude at startup (do not hardcode):
   - `m_per_deg_lat = 111 033.1 m`
   - `m_per_deg_lon = 85 491.2 m`
-- The frontend also works in ENU meters (no basemap tiles, works offline).
+- The frontend also works in ENU meters, offline. Its basemap is OpenStreetMap baked into the
+  same frame ahead of time (§7.3.6) — no tile server at runtime.
 
 ### 2.3 `image_meta.json`
 
@@ -370,41 +398,81 @@ Two services, not three. No GPU anywhere.
 
 | Service | Tech | Responsibility |
 |---|---|---|
-| `api` | Python 3.11, FastAPI, pydantic v2, numpy, scipy, SQLite, `openai` SDK | Intake, validation, detection post-processing, fusion, kinematics, warnings, agent orchestration, sim, auth, audit, REST + WS |
-| `web` | React 18, Vite, TypeScript, deck.gl, Zustand, TanStack Query | All UI |
-| `goru_core` (lib) | Python package | Geo math, time, schemas, config loader, detection parser |
+| `api` | Python 3.11, FastAPI, pydantic v2, numpy, `openai` SDK against the GLM gateway | Intake, validation, detection post-processing, fusion, kinematics, warning baseline with hysteresis, agent orchestration, threat decisions, situational reports, evidence bundles, REST |
+| `stt` | Python 3.11, FastAPI, torch, `whisper-large-v3-tr` on the GPU | Local Turkish transcription and voice-command routing, in its own process (§7.5). Absent from revision 2 entirely. |
+| `web` | React 18, Vite, TypeScript, Zustand | All UI. **No deck.gl and no TanStack Query** — §1.5, §7.3.3. |
+| `goru_core` (lib) | Python package | Geo math, timeline, schemas, config loader, prediction-string parser, provenance hashing |
 
-Run everything with `docker compose up`.
+`docker compose up` brings up the api and the web app. The speech service starts on its own
+(`requirements-stt.txt`, plus a 3.1 GB model download on first use), because the GPU and the
+model are not something every clone of this repo has. Auth, audit and WS are **not** in the api;
+see §4.3.
 
 ### 4.3 Repository layout
 
+The tree below is the repo as it stands, not as revision 2 imagined it. Reading it against §4.3
+of that revision is the fastest way to see where this project actually went.
+
 ```
 goru/
-├── PLAN.md
-├── docker-compose.yml
-├── goru.yaml                  # single config file (§6.10)
+├── PLAN.md                    # this file
+├── stt.md                     # the speech layer's design document (§7.5)
+├── logs/                      # three step logs: what was built, what was measured, and
+│                              # every decision still open. Read these before the code.
+├── README.md · DEPLOYMENT.md · LICENSE
+├── Dockerfile · docker-compose.yml · docker-compose.prod.yml · firebase.json
+├── goru.yaml                  # single config file (§6.10): engine, agent, llm, stt, voice, jev
 ├── .env.example               # GLM_API_KEY, demo user passwords
-├── contracts/                 # JSON Schemas + OpenAPI export + generated TS types
-├── libs/goru_core/            # geo.py, time.py, schemas.py, config.py, predstring.py
+├── contracts/
+│   └── voice_commands.json    # the voice command contract, read by Python and TypeScript (§7.5)
+├── libs/goru_core/            # config.py · geo.py · predstring.py · provenance.py ·
+│                              # schemas.py · timeline.py
 ├── services/api/app/
-│   ├── ingest/                # loaders + validators per source (6 sources)
-│   ├── perception/            # predstring.py, postprocess.py, georef.py
-│   ├── fusion/                # matching.py, reports.py
-│   ├── kinematics/            # velocity.py, predict.py
-│   ├── risk/                  # zones.py, engine.py, hysteresis.py
-│   ├── agents/                # client.py, assessor.py, parser.py, copilot.py,
-│   │                          # tools.py, guardrails.py, budget.py
-│   ├── sim/                   # clock.py, replay.py
-│   ├── security/              # auth.py, rbac.py, audit.py
-│   └── api/                   # rest.py, ws.py
-├── web/                       # React app
-├── data/
-│   ├── raw/stage2/            # organizer files, read-only
-│   ├── raw/bounding_boxes.csv # Stage-1 detector output, read-only
-│   └── processed/             # normalized SQLite + derived cache
-├── scenarios/                 # demo scenario packs (§9)
-└── tests/                     # golden, unit, rbac, e2e smoke
+│   ├── pipeline.py            # analyse_all() / analyse_image() / bundle_for(): the one entry
+│   │                          # point the REST layer and the web fixtures share
+│   ├── cli.py
+│   ├── ingest/loaders.py      # the six sources, with schema and semantic validation
+│   ├── perception/postprocess.py   # score threshold, class-agnostic NMS, GSD-aware area filter
+│   ├── fusion/                # matching.py · reports.py
+│   ├── kinematics/velocity.py
+│   ├── risk/                  # zones.py · engine.py (RuleEngine and Hysteresis together)
+│   ├── evidence/bundle.py     # the evidence bundle every assessment is built over
+│   ├── llm/                   # port.py · glm.py · stub.py · cache.py · budget.py
+│   ├── agents/                # runner.py · factory.py · assessor.py · copilot.py ·
+│   │                          # guardrails.py · tools.py · report_parser.py · jev.py ·
+│   │                          # threat_decisions.py · situational_report.py · prompts/*.md
+│   ├── stt/                   # audio.py · model.py · provider.py · schemas.py ·
+│   │                          # service.py · transcripts.py
+│   ├── voice/                 # router.py · registry.py · prompts/voice_router_system.md
+│   └── api/                   # rest.py · stt_server.py          (no ws.py)
+├── web/                       # React app: src/{api,components,domain,radar,store,views,voice}
+├── stage2/                    # organizer files, read-only
+├── bounding_boxes.csv         # Stage-1 detector output, read-only
+├── data/ · scenarios/
+└── tests/                     # conftest + test_{agents,api_rest,engine,golden_data,
+                               # reports,stt,threat_decisions}.py
 ```
+
+Suite sizes as the runners report them: **195 Python tests**, **234 web tests** (191 before §7.3.6), production
+build green.
+
+**Promised in revision 2, not in the repo.** Naming these is half the point of this revision:
+
+| Missing | What it actually means |
+|---|---|
+| `perception/georef.py` | Cosmetic. Pixel→geo lives in `postprocess.py` and `goru_core/geo.py`. |
+| `kinematics/predict.py` | Cosmetic. Constant-velocity prediction is in `velocity.py`, and again in the frontend's `domain/tracks.ts` for the trails. |
+| `risk/hysteresis.py` | **Cosmetic, not a gap** — checked before writing this line. The `Hysteresis` class lives in `risk/engine.py`, is wired in `pipeline.py` off `warning.downgrade_consecutive`, and `analyse_all()` carries it between ticks. §6.7 is satisfied; only the filename differs. |
+| `sim/clock.py`, `sim/replay.py` | The simulation clock is client-side (§7.3.3). Defensible, but §5.5 and §9 still read as though a server drives the replay. |
+| `security/auth.py`, `rbac.py`, `audit.py` | **The real gap: none of §7.4 exists.** No login endpoint, no roles, no RBAC dependency on any route, no hash-chained log. The word "audit" in the codebase refers only to the `AgentRun` record. `goru_core/provenance.py` does give file and payload SHA-256 plus `SourceRef` / `DatasetVersion`, so hashing exists — the *chain* does not. Decisions round-trip through `POST /frames/{id}/decision` and `GET /decisions`, the operator is hardcoded `nöbetçi-1`, and the web adapter holds them in memory until reload. §1.2 lists access and audit as in scope; that is now this plan's largest single overstatement. |
+| `api/ws.py` | No WebSocket. §5.5 is unbuilt (§7.3.3). |
+
+**Not in revision 2, shipped anyway:** `llm/` as a port with a stub, a response cache and a
+budget counter; `evidence/bundle.py`; `agents/jev.py` with `threat_decisions.py` and
+`situational_report.py` behind it; `agents/runner.py` and `factory.py`; the whole of `stt/` and
+`voice/` plus `contracts/voice_commands.json` (§7.5); `goru_core/provenance.py` and
+`timeline.py`; `pipeline.py` as the shared entry point; and the Docker / Firebase deployment set
+with `DEPLOYMENT.md`.
 
 ---
 
@@ -825,6 +893,121 @@ $15. `budget.py` holds a hard counter, refuses calls past `budget_soft_stop_usd`
 non-interactive paths, exposes `/agents/budget`, and every cached bundle hash short-circuits a
 repeat call. Rehearsals run with the cache warm.
 
+### 6.12 Zone pressure field — the density view
+
+The map answers *where is each vehicle*. It has never answered *which zone is under pressure
+right now*, and at the busiest clock it carries 101 vehicles (measured, `live.perf.test.ts`) —
+counting glyphs around eight rings by eye is exactly the judgement a reviewer gets wrong under
+time pressure. The density view is a second reading of the same derived set, not a second
+dataset.
+
+**Definition.** At the simulation clock *t*, over the live set L(t) the map already derives
+(`liveVehiclesAt`, §7.3), the pressure at a ground point **p** is
+
+```
+I(p, t) = Σ  w(v) · exp( −‖p − x_v‖² / 2σ² )        over v ∈ L(t)
+```
+
+| Term | Value | Why |
+|---|---|---|
+| `w(v)` | ALERT 3, WATCH 2, CLEAR 1, not-yet-assessed 1 | Decided this revision: the heat is **risk-weighted**, so one approaching threat outweighs three parked cars. A vehicle whose own frame has not been captured yet has no level at all (§7.3) — it counts as present-but-unjudged, never as zero, because dropping it would make the early clocks look emptier than the ground truth. |
+| `σ` | 350 m, from config | The scale at which two vehicles read as one cluster. Bounded by the zone geometry: the zones sit on a 3.2 km ring and their radius+buffer is well under a kilometre (§2.4), so σ must stay smaller than a zone or every zone bleeds into its neighbours. |
+| `x_v` | the vehicle's ENU position at *t* | The same `sample.enu` its glyph is drawn at, so heat and glyph cannot disagree. |
+
+**Normalisation is against the whole exercise, not the current tick.** This is the one decision
+in the feature that is easy to get wrong and expensive to notice. Dividing by the current clock's
+maximum makes every minute of the day look equally hot: a single parked car at 08:10 would
+render as deep as a seven-vehicle build-up at 13:50, and the view would be lying while looking
+entirely plausible. Instead `I_ref` is computed **once at boot** as the maximum of `I` over the
+08:10–15:50 window sampled every five minutes, and every tick is drawn against that fixed
+reference. Scrubbing the timeline then shows the day's real accumulation.
+
+Five minutes, not the frame cadence: sampling only the 40 capture minutes would miss every clock
+between them, and since a track carries two hours of history, vehicles are live at clocks no
+image was taken at. A reference blind to those clocks lets them saturate at the top of the ramp,
+which reads as *as busy as the day ever got* on a minute that was not.
+
+Cost of that boot pass: 93 clocks, each a live-set derivation (0.291 ms median, 0.669 ms p90
+measured) plus a peak evaluated at the blob centres rather than over a grid — the maximum of a
+sum of Gaussians always sits near a data point, so this is within a few percent of the true peak,
+which is all a normalisation reference has to be. Tens of milliseconds, once, off the render
+path, and not paid at all by a reviewer who never opens the view.
+
+**Rendering: a continuous field.** One radial-gradient blob per vehicle, composited in a single
+memoised group *under* the zones — chosen over per-zone fills because a convoy stacking up just
+outside a zone boundary is precisely the case a per-zone number hides, and that convoy is the
+demo's whole story. The kernel's gradient stops are sampled from the Gaussian itself, so the
+blob drawn is the kernel summed.
+
+**Colour: a lookup on accumulated density.** Each blob is drawn as black-with-alpha, linear in its
+vehicle's weight, and the blobs blend where vehicles cluster. An SVG filter on the group then reads
+the accumulated alpha and looks it up in a table (`feColorMatrix` copies alpha into the colour
+channels, `feComponentTransfer` maps each through the lookup). The colour therefore comes from the
+*total* density at a pixel — a lone car is a light violet, a convoy is deep magenta. Colouring each
+blob separately cannot do that: overlapping blobs of one colour only darken, never shift hue.
+
+The lookup is **curved**, and the curve is applied to the accumulated value — an honest
+compression of the field rather than of each vehicle. Most of the map sits at low density (a lone
+vehicle reaches about a quarter of the range) and a linear lookup's low end does not read on a
+near-white map, so both colour and coverage are front-loaded. `heat-ramp.test.ts` holds the floor:
+a lone CLEAR vehicle — the faintest thing the field ever draws — must paint at a contrast above 1.3
+against `--surface-map`, and an ALERT must paint above 1.3 against a CLEAR. Painted colours on the
+shipped data: lone CLEAR `#d7c8f8`, lone ALERT `#b18eec`, busiest clock `#843b89`.
+
+**Ramp: violet into magenta.** `#a78bfa` → `#701a75`, darkening monotonically. This reverses the
+decision taken earlier in this revision — one neutral slate with opacity carrying density, chosen
+to keep `tokens.css`'s rule that colour means risk. On the real map it read as grey smudge and was
+rejected on sight. The rule is kept a different way: every stop stays more than 30° of hue clear of
+ALERT red, WATCH amber, CLEAR blue and terrain green, and the test pins it. A blue→yellow→red ramp
+fails that test on purpose, since red would then mean both *threat* and *busy* on the one screen
+where that must not happen. The ramp does sit near two of the six pin identity colours (indigo,
+purple); pins are solid rings on top and the heat is a diffuse wash underneath, so they separate by
+form, and pins are identity rather than risk.
+
+**Per-zone readout: a catchment count, not a sample of the field.** The readout — not the
+picture — is what the toggle's caption and the screen-reader text say out loud ("*en yoğun ·
+Bati Yerlesimi · %100*"). A reviewer who cannot read a gradient still gets the ranking, and a
+figure they can repeat.
+
+Two corrections here, both found by running the thing over the real export rather than reasoned
+out beforehand, and both worth recording because the first version looked plausible:
+
+1. **It cannot be a Gaussian sample at the zone centre.** A zone's catchment is a full kilometre
+   across — the shipped thresholds are `zone_radius_m: 250` and `zone_buffer_m: 750` — while the
+   drawing kernel is σ = 350 m. So a vehicle sitting on the buffer edge, exactly the vehicle a
+   reviewer is watching, contributed **1.7 %** at the centre. Measured at the busiest sampled
+   clock: the most-pressed zone read 0.157 and **five of the eight read 0.000**. A ranking that is
+   correct and useless, on a control whose whole claim is that it explains itself. An earlier draft
+   of this section asserted that radius+buffer was "well under a kilometre", which is where the bad
+   σ came from; it is exactly a kilometre.
+2. So the readout is **the weighted vehicles inside the zone's own radius + buffer**. That is the
+   operational meaning of pressure on a zone, and it is the same geometry the rule engine warns on
+   (§6.6, §6.7) — so the readout and the warnings cannot tell different stories. It is also
+   countable: the caption can say a figure.
+
+It therefore needs a **second reference**, and `referencesOf` returns both from one walk of the
+window: `field` (the busiest clock's peak anywhere, for drawing) and `zone` (the worst catchment
+any zone carried all day, for the readout). Measured on the shipped data: field 20.9, zone 23.0
+weighted vehicles, and the hourly readout then runs 0 → 5 → 9 → **23** → 15 → 3, which
+discriminates.
+
+**Where it lives.** `web/src/domain/pressure.ts`: pure, no React, beside `risk.ts` and
+`polar.ts`, taking the `Projection` as a parameter like every other layer. It consumes
+`LiveVehicle[]` and never re-reads tracks. Filters apply exactly as they do to the glyph layer —
+a class or zone filter narrows the live set first and the field follows, so the two views can
+never describe different fleets.
+
+**Tests** — `pressure.test.ts`, beside the existing `risk` / `polar` / `live` suites:
+
+| Assertion | What it protects |
+|---|---|
+| One ALERT outweighs two CLEARs at the same point | The weighting is the feature, not decoration. |
+| The field is zero where the live set is empty | No phantom heat on a quiet clock. |
+| `I_ref` is identical across two different ticks | Catches an accidental per-tick renormalisation — the failure mode above, which is invisible by eye. |
+| A vehicle at a zone centre lifts that zone's readout above its neighbours' | Sanity of the per-zone sampling. |
+| A class filter removes that vehicle's contribution | Heat and glyphs stay in agreement. |
+| Pressure at 2σ is under 15 % of the peak | The kernel does not smear across the 45° spokes. |
+
 ---
 
 ## 7. Workstreams
@@ -982,92 +1165,198 @@ baseline, simulation clock, API/WS, persistence.
 
 Owns: all screens, visual language, interaction, demo choreography on screen.
 
-#### 7.3.1 Visual specification
+**Status: built.** 234 tests, production build green. What follows is the UI that exists.
+Revision 2 specified a different one — a dark deck.gl display with five routes — and the
+wireframe set in `Sentinel system wireframes.zip` was handed to the frontend as the authority
+wherever the two disagreed. The divergence is not drift to be tidied away: it is a decision with
+measurements behind it, recorded in `logs/step_frontend_development_logs.md` (W1, decisions two
+and three) and summarised in §7.3.3.
+
+#### 7.3.1 Visual specification (as shipped)
+
+Every value below lives in `web/src/styles/tokens.css`, which is the single source of truth
+F0.3 asked for — it simply holds different values than revision 2 predicted.
 
 | Element | Spec |
 |---|---|
-| Background | `#0A0F14`. Dark background keeps `#A6F2FF` legible. |
-| Polar grid | Centered on base. Range rings every 1 km to 10 km, **dashed**, stroke `#A6F2FF` at 15 % opacity; the **3.2 km ring brighter** — that is where all 8 zones sit. Radial spokes every 45°, labelled with the real zone names (§2.4), plus 30° minor spokes. Range labels on the 000 spoke. |
-| Zones | 2.5D extruded hexagonal prisms `#3a913f`, fill 60 %; solid ring at R, dashed at R+B (40 %). Name label above. A zone targeted by any ALERT gets a pulsing `#FC3030` outline. |
-| Base | Small neutral marker at origin, label "Merkez Us". |
-| ALERT | Filled triangle ▲ `#FC3030`, 22 px |
-| WATCH | Filled circle ● `#EB8E3D`, 18 px |
-| CLEAR | Diagonal slash ⟋ `#A6F2FF`, 16 px |
-| Agent dissent | Small hollow ring around the symbol when `agent_level ≠ baseline_level`, tooltip with both |
-| Track trail | Polyline of the 25 past fixes, fading alpha; prediction cone (widening with σ) to horizon, dashed |
-| Image footprint | Translucent quad at capture time; click → image inspector. **Footprints vary in size** (3 resolutions, GSD 0.109–0.199) — do not assume one scale. |
-| Detections | Kept boxes solid (class colour by matched track's level); dropped boxes dashed grey, tooltip with `drop_reason` and `suppressed_by`. A "show suppressed (n≈430)" toggle, off by default. |
-| Expected-not-seen | Ghost symbol at the track's position with a dashed leader to the footprint edge |
-| Reports | Pin with source badge (`OFFICIAL` solid, `3RD PARTY` outlined) and a `kind` chip; zone-named reports attach to the zone; area-wide ones as a timeline banner labelled "unverified context"; `contradicts` reports get a warning chip |
-| Typography | UI: Inter; numbers/IDs: JetBrains Mono |
-| Accessibility | Level encoded by **shape and colour**; never colour alone |
+| Ground / surfaces | Light workspace: `#f1f5f9` ground, `#ffffff` panels, `#f8f9fa` map |
+| Ink | `#1e293b` primary, four steps down to `#94a3b8` |
+| Polar grid | Centred on the base, dashed range rings, 45° spokes on the eight zone bearings plus 30° minors, auto-extended when the map is panned (`GridLayer`) |
+| Zones | Flat circles, not 2.5D prisms: filled ring at R in `--terrain` `#3a913f`, dashed ring at R+B, name label on the outward side. The filtered zone gets a solid deep-green buffer with a halo; a zone named by an open ALERT gets the only pulsing outline on the map (`ZoneLayer`) |
+| Base | Small flat plan mark at the origin, labelled in caps (`BaseLayer`) |
+| Risk colours | ALERT `#fc3030`, WATCH `#f2c94c`, CLEAR `#1981e6`. **Colour means risk, and nothing else in the interface may be coloured** — terrain green and the six-colour pin identity set are the two carve-outs, both picked to be unlike the risk hues. §6.12's heat ramp is a third, admitted only because it stays over 30° of hue from every risk colour — a test, not a convention |
+| Level glyphs | `▲` ALERT, `●` WATCH, class symbol for CLEAR — shape as well as colour, which is the thing revision 2 got right and `risk.test.ts` pins |
+| Class symbols | `■` car, `▲` van, `★` truck, `●` bus |
+| Typography | One family, the system monospace. No webfont: a CDN font breaks the offline rule (F4.3) and the wireframes are set in mono anyway |
+| Scale | Continuous zoom 1–12 km, default 8 km (the furthest track fix is 7.99 km), wheel-anchored on the ground point under the cursor, interpolated on a log curve; recentre settles at 2.25 km |
+| Motion | Two durations — 160 ms for a control, 500 ms for a layout shift — both zeroed under `prefers-reduced-motion` |
+| Accessibility | Level by shape and colour; the ALERT pulse becomes a static ring under reduced motion; every map control is a real focusable element with a Turkish `aria-label` |
+| Language | Turkish throughout, strings centralised in `domain/strings.ts` |
 
-View: deck.gl `OrthographicView` in ENU meters, pitch ~45° toggle for 2.5D, top-down toggle for
-reading distances. No basemap tiles (offline-safe).
+Renderer: **plain SVG over one `Projection`**, not deck.gl. Measured justification in §7.3.3.
 
-#### 7.3.2 Screens
+#### 7.3.2 The workspace (as shipped)
 
-| Route | Role | Content |
+One workspace, not five routes. `useAppStore.view` is `'map' | 'motion' | 'logs' | 'voice'`;
+the toolbar exposes Harita / Kayıtlar, and the voice view is reached from the dock or the `S`
+key.
+
+| Region | Content |
+|---|---|
+| Header | Clock, date, alert counts, notification toggle (`AppHeader`) |
+| Map toolbar | View tabs, zone and class filter popovers, symbol and risk legend, zoom stepper with the live radius, frame / camera button (`MapToolbar`) |
+| Stage | The radar and its overlays: pin list top-left, vehicle infobox, camera panel, phone alert (`Radar`, `PinList`, `VehicleInfobox`, `CameraFrame`, `PhoneAlert`) |
+| Timeline | The 08:10–15:50 window, 40 frame diamonds, seek and frame select (`Timeline`) |
+| Agent column | 430 px: frame picker, target crop, agent steps, brief card, ask-agent, voice dock |
+| Modals | Threat / review modal with the evidence chain and ack-or-dismiss with a reason (`AlertModal`), voice confirmation (`VoiceConfirm`), toasts |
+
+Data path: `screens → GoruApi (port.ts) → FixtureApi | HttpApi`. Both adapters are real and both
+are exercised by tests, so the seam is a contract rather than a guess; switching to the live API
+is one environment variable and touches no screen. Boot reads 340 KB of JSON (≈100 KB
+compressed); app code is 74 KB gzipped against the 300 KB budget.
+
+#### 7.3.3 Why the shipped UI differs from revision 2
+
+| Revision 2 asked for | Shipped | Reason |
 |---|---|---|
-| `/login` | all | Demo users with role badge |
-| `/ops` | reviewer, admin | Polar display (center), alert queue (left), inspector (right), timeline + sim controls (bottom), agent summary + budget (top-right) |
-| `/intake` | steward, admin | Upload drop zones per source (6 now), validation table with file/pointer/raw/rule, "commit dataset" button |
-| `/audit` | admin | Hash-chained log table, "verify chain" button, filter by actor/action |
-| `/settings` | admin | Warning thresholds, **detection score threshold / NMS IoU / min area**, zone radii, retention |
+| deck.gl `OrthographicView`, 2.5D prisms, pitch toggle | Plain SVG, flat circles | The deletion test, with numbers. The wireframes specify a flat vector radar: no basemap, no extrusion, no pitch control. The busiest clock is 101 vehicles and the per-tick data pass measures 0.291 ms median against a 66 ms budget — under 1 %. A WebGL runtime to draw a hundred triangles costs ≈1 MB against an offline requirement. Every `radar/` layer takes a `Projection` object rather than doing its own arithmetic, so deck.gl stays a drop-in if a later stage needs extrusion: the projection is the seam. |
+| Dark `#0A0F14`, Inter + JetBrains Mono, `⟋` CLEAR glyph | Light `#f1f5f9`, system monospace, class symbols | The wireframe set was handed over as the authority. Webfonts also break F4.3. |
+| Five routes: `/login`, `/ops`, `/intake`, `/audit`, `/settings` | One workspace, three views | Four of the five have no wireframe screen, and three need endpoints that do not exist — auth, the audit chain, a settings write. Each is listed with its blocker in the step log's "deliberately not built". |
+| WebSocket `/ws/stream` (§5.5) | Client-side simulation clock | The dataset is fixed and fully known at boot, so a socket would stream a replay the browser can compute. `HttpApi` is where `/ws/stream` lands if live data ever arrives. |
+| Alert queue as a left-hand rail | Pin list, phone alert and timeline | Wireframes. |
 
-Inspector content for a track: ID, class + detection score, match distance, speed (m/s and
-km/h), heading, stationary flag, distance-to-base at t−60/t−30/now, per-zone table (distance,
-CPA, ETA, approach), most likely destination, evidence list (image, detection, reports with
-provenance and `consistency`), **agent assessment** (rationale bullets with clickable citations,
-labelled as AI, dissent shown if any), ack/dismiss with mandatory reason.
+**Open, and they are decisions rather than bugs** — carried from the step log: **W1** (are
+`/login`, `/intake`, `/audit` and `/settings` in scope at all), **W6** (`Alert.track_id` may
+carry a det_id), **W7** (the zone radius/buffer answer, R2, changes the display's whole
+character), **W9** (ship rules-only or run the 40-image live assess pass), **W11** (four endpoint
+shapes to agree before `rest.py` grows further).
 
-**P0 (H0–H2)**
+#### 7.3.4 Task status, P0–P4
+
+| ID | Task | Status |
+|---|---|---|
+| F0.1 | Scaffold, routing, store | **Done**, without deck.gl (§7.3.3) |
+| F0.2 | Generated types, transport with reconnect | **Done** as two adapters over one port; no WS |
+| F0.3 | Visual tokens in one place | **Done** — `styles/tokens.css` |
+| F1.1 | Polar grid: dashed rings, named spokes, auto-extent | **Done** |
+| F1.2 | Zone layer, rings, labels | **Done**, flat; the pitch toggle is dropped |
+| F1.3 | Track symbols, 25-point trails, prediction, labels | **Done** |
+| F1.4 | Timeline over 08:10–15:50 | **Done** |
+| F1.5 | Intake page with the validation table | **Not built** — no wireframe screen; the export already carries `validation_issues` (0 errors, 7 warnings), so the data side is ready |
+| F2.1 | Mock → real API | **Done** — one environment variable |
+| F2.2 | Alert queue | **Replaced** by pin list + phone alert |
+| F2.3 | Inspector, evidence list, ack/dismiss with reason | **Done**; decisions are in-memory until an audit endpoint exists (§4.3) |
+| F2.4 | Footprints, image inspector, kept/dropped boxes, suppressed toggle | **Done** at all three resolutions |
+| F2.5 | Report pins, zone attachment, trust chips | **Partial** |
+| F3.1 | Agent panel: rationale, citations, assessing state, dissent, budget | **Done**; the `source: 'llm'` path is untested against real output (W9) |
+| F3.2 | Copilot input with a streaming answer | **Done** as `AskAgent`, non-streaming |
+| F3.3 | Audit page with verify-chain | **Not built** — there is no hash chain to verify (§4.3) |
+| F3.4 | Zone pulse on ALERT, legend, sound cue | **Done** except the sound cue |
+| F3.5 | Performance: memoised layers | **Done** and measured (§7.3.3) |
+| F4.1 | Projector test | **Open** |
+| F4.2 | Demo hotkeys | **Partial** — arrows seek, `S` voice view, `V` push-to-talk, `Esc` unwinds one layer at a time |
+| F4.3 | Offline check: no external fonts or CDNs | **Done** by construction |
+
+#### 7.3.5 P5 — the density view (this revision)
+
+**Status: built in this revision.** A second reading of the map: which zone is under pressure,
+rather than where each vehicle is. The metric is §6.12; these were the screen tasks. Nothing here
+removed existing behaviour — the heat layer is additive and the glyph layer kept its interactions,
+which the shell test asserts by selecting a vehicle with the field on.
 
 | ID | Task | Output / DoD |
 |---|---|---|
-| F0.1 | Vite + React + TS + deck.gl scaffold, routing, Zustand store | App boots |
-| F0.2 | Import generated types; WS client with reconnect against mock server | Mock tracks move on screen |
-| F0.3 | Visual tokens in one `theme.ts` | Single source of truth |
+| F5.1 | `domain/pressure.ts`: the field, the fixed reference, the per-zone readout | Pure module, no React; `pressure.test.ts` green, including the stable-reference and risk-weighting assertions (§6.12) |
+| F5.2 | `radar/HeatLayer.tsx`: one memoised group of radial-gradient blobs under `ZoneLayer`, coloured through a lookup filter on accumulated density | Renders at the busiest clock (101 vehicles) with no measurable change to the per-tick budget; zones, base and glyphs stay readable through it; memoised on the clock and the filters like every other layer |
+| F5.3 | The corner toggle: bottom-right of the map, small and semi-transparent | A real focusable button with a Turkish `aria-label` and `aria-pressed`, keyboard reachable, carrying a one-line caption that names the current view and the densest zone — so the control explains the state rather than just holding an icon. It must not collide with the recentre chip (top-left), the pin list (top-left) or the timeline below |
+| F5.4 | Glyph dimming and the legend | Heat on → glyphs to ~25 % and trails off, while selection, hover and click keep working (decided this revision: the operator must not lose context to change view); the toolbar legend gains the density ramp; no crossfade under `prefers-reduced-motion` |
 
-**P1 (H2–H8)**
+**As built.** `domain/pressure.ts` (pure) + `radar/HeatLayer.tsx` (one memoised group) + the
+toggle in `Radar.tsx`. The ramp and the lookup curves live in `HeatLayer.tsx` as numbers, because
+the filter tables need them; `--heat` in `tokens.css` is the ramp's midpoint for the chrome (the
+toggle's icon and outline). `heatOn` / `toggleHeat` in the store, strings in `domain/strings.ts`,
+and `VehicleLayer` gained one optional `trails` prop.
 
-| ID | Task | Output / DoD |
-|---|---|---|
-| F1.1 | Polar grid layer (dashed rings, 3.2 km emphasis, 45° named spokes, auto-extent) | Matches §7.3.1 |
-| F1.2 | Zone layer 2.5D + rings + labels; pitch toggle | 8 zones render at their true bearings |
-| F1.3 | Track layer: symbols by level, 25-point trails, prediction cones, labels | 226 tracks at 60 fps |
-| F1.4 | Timeline + sim controls over the 08:10–15:50 window | Seek updates the display |
-| F1.5 | Intake page with validation table (6 sources) | Shows a tampered-fixture error with pointer |
+| Measured | Value |
+|---|---|
+| Tests added | **29** — 22 in `pressure.test.ts`; 6 in `heat-ramp.test.ts` (off the risk hues, monotonic ramp, well-formed lookup that never lightens, a lone CLEAR visible on the map, ALERT deeper than CLEAR); one shell test that toggles the view, dims the glyphs, keeps a vehicle selectable and checks the caption and the legend |
+| Suite after | 191 web, 195 Python, production build green |
+| Bundle cost | **+5.01 kB raw / +1.98 kB gzipped** (132.53 → 137.54 kB raw, 44.07 → 46.05 kB gzip), measured by building with and without the change |
+| Boot pass | Deferred until the view is first opened, so a reviewer who never uses it pays nothing |
 
-**P2 (H8–H14)**
+One thing to note against §7.3.1's colour rule: the heat ramp is a *third* carve-out beside
+terrain green and the pin set. It is admissible only because it stays clear of the risk hues, and
+that is a test rather than a convention — if anyone later reaches for a warm scale here, the suite
+goes red, which is the point. The SVG filter re-rasterises the group on every redraw, including
+during a wheel-zoom flight; no drop was measured, but it is the first place to look if the map
+ever stutters with the heat view on.
 
-| ID | Task | Output / DoD |
-|---|---|---|
-| F2.1 | Switch from mock to real API/WS | Same UI, real data |
-| F2.2 | Alert queue (level, then priority, then ETA) | Updates live |
-| F2.3 | Inspector + evidence list + ack/dismiss with reason | Round-trips to backend, audit visible |
-| F2.4 | Image footprints + image inspector with kept/dropped boxes, suppressed toggle | Click from map works at all 3 resolutions |
-| F2.5 | Report pins, zone attachment, area-wide banners, `kind`/`consistency` chips | Trust labels visible |
+The toggle is a **map control, not a fifth view**: it does not enter `useAppStore.view`, because
+the reviewer is not leaving the map — they are changing how the same clock is drawn. It lives in
+the store beside `scaleKm` as a boolean, so the timeline, the filters and the voice layer can all
+reach it, and a voice command for it (§7.5) becomes a one-line registry entry rather than a new
+code path.
 
-**P3 (H14–H19)**
+#### 7.3.6 P6 — the city under the radar, and the route report
 
-| ID | Task | Output / DoD |
-|---|---|---|
-| F3.1 | Agent panel: rationale bullets, clickable citations, "assessing…" state, dissent badge, budget meter | Clearly labelled as AI; never blocks alert render |
-| F3.2 | Copilot input with streaming answer | Tokens stream in |
-| F3.3 | Audit page with verify-chain | Shows ✓ / tamper position |
-| F3.4 | Zone pulse on ALERT, sound cue toggle, legend | Legible from 3 m on a projector |
-| F3.5 | Performance: binary attributes, memoized layers, 10 Hz WS apply | No frame drops at 4× speed |
+**Status: built.** Two requests from the frontend review: the map carried too little detail to
+convince a jury (a blank ground with eight painted "approach road" bands that did not exist), and
+there was no way to report on one vehicle's movement.
 
-**P4 (H19–H22)**
+**Basemap.** OpenStreetMap, not Google. Google Maps needs a billed API key and a live network at
+the venue, and baking its tiles into our own renderer is against its terms; OSM is ODbL — free to
+bake and redraw with attribution, which the map carries bottom-left. `web/scripts/export_basemap.py`
+fetches the area once over Overpass (raw responses cached in `data/processed/osm/`, gitignored)
+and bakes `web/public/basemap/ankara.json` — **committed**, 1.37 MB / 463 KB gzip, so the venue
+laptop needs no network (F4.3). Every coordinate goes through `goru_core.geo.Frame`, the engine's
+own ENU transform, so a road and the vehicle on it land on the same metre.
 
-| ID | Task | Output / DoD |
-|---|---|---|
-| F4.1 | Projector test (contrast, font sizes, 1080p) | Pass on venue screen or equivalent |
-| F4.2 | Demo mode: hotkeys for scenario steps §9 | One key per step |
-| F4.3 | Offline check: no external fonts/CDNs at runtime | Works with network off (agent panel degrades gracefully) |
+| Decision | Why |
+|---|---|
+| Crop = operation area + 1.2 km | The operation area is the bounding box of every position in the dataset: tracks.csv 39.8512–39.9917 N, 32.7603–32.9458 E (15.86 × 15.59 km around Kızılay). Every image corner and zone falls inside the tracks' box — pinned by `basemap.real.test.ts` over all 40 footprints. Drawn on the map as a dashed box with its size; the ground outside is washed back |
+| Content | 13 839 road chains (6 classes), 3 870 areas (park, forest, grass, water, cemetery, commercial, campus), 848 lines (rail, metro, rivers), 295 place names in Ankara's own hierarchy (`town` = 5 districts, `quarter` = 48 semt names such as Kızılay and Tunalı, `suburb` = 242 mahalle), 53 stations, 154 landmarks (Anıtkabir, AŞTİ, campuses, hospitals) |
+| Palette: grey land, white roads, tan blocks, soft parks — **no yellow highways** | Vehicles sit on roads; a yellow highway would swallow every WATCH glyph. Hierarchy is carried by width and outline. All `--map-*` tokens are paler than the lightest risk tint, so §7.3.1's colour rule holds |
+| Still plain SVG, one `scale()` over metre-space paths | The projection seam §7.3.3 promised. A zoom rewrites a transform, not 14 000 roads; off-screen 2 km tiles are skipped; wide views draw a coarse level (14 m simplification, areas under a hectare dropped) |
+| No anti-aliasing **while moving** | Measured in headless Chrome at 8 km: 104 ms median frame during a wheel flight with the full map, **7 ms** with `shape-rendering: optimizeSpeed`. The attribute is set on the element directly (no React render) and cleared 160 ms after the last frame, so the map is crisp at rest. Flight median with the map is now 21 ms — the same as with no map |
+| Labels: monospace, greedy by priority, laid out once per 20 % zoom step | A monospace label's width is exact, so collision needs no measuring. Districts > semt > big roads > stations > parks > mahalle; zone names and the base are obstacles. 35 labels at 8 km in 7 ms, 1 472 at 1 km in 67 ms |
+| The eight painted road bands removed; range rings kept, fainter | The bands would lie across real streets |
+
+**Route report (the Strava reading).** `domain/activity.ts` turns a track into distance, moving
+and total time, average and maximum speed, stops, closest approach to the base and to every zone
+(closed-form on each segment, not sampled), half-hour splits and an event list. Two rules: nothing
+after the simulation clock is read — the report is as-of, like the map — and GPS jitter is not
+distance: a step counts as moving only above `kinematics.stationary_disp_m`, scaled to its
+length, so a parked truck is not credited with a few hundred metres of driving. The selected
+vehicle draws its whole route on the radar (ink on white, fading towards the start, chevrons,
+stop badges, half-hour ticks); **Rota raporu** in the vehicle card (or `R`) opens the page — map
+framed on the route, headline, risk highlight, nine figures, range chart with stop bands, splits,
+events, provenance. **PDF olarak yazdır** is the browser's print dialog over a print stylesheet:
+no PDF library, nothing fetched.
+
+| Measured | Value |
+|---|---|
+| Tests added | **43** — `basemap.test.ts` 22, `activity.test.ts` 15, `basemap.real.test.ts` 4 on the shipped files, and 2 shell tests (map + operation area + attribution; route, report open/close, `R`). `heat-ramp.test.ts` now checks the heat against `--map-land`, the darker ground it is drawn on, and still passes |
+| Suite after | **234 web**, production build green |
+| App bundle | 57.0 kB gzip (+ React 45.3 kB) against the 300 kB budget; the basemap is data, fetched after boot, never blocking first paint |
+| Prepare the real file | 118 ms, once, after boot |
+
+Open: the route joins five-minute fixes with straight lines, so it cuts across blocks rather than
+following streets. Snapping to the road graph would be a guess the data does not support, so it is
+not done.
 
 ### 7.4 Security — Access, Audit, Provenance, Safety
+
+**Status: not built — this is the largest gap between this plan and the repo (§4.3).** There is
+no `services/api/app/security/` package, no login endpoint, no roles, no RBAC dependency on any
+route and no hash-chained log; "audit" in the codebase refers only to the `AgentRun` record.
+What does exist is `goru_core/provenance.py` — file and payload SHA-256 with `SourceRef` and
+`DatasetVersion` — so the hashing this section needs is there and the chain over it is not.
+Decisions round-trip through `POST /frames/{image_id}/decision` and `GET /decisions`, the
+operator is hardcoded `nöbetçi-1`, and the web adapter holds them in memory until reload.
+
+§1.2 lists access and audit as in scope. Either this section gets built or that scope line gets
+cut, and it should be an explicit decision rather than something the demo discovers. Everything
+below is the specification as it was written; none of it has been verified against code.
 
 Owns: auth, RBAC, audit chain, input hardening, LLM guardrail review, threat model, integration QA.
 
@@ -1148,6 +1437,74 @@ review.
 |---|---|---|
 | S4.1 | Demo owner: run the scenario 3×, time each step, keep fallback checklist | Checklist signed off |
 | S4.2 | One-slide security summary for pitch | Done |
+
+### 7.5 Speech-to-text and voice control
+
+**Status: built, and revision 2 did not contain a single word about it.** `stt`, `whisper` and
+`voice` appear nowhere in that revision, while a local Turkish transcription service, an LLM
+command router, a command contract read by both languages and a voice UI were designed, built
+and tested — 48 Python and 62 web tests. The design document is `stt.md`; the build record with
+every measurement is `logs/step_stt_development_logs.md`. This section exists so the plan stops
+lying by omission.
+
+Owns: microphone capture, transcription, transcript → command routing, the voice UI, and the
+safeguards around anything a voice can trigger.
+
+#### 7.5.1 The four decisions
+
+| Decision | What was chosen | Why |
+|---|---|---|
+| Who owns the microphone | **The browser** | The service receives finished WAV utterances, not a live stream. That keeps the model process stateless and leaves the permission prompt where the user expects it. |
+| Privilege level | Speech is **admin-level** | A voice in the room is not an authenticated operator. Anything that changes state is confirmed on screen first. |
+| Transcript → command | **Routed by the LLM**, not a keyword table | The real vocabulary is our own identifiers — zone names, track ids, view names — and Turkish morphology makes a keyword table brittle. Costs ≈5 s per command (S5, open). |
+| Benchmark | **No 100-command benchmark this pass** | It needs recordings that do not exist yet (S9). What exists is the harness. |
+
+#### 7.5.2 Shape
+
+```
+browser mic ──► voice/capture.ts ──► wav.ts ──► POST /stt   (api/stt_server.py)
+                                                    │
+                              stt/ audio · model · provider · service · transcripts
+                                                    ▼
+                                        voice/router.py ── LLM ──► VoiceCommand
+                                                    │
+                                   voice/registry.py ◄── contracts/voice_commands.json
+                                                    ▼
+                                    VoiceConfirm ──► the app store's actions
+```
+
+`contracts/voice_commands.json` is read by both sides — the Python registry and the TypeScript
+command layer — so a command cannot come to exist on one side only. It is a frozen contract in
+the same sense as §5, and it has to stay that way.
+
+Model: `whisper-large-v3-tr` on the GPU, needing no conversion, reporting its own confidence
+(S2). The machine it runs on is **not** the machine `stt.md` was written against, and every
+measurement was redone (S1).
+
+The shell owns the microphone, not the voice view — "kayıtlar sayfasına geç" switches the view,
+so a microphone belonging to the voice screen would be torn down by the very command it had just
+carried out.
+
+#### 7.5.3 Safeguards
+
+| Property | Where it is enforced |
+|---|---|
+| No voice command executes without on-screen confirmation | `VoiceConfirm`; the store action is reachable only from its confirm path |
+| A voice-recorded operator decision is opt-in | One config flag in `goru.yaml` (S6) |
+| Push-to-talk, never an open microphone | The `V` key and the dock, both ways through one control |
+| Transcripts are retained deliberately, not incidentally | `stt/transcripts.py` |
+| An unavailable or failed model degrades to typed control | The dock states the reason instead of going silent |
+
+#### 7.5.4 Open decisions
+
+1. **S3** — `SESLE KONTROL` is a screen the wireframes do not contain. Keep it, or fold the
+   feature entirely into the dock?
+2. **S5** — ≈5 s of LLM routing per command. Acceptable for a demo, or does a fast path for the
+   dozen commands that matter need to exist before the stage?
+3. **S9** — the benchmark needs recorded Turkish utterances. Who records them, and when?
+
+When the density view lands (§7.3.5), one registry entry — *"ısı haritasını aç / kapat"* — is
+enough to reach it, because the toggle is store state rather than a view change.
 
 ---
 
@@ -1362,6 +1719,102 @@ with the answer.
 ---
 
 ## 15. Change log
+
+### Revision 3.1 — 2026-09-27
+
+§7.3.6: the OpenStreetMap basemap under the radar (baked offline, `export_basemap.py`), the
+operation-area box, the painted approach-road bands removed, and the route report — a vehicle's
+movement history as distance, time, splits, stops and events, printable. 43 web tests added
+(234 web). §2.2's "no basemap tiles" is corrected: still no tiles at runtime, but a baked map.
+
+### Revision 3 — 2026-09-27
+
+Written against the shipped code, the three step logs in `logs/`, `stt.md` and the commit
+history through `3e78af8`. Where the plan and the repo disagreed, the repo won.
+
+**New feature**
+
+1. §6.12 — the **zone pressure field**: a risk-weighted Gaussian density over the live set the
+   map already derives, normalised against a reference computed once over the whole exercise
+   rather than per tick (the one mistake in the feature that would look plausible while lying),
+   drawn as a continuous field coloured violet→magenta through a curved lookup on accumulated
+   density, plus a per-zone catchment readout for the caption and the screen reader.
+2. §7.3.5 — tasks **F5.1–F5.4**, **built in this revision**: `domain/pressure.ts`,
+   `radar/HeatLayer.tsx`, the bottom-right toggle, and glyph dimming with a legend. The toggle is
+   a map control, not a fifth view, so it lives in the store beside `scaleKm` and a voice command
+   for it is one registry entry. 29 tests added (191 web, 195 Python, build green) for
+   +1.98 kB gzipped, measured by building with and without it.
+3. **Four defects and one reversed decision that only came out of running it** — one found while
+   building, two on the real export, two reported from the browser. Recorded rather than quietly
+   fixed, because each looked correct in review and each would have reached the demo:
+   1. The reference was first sampled at the 40 capture minutes, leaving every clock between them
+      unsampled even though a track carries two hours of history — those clocks would have
+      saturated at the top of the ramp on minutes that were not busy. It now walks the window
+      every five minutes, pinned by `referenceClocks walks the whole exercise`.
+   2. **The field rendered as a flat, near-invisible wash.** Each blob's own weight was quantised
+      to the six legend steps against the *field's* reference, and since one vehicle is worth at
+      most 3 against a reference of ~21, every blob — ALERT and CLEAR alike — landed on the bottom
+      step: 8 % opacity, no variation anywhere. The six steps belong to the accumulated reading,
+      not to one contribution. The interim fix — a square root applied per blob — is superseded by
+      item 5.
+   3. **The per-zone readout was degenerate** — five of the eight zones printed 0.000 at the
+      busiest clock of the day. It sampled the Gaussian at the zone centre, and a zone's catchment
+      is a full kilometre across against a 350 m kernel, so the vehicle on the buffer edge scored
+      1.7 %. It is now a weighted catchment count over radius + buffer, which is both countable
+      and the geometry the rule engine already warns on. Measured hourly: 0 → 5 → 9 → 23 → 15 → 3.
+      §6.12 records the bad σ claim that caused it.
+   4. **The neutral-ink decision was reversed.** Once the field was visible at all, one slate hue
+      with opacity carrying density read as grey smudge on the real map and was rejected. It is
+      now a violet→magenta ramp applied to accumulated density through an SVG colour-lookup
+      filter, kept off the risk hues by `heat-ramp.test.ts` rather than by avoiding colour.
+   5. **The ramp did not read on the white map.** Reported from the browser with a screenshot:
+      the colour was there, the density was not. Three causes, all fixed. A lone vehicle reached
+      only the palest ramp stop, a near-white lavender, at about 22 % coverage — a contrast of
+      ~1.07 against the ground. The kernel gradient was steeper than the Gaussian it claims to
+      draw (0.36 at one sigma where the Gaussian is 0.61), so every blob was smaller than the
+      field it stands for. And the compression sat on each blob, because before the lookup
+      existed there was no way to compress the sum. Now: the palest stop is gone, the gradient is
+      sampled from `exp(-r²/2σ²)`, per-blob alpha is linear in weight, and a curve on the lookup
+      compresses the accumulated density. A lone CLEAR now paints at a contrast above 1.3, and
+      the test that says so is written from the complaint.
+4. §1.2 gains the density view and the speech layer as in-scope areas.
+
+**Plan re-aligned with the repo**
+
+5. §7.3 **rewritten**. The frontend is a light SVG workspace with three views, not a dark
+   deck.gl display with five routes. §7.3.1 is read off `tokens.css`, §7.3.2 describes the
+   shipped regions, §7.3.3 gives each divergence with the measurement behind it (101 vehicles,
+   0.291 ms median per tick against a 66 ms budget, ≈1 MB of WebGL runtime avoided), and §7.3.4
+   marks every P0–P4 task done, partial, replaced or not built.
+6. §7.5 **added**: the whole speech-to-text and voice-control workstream, which had no entry in
+   this plan while being built and tested (48 Python + 62 web tests). Its four decisions, its
+   shape, its safeguards, and S3 / S5 / S9 still open.
+7. §4.2 corrected: no deck.gl, no TanStack Query, no scipy; the api has no auth, audit or WS;
+   the speech service is a separate process with its own requirements and a 3.1 GB model.
+8. §4.3 **replaced** with the real tree, plus two honest lists — what revision 2 promised and
+   the repo does not have, and what the repo has that revision 2 never mentioned (`llm/` as a
+   port with stub, cache and budget; `evidence/bundle.py`; `jev.py` with `threat_decisions.py`
+   and `situational_report.py`; `stt/`; `voice/`; `provenance.py`; `timeline.py`; `pipeline.py`;
+   the Docker and Firebase set).
+9. §1.5 added: the scope change against revision 2, in one table.
+
+**Corrections found while checking rather than assuming**
+
+10. `risk/hysteresis.py` does not exist, but **hysteresis does** — the `Hysteresis` class is in
+    `risk/engine.py`, wired in `pipeline.py` off `warning.downgrade_consecutive`, carried between
+    ticks by `analyse_all()`. §6.7 is satisfied; an earlier draft of this revision called it a gap
+    and was wrong.
+11. **§7.4 is entirely unbuilt, and that is the largest gap in this plan.** No `security/`
+    package, no login endpoint, no roles, no RBAC on any route, no hash chain. "Audit" in the
+    codebase means the `AgentRun` record and nothing else. `provenance.py` does provide file and
+    payload SHA-256 with `SourceRef` / `DatasetVersion`, so the hashing exists and the chain does
+    not. The operator on every decision is hardcoded `nöbetçi-1` and decisions live in memory
+    until reload. §1.2 still lists access and audit as in scope: that claim needs either work or
+    a scope cut, and it should be decided rather than inherited.
+12. Test counts stated as the runners report them: 195 Python, 191 web (162 before this
+    revision's 29).
+13. §5.5's WebSocket and revision 2's `sim/` package are unbuilt; the simulation clock is
+    client-side. §9's demo script still reads as though a server drives the replay.
 
 ### Revision 2 — 2026-09-26
 

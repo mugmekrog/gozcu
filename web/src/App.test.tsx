@@ -8,6 +8,7 @@ import { setApi } from './api';
 import { useAppStore } from './store/useAppStore';
 import type { AgentEvent, GoruApi } from './api/port';
 import type { Alert, DatasetInfo, Decision, FrameDetail, TrackHistory } from './domain/types';
+import { basemapFile } from './test/fake-api';
 
 const ORIGIN = '2026-09-26T05:10:00+00:00';
 
@@ -300,6 +301,9 @@ class FakeApi implements GoruApi {
   imageUrl() {
     return null;
   }
+  async basemap() {
+    return basemapFile;
+  }
   async *assess(imageId: string): AsyncIterable<AgentEvent> {
     yield {
       type: 'step',
@@ -371,6 +375,66 @@ describe('Harita odaklı arayüz', () => {
     fireEvent.click(vehicle);
     await act(async () => { screen.getByRole('button', { name: 'Uyarıyı incele' }).click(); });
     await waitFor(() => expect(screen.getByRole('alertdialog')).toBeTruthy());
+  });
+
+  it('ısı haritasına geçer, araçları soldurur ve geri döner', async () => {
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole('img', { name: /Bölge haritası/ })).toBeTruthy());
+
+    const off = screen.getByRole('button', { name: /Isı haritasına geç/ });
+    expect(off.getAttribute('aria-pressed')).toBe('false');
+    expect(document.querySelector('.radar-heat')).toBeNull();
+
+    fireEvent.click(off);
+    await waitFor(() => expect(document.querySelector('.radar-heat')).toBeTruthy());
+
+    const on = screen.getByRole('button', { name: /Isı haritasını kapat/ });
+    expect(on.getAttribute('aria-pressed')).toBe('true');
+    // The glyphs step back but stay selectable: changing how the clock is drawn
+    // must not cost the operator track of who is who (PLAN F5.4).
+    expect(document.querySelector('.radar-vehicles--dimmed')).toBeTruthy();
+    expect(screen.queryAllByRole('button', { name: /T0001, kamyon/ }).length).toBeGreaterThan(0);
+    // The control explains its own state rather than just holding an icon.
+    expect(document.querySelector('.radar-heat-toggle__caption')?.textContent).toBeTruthy();
+    expect(document.querySelector('.map-toolbar__heat')?.textContent).toContain('Yoğunluk');
+
+    fireEvent.click(on);
+    await waitFor(() => expect(document.querySelector('.radar-heat')).toBeNull());
+    expect(document.querySelector('.radar-vehicles--dimmed')).toBeNull();
+  });
+
+  it('şehri, operasyon alanını ve OSM atfını haritanın altına çizer', async () => {
+    render(<App />);
+    await waitFor(() => expect(document.querySelector('.basemap path')).toBeTruthy());
+    expect(document.querySelector('.operation-area')?.textContent).toMatch(/OPERASYON ALANI · .* km × .* km/);
+    expect(document.querySelector('.map-attribution')?.textContent).toContain('OpenStreetMap');
+    // The eight painted "approach road" bands are gone: the real streets replace them.
+    expect(document.querySelectorAll('.radar line[stroke="#e5e9ef"]')).toHaveLength(0);
+  });
+
+  it('seçili aracın rotasını çizer ve rota raporunu açıp kapatır', async () => {
+    useAppStore.getState().closeModal();
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole('img', { name: /Bölge haritası/ })).toBeTruthy());
+    act(() => useAppStore.getState().selectTrack(null));
+    fireEvent.click(screen.getAllByRole('button', { name: /T0001, kamyon/ })[0]!);
+    await waitFor(() => expect(document.querySelector('.route')).toBeTruthy());
+
+    fireEvent.click(screen.getByRole('button', { name: 'T0001 için rota raporunu aç' }));
+    const report = await screen.findByRole('dialog', { name: /Dogu Yolu|Merkez Us|Bölgede/ });
+    // 7000 m -> 1570 m east, with one parked step: 5,43 km driven, 5,43 km closer.
+    expect(report.textContent).toContain('5,43 km');
+    expect(report.textContent).toContain('ROTA RAPORU');
+    expect(report.textContent).toContain('14:10 itibarıyla');
+    expect(report.querySelector('.activity__map .route')).toBeTruthy();
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+
+    // R opens it again for the selected vehicle.
+    fireEvent.keyDown(window, { key: 'r' });
+    expect(await screen.findByRole('dialog')).toBeTruthy();
+    act(() => useAppStore.getState().closeReport());
   });
 
   it('shows the live Jev confidence and situational report when inspecting a warning', async () => {

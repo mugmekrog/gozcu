@@ -61,6 +61,51 @@
   --pin-5: #88ccee;
   --pin-6: #999933;
 
+  /* --- density. The heat view's ramp (PLAN 6.12) runs violet into magenta
+         and lives in radar/HeatLayer.tsx, because the SVG colour-lookup filter
+         needs it as numbers. This token is its midpoint, for the chrome around
+         it: the toggle's icon and outline. The ramp stays clear of every risk
+         hue and of terrain green -- heat-ramp.test.ts pins that -- so a pixel of
+         heat can never be read as a level. A first cut in neutral slate kept
+         the rule too, and was rejected on the real map as grey smudge. ------ */
+  --heat: #7c3aed;
+
+  /* --- basemap. OpenStreetMap under the radar (radar/BasemapLayer.tsx), in
+         the light street-map palette -- grey land, white roads, tan blocks,
+         soft parks -- with one deliberate departure from it: no yellow or
+         orange highways. Vehicles sit on roads, and a yellow road would swallow
+         every WATCH glyph driving along it, so the road hierarchy is carried by
+         width and outline instead. Everything here is paler than the lightest
+         risk tint, so a saturated pixel on the map is still always a level. -- */
+  --map-land: #e9ecef;
+  --map-road: #ffffff;
+  --map-highway: #ffffff;
+  --map-casing: #d3d8de;
+  --map-casing-strong: #b3bcc7;
+  --map-tunnel: #f5f6f8;
+  --map-urban: #f1e7d6;
+  --map-campus: #e6e2ee;
+  --map-grass: #dcead2;
+  --map-cemetery: #d4e2cd;
+  --map-forest: #c8dfbe;
+  --map-park: #cce6c2;
+  --map-water: #aed3ee;
+  --map-rail: #a0a9b6;
+  --map-subway: #b7bfca;
+  --map-ring: rgba(71, 85, 105, 0.38);
+  --map-label: #4b5563;
+  --map-label-muted: #7b8490;
+  --map-label-district: #8a7864;
+  --map-label-park: #4a7542;
+  --map-label-water: #3b6d94;
+  --map-icon: #5b6573;
+
+  /* --- route. A vehicle's movement history (radar/RouteLayer.tsx, the
+         activity report). Ink on a white casing, fading towards the start: the
+         route says where and when, never how dangerous, so it takes no hue. */
+  --route: #1e293b;
+  --route-casing: #ffffff;
+
   /* --- type. One family everywhere: the wireframes are set in the system
          monospace, and a webfont would break the offline requirement. ------ */
   --font: ui-monospace, 'Cascadia Mono', Consolas, 'SF Mono', Menlo, monospace;

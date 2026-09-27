@@ -12,6 +12,7 @@ import { BriefCard } from '@/components/BriefCard';
 import { AskAgent } from '@/components/AskAgent';
 import { AlertModal } from '@/components/AlertModal';
 import { CameraFrame } from '@/components/CameraFrame';
+import { ActivityReport } from '@/components/ActivityReport';
 import { Toast } from '@/components/Toast';
 import { VoiceDock } from '@/components/VoiceDock';
 import { VoiceConfirm } from '@/components/VoiceConfirm';
@@ -20,6 +21,7 @@ import { LogsView } from '@/views/LogsView';
 import { VoiceView } from '@/views/VoiceView';
 import { api } from '@/api';
 import { assembleBrief } from '@/domain/brief';
+import { activityOf } from '@/domain/activity';
 import { framesOverZone, liveVehiclesAt, nearestZoneId, zoneAssessmentFor } from '@/domain/live';
 import { T } from '@/domain/strings';
 import * as fmt from '@/domain/format';
@@ -56,6 +58,7 @@ function Workspace() {
   const zoneFilter = useAppStore((s) => s.zoneFilter);
   const classFilter = useAppStore((s) => s.classFilter);
   const scaleKm = useAppStore((s) => s.scaleKm);
+  const heatOn = useAppStore((s) => s.heatOn);
   const selectedTrackId = useAppStore((s) => s.selectedTrackId);
   const pins = useAppStore((s) => s.pins);
   const selectedFrameId = useAppStore((s) => s.selectedFrameId);
@@ -71,6 +74,8 @@ function Workspace() {
   const modalTargetDetId = useAppStore((s) => s.modalTargetDetId);
   const showSuppressed = useAppStore((s) => s.showSuppressed);
   const toast = useAppStore((s) => s.toast);
+  const basemap = useAppStore((s) => s.basemap);
+  const reportTrackId = useAppStore((s) => s.reportTrackId);
 
   const setTime = useAppStore((s) => s.setTime);
   const setView = useAppStore((s) => s.setView);
@@ -90,6 +95,8 @@ function Workspace() {
   const record = useAppStore((s) => s.record);
   const setStepsExpanded = useAppStore((s) => s.setStepsExpanded);
   const showToast = useAppStore((s) => s.showToast);
+  const openReport = useAppStore((s) => s.openReport);
+  const closeReport = useAppStore((s) => s.closeReport);
 
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraSelectedDetId, setCameraSelectedDetId] = useState<string | null>(null);
@@ -132,6 +139,18 @@ function Workspace() {
   const selectedVehicle = vehicles.find((vehicle) => vehicle.trackId === selectedTrackId) ?? null;
   const selectedSummary = dataset.frames.find((item) => item.image_id === selectedFrameId) ?? null;
   const stepsDone = steps.filter((step) => step.state === 'done' && step.index !== null).length;
+  /* The route report follows the clock: opened mid-play it keeps filling in, and
+   * it never shows a fix recorded after the current minute. */
+  const reportHistory = reportTrackId ? trackIndex.get(reportTrackId) ?? null : null;
+  const reportActivity = useMemo(() => reportHistory ? activityOf(reportHistory, {
+    toMin: tMin, zones: dataset.zones, stationaryDispM: dataset.thresholds.stationary_disp_m,
+  }) : null, [reportHistory, tMin, dataset]);
+  const reportVehicle = useMemo(() => reportTrackId ? liveVehiclesAt({
+    tMin, tracks, frames: dataset.frames, alertsByFrame,
+    stationaryDispM: dataset.thresholds.stationary_disp_m, classFilter: 'all', zoneFilter: 'all',
+  }).find((vehicle) => vehicle.trackId === reportTrackId) ?? null : null,
+  [reportTrackId, tMin, tracks, dataset, alertsByFrame]);
+
   const brief = useMemo(() => frame ? assembleBrief(frame, {
     zones: dataset.zones, histories: trackIndex,
     stationaryDispM: dataset.thresholds.stationary_disp_m, originIso: dataset.origin_ts,
@@ -145,6 +164,10 @@ function Workspace() {
       if (event.key === 'ArrowRight') setTime(useAppStore.getState().tMin + (event.shiftKey ? 30 : 5));
       if (event.key === 'ArrowLeft') setTime(useAppStore.getState().tMin - (event.shiftKey ? 30 : 5));
       if (event.key === 's') setView('voice');
+      if (event.key === 'r') {
+        const selected = useAppStore.getState().selectedTrackId;
+        if (selected) openReport(selected);
+      }
       if (event.key === 'v') {
         // Push to talk. One key, both directions: pressing it again while the
         // microphone is open sends the utterance rather than hunting for a
@@ -156,6 +179,7 @@ function Workspace() {
       if (event.key === 'Escape') {
         if (useVoiceStore.getState().pending) voice.reject();
         else if (useVoiceStore.getState().open) voice.cancel();
+        else if (useAppStore.getState().reportTrackId) closeReport();
         else if (useAppStore.getState().modal) closeModal();
         else if (cameraOpen) setCameraOpen(false);
         else selectTrack(null);
@@ -163,7 +187,7 @@ function Workspace() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [setTime, setView, closeModal, selectTrack, cameraOpen, voice]);
+  }, [setTime, setView, closeModal, selectTrack, cameraOpen, voice, openReport, closeReport]);
 
   const inspectVehicle = async () => {
     if (!selectedVehicle?.imageId || !selectedVehicle.alert) return;
@@ -191,7 +215,7 @@ function Workspace() {
         <main className="app__map panel">
           <MapToolbar view={view === 'logs' ? 'logs' : 'map'} onView={setView}
             zones={dataset.zones} zoneFilter={zoneFilter} classFilter={classFilter}
-            scaleKm={scaleKm} selectedFrame={selectedSummary}
+            scaleKm={scaleKm} selectedFrame={selectedSummary} heatOn={heatOn}
             onZoneFilter={setZoneFilter} onClassFilter={setClassFilter}
             onScale={setScale} onCamera={openCamera} />
           <div className="app__stage">
@@ -216,6 +240,7 @@ function Workspace() {
                 onSelectFrame={(imageId) => void openFrame(imageId)}
                 onInspect={() => void inspectVehicle()}
                 onTogglePin={() => togglePin(selectedVehicle.trackId)}
+                onReport={() => openReport(selectedVehicle.trackId)}
                 onClose={() => selectTrack(null)}
               />}
             </>}
@@ -285,6 +310,9 @@ function Workspace() {
         targetDetId={modalTargetDetId} showSuppressed={showSuppressed}
         onInfoOpen={setModalInfoOpen} onTarget={setModalTarget} onShowSuppressed={setShowSuppressed}
         onDecide={(verdict, note) => void record(verdict, note)} onClose={closeModal} />}
+      {reportActivity && <ActivityReport activity={reportActivity} vehicle={reportVehicle}
+        zones={dataset.zones} basemap={basemap} originIso={dataset.origin_ts}
+        baseName={dataset.base.name} onClose={closeReport} />}
       {voicePending && <VoiceConfirm pending={voicePending}
         onConfirm={voice.confirm} onReject={voice.reject} />}
       {toast && <Toast toast={toast} onDismiss={() => showToast(null)} />}

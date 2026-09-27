@@ -12,6 +12,49 @@
   cursor: grabbing;
 }
 
+/* --- basemap: scenery, never a target ------------------------------------- */
+
+.basemap,
+.basemap-labels,
+.operation-area {
+  pointer-events: none;
+}
+
+/* While the view moves, the city draws without anti-aliasing (see SETTLE_MS in
+ * Radar.tsx for the measurement). It returns the moment the view settles. */
+.radar[data-moving] .basemap {
+  shape-rendering: optimizeSpeed;
+}
+
+/* Street-map lettering: a white halo so a name reads over any road or block. */
+.map-label {
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.map-attribution {
+  stroke-width: 2.5px;
+}
+
+/* --- route: the selected vehicle's movement history ------------------------ */
+
+.route {
+  pointer-events: none;
+}
+
+.route__stop rect {
+  fill: var(--surface);
+  stroke: var(--route);
+}
+
+.route__stop text,
+.route__tick text {
+  fill: var(--route);
+}
+
 /* --- recentre: shown only while the map is panned off the base ------------ */
 
 .radar-recentre {
@@ -32,6 +75,73 @@
 }
 
 .radar-recentre:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* --- density view: the field, the dimming, the corner toggle -------------- */
+
+.radar-heat {
+  /* The field is scenery. Zones, frames and vehicles keep their hit areas. */
+  pointer-events: none;
+}
+
+/* Glyphs step back while the field is the subject, but stay selectable and
+ * clickable: changing how the clock is drawn must not cost the operator track
+ * of who is who. */
+.radar-vehicles {
+  transition: opacity var(--dur-quick) var(--ease);
+}
+
+.radar-vehicles--dimmed {
+  opacity: 0.25;
+}
+
+/* Small, semi-transparent, bottom-right. It sits over the map, so it stays
+ * faint until it is wanted -- and never while it is the active view. */
+.radar-heat-toggle {
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity var(--dur-quick) var(--ease);
+}
+
+.radar-heat-toggle:hover,
+.radar-heat-toggle:focus-visible,
+.radar-heat-toggle[data-on] {
+  opacity: 1;
+}
+
+.radar-heat-toggle rect {
+  fill: var(--surface-map);
+  stroke: var(--hairline);
+}
+
+.radar-heat-toggle:hover rect {
+  stroke: var(--ink);
+}
+
+.radar-heat-toggle[data-on] rect {
+  fill: var(--surface);
+  stroke: var(--heat);
+}
+
+.radar-heat-toggle__label {
+  fill: var(--ink);
+  font-weight: 700;
+  letter-spacing: var(--tracking-label);
+}
+
+/* The caption is the control explaining itself: which view is on, and which
+ * zone the field is pointing at. */
+.radar-heat-toggle__caption {
+  fill: var(--ink-muted);
+}
+
+.radar-heat-toggle:focus {
+  outline: none;
+}
+
+.radar-heat-toggle:focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
 }

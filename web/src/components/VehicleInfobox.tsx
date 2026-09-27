@@ -6,7 +6,8 @@
  * summary of several.
  *
  * "Kareyi seç" loads the frame that assessed this vehicle, which is the bridge
- * from a symbol on the map to the evidence behind its level.
+ * from a symbol on the map to the evidence behind its level. "Rota raporu"
+ * opens the vehicle's whole movement history as a printable page.
  */
 
 import { memo } from 'react';
@@ -26,6 +27,7 @@ export interface VehicleInfoboxProps {
   onSelectFrame: (imageId: string) => void;
   onInspect: () => void;
   onTogglePin: () => void;
+  onReport: () => void;
   onClose: () => void;
 }
 
@@ -44,6 +46,7 @@ export const VehicleInfobox = memo(function VehicleInfobox({
   onSelectFrame,
   onInspect,
   onTogglePin,
+  onReport,
   onClose,
 }: VehicleInfoboxProps) {
   const band = bandOf(vehicle.level, vehicle.score);
@@ -119,6 +122,14 @@ export const VehicleInfobox = memo(function VehicleInfobox({
           aria-pressed={pinned}
         >
           {pinned ? T.vehicle.unpin : T.vehicle.pin}
+        </button>
+        <button
+          type="button"
+          className="btn btn--small"
+          onClick={onReport}
+          aria-label={T.report.openLabel(vehicle.trackId)}
+        >
+          {T.report.open}
         </button>
       </div>
     </aside>

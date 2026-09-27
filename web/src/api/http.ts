@@ -22,7 +22,9 @@ import type {
   FrameDetail,
   TrackHistory,
 } from '@/domain/types';
+import type { BasemapFile } from '@/domain/basemap';
 import { ApiError, type AgentBudget, type AgentEvent, type AgentStep, type GoruApi } from './port';
+import { loadBasemap } from './basemap';
 
 export interface HttpApiOptions {
   baseUrl: string;
@@ -90,6 +92,11 @@ export class HttpApi implements GoruApi {
 
   imageUrl(imageId: string): string {
     return `${this.opts.baseUrl}/images/${encodeURIComponent(imageId)}`;
+  }
+
+  /** Not an API call: the basemap is a static asset of the web app itself. */
+  basemap(): Promise<BasemapFile | null> {
+    return loadBasemap();
   }
 
   /**

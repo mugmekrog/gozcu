@@ -46,6 +46,13 @@ export interface VehicleLayerProps {
   selectedId: string | null;
   hoveredId: string | null;
   pins: readonly string[];
+  /**
+   * Trails off while the density field is the subject (PLAN F5.4): two
+   * overlapping ways of showing where a vehicle has been is one too many.
+   */
+  trails?: boolean;
+  /** The vehicle whose whole route RouteLayer draws; its short trail is skipped. */
+  routedId?: string | null;
   onSelect: (trackId: string | null) => void;
   onHover: (trackId: string | null) => void;
 }
@@ -58,6 +65,8 @@ export const VehicleLayer = memo(function VehicleLayer({
   selectedId,
   hoveredId,
   pins,
+  trails: showTrails = true,
+  routedId = null,
   onSelect,
   onHover,
 }: VehicleLayerProps) {
@@ -84,7 +93,7 @@ export const VehicleLayer = memo(function VehicleLayer({
     const dimmed = focusing && !selected && !pinned;
     const history = histories.get(vehicle.trackId);
 
-    if (history && (selected || pinned)) {
+    if (showTrails && history && (selected || pinned) && vehicle.trackId !== routedId) {
       const minutes = pinned || selected ? PIN_TRAIL_MINUTES : TRAIL_MINUTES;
       const points = trailAt(history, tMin, minutes);
       if (points.length > 1) {

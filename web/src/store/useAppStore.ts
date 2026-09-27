@@ -15,6 +15,7 @@ import { create } from 'zustand';
 import { api } from '@/api';
 import type { AgentStep } from '@/api';
 import { DEFAULT_SCALE } from '@/domain/polar';
+import { prepareBasemap, type PreparedBasemap } from '@/domain/basemap';
 import { minutesOf } from '@/domain/format';
 import type {
   Alert,
@@ -60,6 +61,12 @@ interface State {
   alerts: Alert[];
   /** Every alert, keyed by the frame it was raised in. */
   alertsByFrame: ReadonlyMap<string, Alert[]>;
+  /**
+   * The OpenStreetMap city under the radar. Loaded after boot, never before
+   * it: the map is usable on its plain ground while ~460 KB of streets arrive.
+   * Null until then, and for good if the file was never baked.
+   */
+  basemap: PreparedBasemap | null;
 
   // --- clock --------------------------------------------------------------- //
   /** Minutes from the exercise origin. */
@@ -84,6 +91,15 @@ interface State {
   scaleKm: number;
   showSuppressed: boolean;
   showAllInMotion: boolean;
+  /**
+   * The density view (PLAN 6.12).
+   *
+   * A map control rather than a fifth view: the reviewer is not leaving the map,
+   * they are changing how the same clock is drawn. So it lives here beside
+   * `scaleKm` instead of in `view`, which also puts it within reach of the
+   * timeline, the filters and a voice command without a new code path.
+   */
+  heatOn: boolean;
 
   // --- the opened frame and its evaluation --------------------------------- //
   frame: FrameDetail | null;
@@ -106,6 +122,9 @@ interface State {
    */
   mapFocus: { enu: Enu; seq: number } | null;
 
+  /** The vehicle whose route report is open (the Strava reading), if any. */
+  reportTrackId: string | null;
+
   // --- record -------------------------------------------------------------- //
   decisions: Decision[];
   toast: Toast | null;
@@ -113,6 +132,7 @@ interface State {
 
 interface Actions {
   boot(): Promise<void>;
+  loadBasemap(): Promise<void>;
 
   setTime(tMin: number): void;
   play(): void;
@@ -135,6 +155,8 @@ interface Actions {
   setZoom(scaleKm: number): void;
   setShowSuppressed(show: boolean): void;
   setShowAllInMotion(show: boolean): void;
+  setHeat(on: boolean): void;
+  toggleHeat(): void;
 
   /** Open a frame: loads its detail and moves the clock to its capture time. */
   openFrame(imageId: string, opts?: { seek?: boolean }): Promise<void>;
@@ -146,6 +168,8 @@ interface Actions {
   closeModal(): void;
   setModalInfoOpen(open: boolean): void;
   setModalTarget(detId: string | null): void;
+  openReport(trackId: string): void;
+  closeReport(): void;
 
   record(verdict: Decision['verdict'], note: string): Promise<void>;
   showToast(toast: Toast | null): void;
@@ -176,6 +200,7 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   reports: [],
   alerts: [],
   alertsByFrame: new Map(),
+  basemap: null,
 
   tMin: 0,
   playing: false,
@@ -194,6 +219,7 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   scaleKm: DEFAULT_SCALE,
   showSuppressed: false,
   showAllInMotion: false,
+  heatOn: false,
 
   frame: null,
   frameLoading: false,
@@ -209,6 +235,7 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   modalInfoOpen: false,
   modalTargetDetId: null,
   mapFocus: null,
+  reportTrackId: null,
 
   decisions: [],
   toast: null,
@@ -238,12 +265,19 @@ export const useAppStore = create<State & Actions>((set, get) => ({
         tMin: firstFrame?.capture_min ?? minutesOf(dataset.origin_ts, dataset.sim.start_hhmm),
         selectedFrameId: firstFrame?.image_id ?? null,
       });
+      void get().loadBasemap();
     } catch (error) {
       set({
         status: 'error',
         error: error instanceof Error ? error.message : String(error),
       });
     }
+  },
+
+  async loadBasemap() {
+    if (get().basemap) return;
+    const file = await api().basemap();
+    if (file) set({ basemap: prepareBasemap(file) });
   },
 
   setTime(tMin) {
@@ -318,6 +352,12 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   },
   setShowAllInMotion(showAllInMotion) {
     set({ showAllInMotion });
+  },
+  setHeat(heatOn) {
+    set({ heatOn });
+  },
+  toggleHeat() {
+    set({ heatOn: !get().heatOn });
   },
 
   async openFrame(imageId, opts = {}) {
@@ -445,6 +485,13 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   },
   setModalTarget(modalTargetDetId) {
     set({ modalTargetDetId, ...(modalTargetDetId ? { modalInfoOpen: true } : {}) });
+  },
+
+  openReport(reportTrackId) {
+    set({ reportTrackId });
+  },
+  closeReport() {
+    set({ reportTrackId: null });
   },
 
   async record(verdict, note) {
