@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -574,6 +575,9 @@ def _load_tracks(
             except (KeyError, TypeError, ValueError):
                 log.error(path.name, f"/row/{row_no}", "tracks.number_parse", "lat/lon are not numbers")
                 continue
+            if not math.isfinite(lat) or not math.isfinite(lon):
+                log.error(path.name, f"/row/{row_no}", "tracks.number_parse", "lat/lon must be finite")
+                continue
             rows.append((row_no, track_id, hhmm, lat, lon))
 
     grouped: dict[str, list[tuple[int, str, float, float]]] = {}
@@ -583,7 +587,6 @@ def _load_tracks(
     capture_times = {m.capture_ts for m in images.values()}
     tracks: dict[str, list[TrackPoint]] = {}
     for track_id, entries in grouped.items():
-        entries.sort(key=lambda e: e[1])
         points: list[TrackPoint] = []
         previous_ts: datetime | None = None
         for row_no, hhmm, lat, lon in entries:
@@ -597,7 +600,7 @@ def _load_tracks(
                         "tracks.step",
                         f"step is {gap_min:.0f} min, expected {TRACK_STEP_MIN}",
                     )
-                if ts > previous_ts + timedelta(days=0, minutes=0) and hhmm < timeline.hhmm(previous_ts):
+                if hhmm < timeline.hhmm(previous_ts):
                     log.warning(
                         path.name,
                         f"/{track_id}/row/{row_no}",

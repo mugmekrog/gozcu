@@ -21,6 +21,39 @@
 > plan and the repo disagreed, the repo won and the divergence is written down rather than
 > quietly dropped. Evidence: the three step logs in `logs/`, `stt.md`, and the commit history
 > through `3e78af8`. Full list in §15.
+>
+> **Revision 4 (2026-09-27).** The shipped decision path is the rule baseline plus
+> GLM assessor; JEV receives the full evidence and assessor result and supplies a
+> confidence score, not a level. The authoritative matching metric is **188/217
+> (0.866)** under exclusive 1:1 assignment. Earlier 214/217 figures measure
+> non-exclusive nearest neighbours and must not be presented as product accuracy.
+> The report path and current threat controls are recorded below; older proposed
+> architecture and security controls remain historical unless explicitly marked built.
+
+### Revision 4 — shipped decision, report and threat path
+
+- **Decision:** Per-frame evidence contains detections, tracks, zones and report
+  relations. Rules set the floor. `/agents/assess/{image_id}` runs the GLM assessor;
+  `apply_assessment_to_alerts` applies validated category/likelihood/reasons/citations.
+  The assessor cannot lower level or likelihood or turn a contradictory report into
+  verified. JEV reads the same context and assessor decision to score confidence;
+  disagreement is shown to the reviewer. Reviewer decisions require operator and
+  rationale and are persisted as JSONL. JEV never sets threat level.
+- **Reports:** Source reports are parsed and related to tracks in the deterministic
+  pipeline. Contradictions and support are carried into the evidence bundle and
+  assessor. The situational report is explanatory text after assessment and does not
+  set alert levels. A friendly claim stays an allegation pending human confirmation.
+- **Threat model, current state:** Prompt injection in reports is limited by treating
+  source text as data and validating agent output/citations; rules enforce the alert
+  floor. Unexpected model spending is bounded by cache and budget. Decision records
+  have operator and rationale but no authenticated identity or tamper-evident chain.
+  `.env` contains keys in Git history: rotate the GLM and Typesafe credentials before
+  repository access is broadened. Auth/RBAC, audit hash chain, inbound rate limits and
+  CSP in §7.4.2 are proposals, not shipped protections.
+- **Measured matching:** 217 detections survive post-processing; 188/217 (0.866)
+  match distinct tracks under Hungarian 1:1 assignment. Non-exclusive nearest
+  neighbour yields 214/217 (0.986) but allows duplicate claims. The 29 unmatched
+  detections include 15 near already-matched tracks. See F2–F3 in the agent log.
 
 ---
 
@@ -1623,8 +1656,8 @@ Rehearsals run with the response cache warm so they cost nothing.
 
 | Metric | Target | Status |
 |---|---|---|
-| Detections matched to a track | ≥ 0.95 | **0.986 measured** (214/217) |
-| Median match error | ≤ 2 m | **0.19 m measured** |
+| Detections matched to a distinct track (1:1) | ≥ 0.95 proposed | **0.866 measured** (188/217); below target |
+| Median exclusive match error | ≤ 2 m | **0.158 m measured** |
 | Detection reduction (raw → kept) | — | **17 394 → 217** |
 | Tick compute (all tracks × 8 zones) | < 50 ms | to measure |
 | Image arrival → baseline alert on screen | < 2 s | to measure |

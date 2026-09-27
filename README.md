@@ -12,10 +12,16 @@ layer**. A human reviewer sees everything on a tactical display, inspects the
 evidence chain, and acknowledges or dismisses. Nothing is automated beyond the
 warning.
 
-> **Facts are deterministic; judgement is the agent's.** Geometry, matching and
+> **Facts are deterministic; judgement is the assessor's within the rule floor.** Geometry, matching and
 > kinematics are plain testable code and are never invented by a model. The agent
 > may raise a warning level, never lower one — that floor is structural, not
 > prompted.
+
+Revision 4 records **188/217** exclusive detection-to-track matches (0.866).
+The older 214/217 figure is non-exclusive nearest-neighbour and is not the
+shipped match rate. JEV scores confidence using the evidence and GLM assessor
+decision; it does not set threat level. See [PLAN.md](PLAN.md) for the report
+path and current threat model.
 
 ## Read these first
 
@@ -125,7 +131,10 @@ starting. The production preview uses
 when available). Check that `/stt/status` reports `"ready": true` before using
 dictation. If the first model download is rate-limited by Hugging Face, retry
 after the limit clears or export `HF_TOKEN` in your shell and restart `stt`.
-Do not put that token in the committed `.env` file.
+Do not put that token in the committed `.env` file. Both frontend containers
+have a healthcheck. The dev backend reloads when `./libs` or `./services`
+changes; the preview image serves its bundled Vite binary without fetching
+packages at runtime.
 
 ## Secrets
 
@@ -140,6 +149,8 @@ consequences to keep in mind:
 - **Before this repo is ever made public**, rotate the key with the organizers.
   Deleting the file will not remove it from git history; every clone and fork
   already has it.
+- Rotate the Typesafe credential too before widening repository access. Rotation
+  must be completed at the providers; this codebase cannot revoke issued keys.
 - Anyone with read access to this repo can spend the budget. Check what is left
   with `python services/api/app/cli.py budget` — the gateway's own `/key/info` is the
   authoritative figure, and the ledger prefers it over its local estimate.
@@ -155,6 +166,7 @@ them for real before auth is built (that stream has not started).
 | Agent layer | built — assessor, report parser, reviewer copilot, guardrails, budget ledger |
 | Frontend | built, 149 tests |
 | Speech-to-text + voice control | built — `whisper-large-v3-tr` on the GPU, admin-level Turkish commands, 48 Python + 62 web tests. Four open decisions in the step log, **S5 first**. |
-| REST + WebSocket API | **not built** — `web/src/api/http.ts` specifies what it must serve |
+| REST API | built — frame assessment, evidence and persistent reviewer decisions |
+| WebSocket API | not built; assessment streams over HTTP |
 | Auth, RBAC, audit hash chain | **not built** |
 | Simulation clock (server side) | **not built** — the frontend runs its own over the fixed dataset |

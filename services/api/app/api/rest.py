@@ -25,7 +25,7 @@ from zoneinfo import ZoneInfo
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # Ensure libs and services/api are in sys.path
 _HERE = Path(__file__).resolve()
@@ -432,8 +432,22 @@ class DecisionModel(BaseModel):
     note: str = Field(min_length=1)
     operator: str = Field(min_length=1)
     hhmm: str | None = None
-    agent_level: str | None = None
-    agent_score: float | None = None
+    agent_level: Literal["CLEAR", "WATCH", "ALERT"] | None = None
+    agent_score: float | None = Field(default=None, ge=0, le=100, allow_inf_nan=False)
+
+    @field_validator("target_id", "note", "operator")
+    @classmethod
+    def require_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("must contain non-whitespace text")
+        return value.strip()
+
+    @model_validator(mode="after")
+    def check_verdict_kind(self) -> "DecisionModel":
+        scenario_verdicts = {"watch", "invalid", "verified"}
+        if (self.verdict in scenario_verdicts) != (self.target_kind == "scenario"):
+            raise ValueError("verdict does not match target kind")
+        return self
 
 
 @app.post(
@@ -442,13 +456,8 @@ class DecisionModel(BaseModel):
     dependencies=[Depends(require_client_header)],
 )
 def record_decision(image_id: str, decision: DecisionModel) -> dict[str, Any]:
-    if not decision.note.strip() or not decision.operator.strip() or not decision.target_id.strip():
-        raise HTTPException(status_code=422, detail="Target, rationale and operator are required")
     if decision.image_id != image_id:
         raise HTTPException(status_code=422, detail="Image id mismatch")
-    scenario_verdicts = {"watch", "invalid", "verified"}
-    if (decision.verdict in scenario_verdicts) != (decision.target_kind == "scenario"):
-        raise HTTPException(status_code=422, detail="Verdict does not match target kind")
     if not (FIXTURES_DIR / "frames" / f"{image_id}.json").is_file():
         raise HTTPException(status_code=404, detail="Frame not found")
     item = decision.model_dump()

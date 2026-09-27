@@ -29,6 +29,7 @@ services:
       - ./services:/app/services:ro
       - ./goru.yaml:/app/goru.yaml:ro
       - operator-decisions:/app/data/processed
+    command: ["uvicorn", "app.api.rest:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
       interval: 10s
@@ -79,6 +80,12 @@ services:
       - ./web/src:/app/src
       - ./web/public:/app/public
       - ./web/index.html:/app/index.html
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5173/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     depends_on:
       backend:
         condition: service_healthy

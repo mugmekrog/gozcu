@@ -54,4 +54,4 @@ COPY --from=build /app/dist /app/dist
 
 EXPOSE 5173
 
-CMD ["npx", "vite", "preview", "--host", "0.0.0.0", "--port", "5173", "--outDir", "dist"]
+CMD ["./node_modules/.bin/vite", "preview", "--host", "0.0.0.0", "--port", "5173", "--outDir", "dist"]
