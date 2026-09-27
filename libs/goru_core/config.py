@@ -236,6 +236,7 @@ class VoiceConfig(_Frozen):
 
 class JevConfig(_Frozen):
     enabled: bool = True
+    cache_only: bool = False
     model: str = "jev-latest"
     api_key_env: str = "TYPESAFE_API_KEY"
     timeout_s: float = Field(10.0, gt=0)

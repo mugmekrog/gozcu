@@ -36,12 +36,12 @@ elif (Path("/app") / "goru.yaml").exists():
 else:
     _REPO_ROOT = Path.cwd()
 
-for _p in (str(_REPO_ROOT / "libs"), str(_REPO_ROOT / "services" / "api")):
+for _p in (str(_REPO_ROOT), str(_REPO_ROOT / "libs"), str(_REPO_ROOT / "services" / "api")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
 from goru_core.config import Config, load_config
-from app.agents.assessor import ImageAssessorPolicy
+from app.agents.assessor import ImageAssessorPolicy, apply_assessment_to_alerts
 from app.agents.copilot import ReviewerCopilot
 from app.agents.factory import build_agent_stack
 from app.agents.jev import JevService, TypeSafeGateway
@@ -124,6 +124,7 @@ def get_jev_service(cfg: Config) -> JevService:
         cfg.jev.timeout_s,
         cfg.jev.budget_cap_usd,
         cfg.jev.input_usd_per_mtok,
+        cfg.jev.cache_only,
     )
 
 
@@ -136,6 +137,7 @@ def _cached_jev_service(
     timeout_s: float,
     cap_usd: float,
     input_usd_per_mtok: float,
+    cache_only: bool,
 ) -> JevService:
     gateway = TypeSafeGateway(key, timeout_s=timeout_s) if key else None
     return JevService(
@@ -145,6 +147,7 @@ def _cached_jev_service(
         model=model,
         cap_usd=cap_usd,
         input_usd_per_mtok=input_usd_per_mtok,
+        cache_only=cache_only,
     )
 
 
@@ -355,7 +358,16 @@ async def assess_frame(image_id: str) -> StreamingResponse:
 
         analysis = await _run_blocking(pipeline.analyse_image, image_id)
         bundle = pipeline.bundle_of(analysis)
-        outcome = await _run_blocking(get_jev_service(cfg).run, bundle)
+        assessor = await _run_blocking(
+            build_agent_stack(cfg).runner.run, ImageAssessorPolicy(cfg), bundle
+        )
+        analysis.alerts = apply_assessment_to_alerts(
+            analysis.alerts, assessor.value, bundle=bundle,
+            run_id=assessor.run.run_id, dissents=assessor.extra.get("dissents"),
+            fallback_used=assessor.used_fallback, ts=analysis.as_of,
+            rules_version=cfg.rules_version,
+        )
+        outcome = await _run_blocking(get_jev_service(cfg).run, bundle, assessor.value)
         analysis.alerts = apply_threat_decisions(
             analysis.alerts,
             bundle,

@@ -205,6 +205,7 @@ export const AlertModal = memo(function AlertModal({
               {frame.image_id} · {brief.lead?.zone?.name ?? '—'} · {frame.capture_hhmm} ·{' '}
               {threat ? `${T.band.critical} ${fmt.count(brief.score)}/100` : T.band.review}
               {` · Jev güveni: ${brief.confidence}`}
+              {lead?.alert.agent_dissent === 'modeller ayrışıyor' && ' · modeller ayrışıyor'}
             </p>
           </div>
           <div className="spacer" />

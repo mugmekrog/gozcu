@@ -16,7 +16,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @pytest.fixture(scope="session")
 def cfg() -> Config:
-    return load_config(ROOT / "goru.yaml")
+    configured = load_config(ROOT / "goru.yaml")
+    # Scripted gateways in tests must exercise validation, not rehearsal fallback.
+    return configured.model_copy(update={
+        "agents": configured.agents.model_copy(update={"cache_only": False})
+    })
 
 
 @pytest.fixture(scope="session")

@@ -7,14 +7,14 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from goru_core.schemas import Alert, EvidenceBundle, Level
+from goru_core.schemas import Alert, EvidenceBundle, ImageAssessment, Level
 
 
 @dataclass(frozen=True)
 class ChoiceQuestion:
     instructions: str
-    criteria: dict[str, str]
-    type: str = "choice"
+    criteria: list[str]
+    type: str = "score"
 
 
 @dataclass(frozen=True)
@@ -35,18 +35,20 @@ class ThreatDecision:
     source: str
 
 
-_CRITERIA = {
-    "CLEAR": "No immediate human review is needed; the vehicle is stationary or far from protected zones.",
-    "WATCH": "Human review is warranted because the vehicle may approach or affect a protected zone.",
-    "ALERT": "Urgent human review is needed because the vehicle is inside a protected area or poses an imminent threat.",
-}
+_CRITERIA = [
+    "The evidence does not support the assessor's effective decision.",
+    "The evidence supports the assessor's effective decision.",
+]
 
 
-def build_request(bundle: EvidenceBundle, *, model: str) -> JevRequest:
+def build_request(bundle: EvidenceBundle, *, model: str, assessment: ImageAssessment | None = None) -> JevRequest:
+    assessed = {item.track_id: item for item in assessment.assessments} if assessment else {}
     questions = {
         vehicle.track_id: ChoiceQuestion(
             instructions=(
-                f"For vehicle {vehicle.track_id}, choose its threat level from the evidence. "
+                f"For vehicle {vehicle.track_id}, score how strongly the full evidence supports "
+                f"the effective {Level.highest(vehicle.baseline_level, assessed[vehicle.track_id].level).value if vehicle.track_id in assessed else vehicle.baseline_level.value} decision. "
+                "Do not choose or change a threat level. "
                 "Weigh zone and buffer presence, time to entry, approach confidence, "
                 "recent closing movement, vehicle type, and field report consistency. "
                 "Where `profile` is present it summarises the whole two-hour record. "
@@ -65,11 +67,13 @@ def build_request(bundle: EvidenceBundle, *, model: str) -> JevRequest:
                 "Behaviour unlike a vehicle's own history is context for the choice, never "
                 "on its own a reason to raise the level. "
             ),
-            criteria=dict(_CRITERIA),
+            criteria=list(_CRITERIA),
         )
         for vehicle in bundle.vehicles
     }
-    return JevRequest(model=model, state=bundle.model_dump(mode="json"), questions=questions)
+    state = bundle.model_dump(mode="json")
+    state["assessor_decision"] = assessment.model_dump(mode="json") if assessment else None
+    return JevRequest(model=model, state=state, questions=questions)
 
 
 def resolve_answers(
@@ -87,41 +91,40 @@ def resolve_answers(
                 track_id, baseline, baseline, None, None, None, "rules_fallback"
             )
             continue
-        choice, confidence, probabilities = valid
-        level = Level.highest(baseline, choice)
+        score, probabilities = valid
+        level = baseline
         decisions[track_id] = ThreatDecision(
             track_id,
             baseline,
             level,
-            choice,
-            confidence,
+            None,
+            score,
             probabilities,
-            "rules_floor" if level is not choice else "jev",
+            "jev",
         )
     return decisions
 
 
-def _valid_choice(answer: Any) -> tuple[Level, float, dict[str, float]] | None:
-    if not isinstance(answer, dict) or answer.get("type") != "choice":
+def _valid_choice(answer: Any) -> tuple[float, dict[str, float]] | None:
+    if not isinstance(answer, dict) or answer.get("type") != "score":
         return None
     try:
-        choice = Level(answer["choice"])
-        confidence = float(answer["confidence"])
+        score = float(answer["score"])
         raw = answer["probabilities"]
-        if not isinstance(raw, dict) or set(raw) != set(_CRITERIA):
+        if not isinstance(raw, dict) or set(raw) != {"0", "1"}:
             return None
         probabilities = {key: float(value) for key, value in raw.items()}
     except (KeyError, TypeError, ValueError):
         return None
-    if not math.isfinite(confidence) or not 0 <= confidence <= 1:
+    if not math.isfinite(score) or not 0 <= score <= 1:
         return None
     if any(not math.isfinite(p) or not 0 <= p <= 1 for p in probabilities.values()):
         return None
     if abs(sum(probabilities.values()) - 1) > 0.01:
         return None
-    if probabilities[choice.value] + 0.01 < max(probabilities.values()):
+    if abs(probabilities["1"] - score) > 0.01:
         return None
-    return choice, confidence, probabilities
+    return score, probabilities
 
 
 def apply_threat_decisions(
@@ -132,47 +135,22 @@ def apply_threat_decisions(
     ts: datetime,
     rules_version: str,
 ) -> list[Alert]:
-    """Apply Jev choices while keeping the engine's level as a floor."""
+    """Attach Jev's second opinion without changing a rule or assessor level."""
     updated: list[Alert] = []
-    covered: set[str] = set()
     for alert in alerts:
         decision = decisions.get(alert.track_id)
         if decision is None:
             updated.append(alert)
             continue
-        covered.add(alert.track_id)
         updated.append(
             alert.model_copy(
                 update={
-                    "level": decision.level,
                     "jev_level": decision.jev_level,
                     "jev_confidence": decision.jev_confidence,
-                    "source": decision.source,
+                    "agent_dissent": "modeller ayrışıyor" if decision.jev_confidence is not None
+                    and decision.jev_confidence < 0.5 else alert.agent_dissent,
                     "updated_ts": ts,
                 }
-            )
-        )
-    vehicles = {vehicle.track_id: vehicle for vehicle in bundle.vehicles}
-    for track_id, decision in decisions.items():
-        if track_id in covered or decision.level is Level.CLEAR:
-            continue
-        vehicle = vehicles[track_id]
-        updated.append(
-            Alert(
-                alert_id=f"A-{bundle.image.image_id}-{track_id}",
-                track_id=track_id,
-                zone_id=vehicle.zones[0].zone_id if vehicle.zones else None,
-                baseline_level=decision.baseline_level,
-                jev_level=decision.jev_level,
-                jev_confidence=decision.jev_confidence,
-                level=decision.level,
-                source=decision.source,
-                priority=0.2 if decision.level is Level.WATCH else 0.5,
-                reasons=["raised by Jev above the deterministic baseline"],
-                evidence=[track_id],
-                first_raised_ts=ts,
-                updated_ts=ts,
-                rules_version=rules_version,
             )
         )
     updated.sort(key=lambda alert: (-alert.level.rank, -alert.priority))

@@ -578,15 +578,25 @@ class ReportConflict(_StrictAgentModel):
     why: str = Field(max_length=400)
 
 
+class AgentReportJudgment(_StrictAgentModel):
+    report_id: str
+    consistency: ReportConsistency
+    comment: str = Field(max_length=400)
+
+
 class AgentAssessment(_StrictAgentModel):
     """The agent's verdict for one vehicle."""
 
     track_id: str
     level: Level
+    probability: Probability = 0.0
     needs_attention: bool
     rationale: list[str] = Field(default_factory=list, max_length=3)
     cited_ids: list[str] = Field(default_factory=list)
     report_conflicts: list[ReportConflict] = Field(default_factory=list)
+    report_judgments: list[AgentReportJudgment] = Field(default_factory=list)
+    report_interpretation: str = ""
+    scenario_interpretation: str = ""
 
 
 class ImageAssessment(_StrictAgentModel):
