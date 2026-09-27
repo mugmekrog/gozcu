@@ -66,6 +66,13 @@ def build_request(bundle: EvidenceBundle, *, model: str, assessment: ImageAssess
                 "`direct_run`. A name there means the track stands apart from its peers. "
                 "Behaviour unlike a vehicle's own history is context for the choice, never "
                 "on its own a reason to raise the level. "
+                "Where `map_match` is present it is the same track read against the "
+                "road network: `roads` names the roads it used, in order. Read "
+                "`matched_fraction` first - it is the share of fixes close enough to a "
+                "mapped road to snap to one, about half for a typical vehicle here, so "
+                "`roads` is a partial itinerary. A road missing from the list is not "
+                "evidence the vehicle avoided it. The raw measurements above outrank "
+                "the map match wherever the two disagree. "
             ),
             criteria=list(_CRITERIA),
         )

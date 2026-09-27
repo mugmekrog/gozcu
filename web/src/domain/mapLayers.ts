@@ -18,6 +18,7 @@ export type MapLayerId =
   | 'zones'
   | 'frames'
   | 'routes'
+  | 'roadmatch'
   | 'vehicles';
 
 export type MapLayers = Record<MapLayerId, boolean>;
@@ -33,13 +34,18 @@ export const DEFAULT_LAYERS: MapLayers = {
   zones: true,
   frames: true,
   routes: true,
+  roadmatch: true,
   vehicles: true,
 };
 
 export interface MapLayerSpec {
   id: MapLayerId;
   name: string;
-  /** One line on what disappears when it is unticked. */
+  /**
+   * What disappears when it is unticked, in two or three words. The name
+   * carries the meaning; this is the confirmation under it, and a sentence
+   * here makes a nine-row menu twice as tall for nothing.
+   */
   description: string;
 }
 
@@ -53,20 +59,21 @@ export const LAYER_GROUPS: MapLayerGroup[] = [
   {
     title: 'ALTLIK',
     layers: [
-      { id: 'basemap', name: 'Şehir haritası', description: 'Yollar, su ve yapılar' },
-      { id: 'labels', name: 'Yer adları', description: 'Mahalle ve bölge etiketleri' },
-      { id: 'area', name: 'Operasyon alanı', description: 'Tatbikatın sınır kutusu' },
-      { id: 'grid', name: 'Mesafe halkaları', description: 'Üsse uzaklık çemberleri' },
+      { id: 'basemap', name: 'Şehir haritası', description: 'Yollar ve yapılar' },
+      { id: 'labels', name: 'Yer adları', description: 'Mahalle etiketleri' },
+      { id: 'area', name: 'Operasyon alanı', description: 'Tatbikat sınırı' },
+      { id: 'grid', name: 'Mesafe halkaları', description: 'Üsse uzaklık' },
     ],
   },
   {
     title: 'VERİ',
     layers: [
-      { id: 'heat', name: 'Sektör hareketliliği', description: 'Sektörlerde araç hareketliliği' },
-      { id: 'zones', name: 'Bölgeler', description: 'Kritik bölgeler ve tamponları' },
-      { id: 'frames', name: 'Görüntü kareleri', description: 'Drone kare izleri' },
-      { id: 'routes', name: 'Rota ve iz', description: 'Seçili aracın geçmiş yolu' },
-      { id: 'vehicles', name: 'Araçlar', description: 'Canlı araç işaretleri' },
+      { id: 'heat', name: 'Sektör hareketliliği', description: 'Sektör yoğunluğu' },
+      { id: 'zones', name: 'Bölgeler', description: 'Bölge ve tampon' },
+      { id: 'frames', name: 'Görüntü kareleri', description: 'Drone kareleri' },
+      { id: 'routes', name: 'Rota ve iz', description: 'Ham geçmiş yol' },
+      { id: 'roadmatch', name: 'Yol eşlemesi', description: 'Yola oturtulmuş iz' },
+      { id: 'vehicles', name: 'Araçlar', description: 'Canlı işaretler' },
     ],
   },
 ];

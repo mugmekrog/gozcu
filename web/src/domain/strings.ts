@@ -192,6 +192,8 @@ export const T = {
     speed10: 'HIZ · son 10 dk',
     eta: 'Varış süresi',
     stops: 'DURAKLAMA',
+    roads: 'YOLLAR',
+    matchRate: (pct: number) => `(%${pct} eşleşti)`,
     selectFrame: 'Kareyi seç',
     toMotion: 'Hareket →',
     pin: '📌 Sabitle',

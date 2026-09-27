@@ -102,6 +102,25 @@ record, in four families.
   than a vehicle that happens to be near right now. `base_range_min_m` is the
   closest it has come.
 
+Each vehicle may also carry a `map_match`: the same track read against the
+OpenStreetMap road network, so a position becomes a street name rather than a
+pair of coordinates. `roads` is the named roads it used, in order of travel.
+
+Read `matched_fraction` first, every time. It is the share of the track's fixes
+that fell close enough to a mapped road to be snapped to one; the rest are not
+on `roads` at all. On this exercise the median vehicle matches about half its
+fixes, so `roads` is normally a partial itinerary, not a full one. Never say a
+vehicle "drove along" a road as though the record showed it continuously, and
+never infer that a vehicle avoided a road because the road is missing from the
+list - it may simply not have matched. `median_offset_m` says how far the raw
+fixes sat from the roads they were snapped to: a few metres is a good match, a
+few tens of metres means the snapping is a guess.
+
+The raw kinematics above are the measurement; the map match is an
+interpretation of it laid over a street map. Where they disagree, the raw
+numbers win. A street name is useful for saying *where* a vehicle is in terms an
+operator knows - it is never on its own a reason to raise or lower a level.
+
 `profile.behaviour` names the behaviours those scalars support, and is empty for
 about four vehicles in five. A name there means this track stands apart from the
 other 226 in the day, not merely that it moved:

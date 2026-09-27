@@ -229,3 +229,32 @@
     fill var(--dur-shift) var(--ease),
     stroke var(--dur-shift) var(--ease);
 }
+
+/* --- map match -------------------------------------------------------------
+ * The snapped trace sits over the raw route in the route hue, solid and a
+ * little heavier, so the daylight between the two is the visible thing. An
+ * unmatched fix is a hollow ring at its raw position: no road was close enough,
+ * and the trace is not bridged across it. */
+/* The routed leg: the line along the streets. Heavier than the raw route under
+ * it, because this is the trajectory the eye should follow. */
+.radar-roadmatch__leg {
+  fill: none;
+  stroke: var(--route);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.9;
+}
+
+/* Where each fix actually snapped to. Small: with a path drawn, these are
+ * detail on it rather than the picture. */
+.radar-roadmatch__fix {
+  fill: var(--route-casing);
+}
+
+.radar-roadmatch__gap circle {
+  fill: none;
+  stroke: var(--ink-faint);
+  stroke-width: 1.2;
+  stroke-dasharray: 2 1.8;
+}

@@ -66,3 +66,16 @@
     width: auto;
   }
 }
+
+/* The map-matched itinerary. Muted: it is an interpretation of the fixes, not
+ * one of the engine's own figures, and the match rate says how far to trust it. */
+.infobox__roads {
+  margin-top: var(--space-3);
+  font-size: var(--text-micro);
+  color: var(--ink-body);
+  line-height: var(--leading-tight);
+}
+
+.infobox__roads-conf {
+  color: var(--ink-faint);
+}

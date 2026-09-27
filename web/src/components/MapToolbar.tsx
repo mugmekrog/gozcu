@@ -1,12 +1,19 @@
 import { memo } from 'react';
 import { T } from '@/domain/strings';
+import { VEHICLE_ICONS } from '@/radar/VehicleSymbol';
 import { MAX_SCALE, MIN_SCALE, zoomScale } from '@/domain/polar';
 import type { FrameSummary, VehicleClass, Zone } from '@/domain/types';
 import type { ViewName } from '@/store/useAppStore';
 import './map-toolbar.css';
 
 const CLASSES: VehicleClass[] = ['car', 'van', 'truck', 'bus'];
-const SYMBOLS: Record<VehicleClass, string> = { car: '■', van: '▲', truck: '★', bus: '●' };
+
+/** The map's own icon, so the dropdown, the legend and the glyphs all agree. */
+const ClassMark = ({ cls }: { cls: VehicleClass }) => (
+  <svg className="filter-popover__mark" viewBox="-1.1 -1.1 2.2 2.2" width="13" height="13" aria-hidden="true">
+    <path d={VEHICLE_ICONS[cls]} fill="currentColor" />
+  </svg>
+);
 
 export interface MapToolbarProps {
   view: 'map' | 'logs';
@@ -61,7 +68,7 @@ export const MapToolbar = memo(function MapToolbar({
         <div className="filter-popover__options" role="group" aria-label={T.filter.class}>
           <button type="button" aria-pressed={classFilter === 'all'} onClick={(event) => choose(event, () => onClassFilter('all'))}>{T.filter.all}</button>
           {CLASSES.map((cls) => <button key={cls} type="button" aria-pressed={classFilter === cls}
-            onClick={(event) => choose(event, () => onClassFilter(cls))}><span aria-hidden="true">{SYMBOLS[cls]} </span>{T.cls[cls]}</button>)}
+            onClick={(event) => choose(event, () => onClassFilter(cls))}><ClassMark cls={cls} />{T.cls[cls]}</button>)}
         </div>
       </details>
     </div>

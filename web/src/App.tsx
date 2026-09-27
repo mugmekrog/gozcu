@@ -27,6 +27,7 @@ import { api } from '@/api';
 import { assembleBrief } from '@/domain/brief';
 import { activityOf } from '@/domain/activity';
 import { framesOverZone, liveVehiclesAt, nearestZoneId, zoneAssessmentFor } from '@/domain/live';
+import { matchedTrace } from '@/domain/roadMatch';
 import { T } from '@/domain/strings';
 import * as fmt from '@/domain/format';
 import { useAppStore } from '@/store/useAppStore';
@@ -156,6 +157,10 @@ function Workspace() {
     stationaryDispM: dataset.thresholds.stationary_disp_m, classFilter: 'all', zoneFilter: 'all',
   }).filter((vehicle) => vehicle.level === 'ALERT'), [tMin, tracks, dataset, alertsByFrame]);
   const selectedVehicle = vehicles.find((vehicle) => vehicle.trackId === selectedTrackId) ?? null;
+  const selectedRoads = useMemo(() => {
+    const history = selectedTrackId ? trackIndex.get(selectedTrackId) : null;
+    return history ? matchedTrace(history, tMin) : null;
+  }, [selectedTrackId, trackIndex, tMin]);
   const selectedSummary = dataset.frames.find((item) => item.image_id === selectedFrameId) ?? null;
   const stepsDone = steps.filter((step) => step.state === 'done' && step.index !== null).length;
   /* The route report follows the clock: opened mid-play it keeps filling in, and
@@ -253,6 +258,7 @@ function Workspace() {
                   ? zoneAssessmentFor(frame.zone_assessments, selectedVehicle.trackId, selectedVehicle.alert?.zone_id ?? null)
                   : null}
                 pinned={pins.includes(selectedVehicle.trackId)}
+                roads={selectedRoads}
                 onSelectFrame={(imageId) => void openFrame(imageId)}
                 onInspect={() => void inspectVehicle()}
                 onTogglePin={() => togglePin(selectedVehicle.trackId)}

@@ -38,6 +38,22 @@ matching:
   report_lookback_min: 120
   report_claim_radius_m: 50     # the detections a report's type and count are tested against
 
+roads:                        # map matching against the baked OSM network
+  enabled: true
+  graph_json: "data/processed/roadgraph.json"   # built by web/scripts/export_roadgraph.py.
+                              # Present: real HMM on the OSM topology, with routed legs.
+                              # Absent: quiet fall back to geometry-only matching.
+  basemap_json: "web/public/basemap/ankara.json"
+  sigma_m: 20                 # assumed position error
+  gate_m: 30                  # past this a fix is left unmatched rather than guessed.
+                              # MEASURED on the shipped day: median fix sits 23 m from
+                              # the nearest mapped road, p90 141 m, and moving fixes are
+                              # no closer than stationary ones -- these tracks were not
+                              # generated along roads, so ~56% match and the rest stay
+                              # honestly unmatched. Read matched_fraction.
+  beta_m: 120                 # transition penalty scale
+  same_way_bonus: 1.2         # log-odds for staying on the same way
+
 kinematics:
   fit_points: 4
   stationary_disp_m: 25

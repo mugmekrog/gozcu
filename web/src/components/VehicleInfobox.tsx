@@ -16,6 +16,7 @@ import { classLabel, T } from '@/domain/strings';
 import * as fmt from '@/domain/format';
 import { LevelBadge } from './LevelBadge';
 import type { LiveVehicle } from '@/domain/live';
+import type { MatchedTrace } from '@/domain/roadMatch';
 import type { Zone, ZoneAssessmentRow } from '@/domain/types';
 import './vehicle-infobox.css';
 
@@ -24,6 +25,8 @@ export interface VehicleInfoboxProps {
   zone: Zone | null;
   assessment: ZoneAssessmentRow | null;
   pinned: boolean;
+  /** The vehicle's map match, when the fixtures carry one. */
+  roads: MatchedTrace | null;
   onSelectFrame: (imageId: string) => void;
   onInspect: () => void;
   onTogglePin: () => void;
@@ -43,6 +46,7 @@ export const VehicleInfobox = memo(function VehicleInfobox({
   zone,
   assessment,
   pinned,
+  roads,
   onSelectFrame,
   onInspect,
   onTogglePin,
@@ -96,6 +100,21 @@ export const VehicleInfobox = memo(function VehicleInfobox({
           </dd>
         </div>
       </dl>
+
+      {roads && roads.roads.length > 0 && (
+        /* Where it has been, in street names. Qualified with the share of fixes
+           that actually matched a road: half a track typically matches nothing,
+           and an unqualified list of streets would read as a full itinerary. */
+        <p className="infobox__roads">
+          <span className="label">{T.vehicle.roads}</span>{' '}
+          {roads.roads.slice(0, 3).join(' → ')}
+          {roads.roads.length > 3 && ` +${roads.roads.length - 3}`}
+          <span className="infobox__roads-conf">
+            {' '}
+            {T.vehicle.matchRate(Math.round(roads.matchedFraction * 100))}
+          </span>
+        </p>
+      )}
 
       {vehicle.level === null && (
         <p className="infobox__note">
