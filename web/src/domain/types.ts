@@ -241,6 +241,8 @@ export interface FieldReport {
   consistency: ReportConsistency | null;
   consistency_note: string | null;
   matched_track_ids: string[];
+  /** The frame whose detections judged this report; null if none reached it. */
+  checked_in?: string | null;
 }
 
 export interface Match {

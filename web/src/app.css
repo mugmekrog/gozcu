@@ -137,3 +137,12 @@
     padding: var(--space-4);
   }
 }
+
+/* The phone overlay's wrapper adds no box of its own; `hidden` takes it away. */
+.app__phone {
+  display: contents;
+}
+
+.app__phone[hidden] {
+  display: none;
+}

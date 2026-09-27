@@ -35,6 +35,8 @@ FROM base AS build
 # Build arg to set backend Cloud Run URL at build time
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+ARG VITE_STT_URL
+ENV VITE_STT_URL=${VITE_STT_URL}
 
 COPY . .
 
@@ -44,12 +46,9 @@ RUN npm run build
 # ------------------------------------------------------------------------------
 # Preview stage (serves production bundle locally to test before Firebase deploy)
 # ------------------------------------------------------------------------------
-FROM node:20-alpine AS preview
+FROM base AS preview
 
 WORKDIR /app
-
-COPY package*.json ./
-RUN npm ci --omit=dev
 
 COPY --from=build /app/dist /app/dist
 

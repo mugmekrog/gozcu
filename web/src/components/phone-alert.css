@@ -68,9 +68,18 @@
   border: 1px solid var(--hairline);
   background: var(--surface);
   color: var(--ink);
-  font-size: 13px;
+  display: grid;
+  place-items: center;
+  padding: 0;
   cursor: pointer;
   box-shadow: var(--lift-modal);
+}
+
+.phone__close svg {
+  display: block;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
 }
 
 .phone__device {
