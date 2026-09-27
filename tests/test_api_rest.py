@@ -121,7 +121,7 @@ def test_ask_answers_through_the_copilot_and_its_tools(monkeypatch, offline_cfg)
     response = client.post("/agents/ask", json={"question": "T0104 neden kirmizi?"}, headers=CLIENT)
 
     assert response.status_code == 200
-    assert response.json() == {"answer": "T0104 hareket halinde; ayrinti izde."}
+    assert response.json()["answer"] == "T0104 hareket halinde; ayrinti izde."
     tool_reply = gateway.requests[1].messages[-1]
     assert tool_reply["role"] == "tool"
     assert '"T0104"' in tool_reply["content"]
@@ -137,6 +137,20 @@ def test_ask_is_honest_when_the_model_is_unreachable(monkeypatch, offline_cfg):
     answer = response.json()["answer"]
     assert "could not reach the assessment model" in answer
     assert FABRICATED not in answer
+
+
+def test_ask_copilot(monkeypatch):
+    from types import SimpleNamespace
+    from app.api import rest
+    from app.agents.copilot import ReviewerCopilot
+
+    monkeypatch.setattr(ReviewerCopilot, "ask", lambda self, question: SimpleNamespace(
+        text="Bir kare seçildi.", assessment_image_ids=["img_000860"]
+    ))
+    data = rest.ask_copilot(rest.AskRequest(question="img_000860 karesini değerlendir"))
+    assert "answer" in data
+    assert len(data["answer"]) > 0
+    assert data["assessment_image_ids"] == ["img_000860"]
 
 
 def test_assess_stream(monkeypatch):

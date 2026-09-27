@@ -61,6 +61,11 @@ export interface AgentBudget {
   cap_usd: number;
 }
 
+export interface AgentReply {
+  answer: string;
+  assessment_image_ids: string[];
+}
+
 export interface GoruApi {
   /** How this adapter got its data, for the honesty pill in the header. */
   readonly mode: 'fixture' | 'http';
@@ -87,8 +92,8 @@ export interface GoruApi {
 
   /** Run the assessment for one frame, reporting progress as it goes. */
   assess(imageId: string, signal?: AbortSignal): AsyncIterable<AgentEvent>;
-  /** Ask the read-only copilot. Rejects when no gateway is configured. */
-  ask(question: string, signal?: AbortSignal): Promise<string>;
+  /** Ask the copilot; explicit evaluation requests may return frame ids to assess. */
+  ask(question: string, signal?: AbortSignal): Promise<AgentReply>;
   /** Spend against the cap, or null when there is no gateway to ask. */
   budget(): Promise<AgentBudget | null>;
 

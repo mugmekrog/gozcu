@@ -81,6 +81,41 @@ detection agrees with the type and movement it claims.
 A vehicle far from the base with no approach or surveillance signal does not need
 attention. Say so briefly rather than inventing concern.
 
+Each vehicle may carry a `profile`: how it moved across its whole two-hour
+record, in four families.
+
+- **Speed** - `speed_mean_mps` against `speed_max_mps` says whether the current
+  speed is normal for this vehicle or a departure from it. `accel_max_mps2` is
+  its hardest acceleration.
+- **Stops** - `moving_fraction` is how much of the window it moved at all;
+  `stop_count` and `longest_stop_min` say whether that idle time was one long
+  wait or many short ones. One 50-minute halt reads very differently from the
+  same minutes scattered over the window.
+- **Path** - `straightness` is net displacement over path length: near 1 is a
+  beeline, low is wandering. `heading_change_deg` is total turning and
+  `reversals` counts doubling-backs. A vehicle that passes a zone, turns around
+  and passes again is behaving unlike ordinary traffic.
+- **Range to base** - `base_closing_rate_mps` is positive when the range to base
+  has been shrinking across the window, and `closing_step_fraction` is how many
+  of its steps closed that range. A high fraction is a sustained approach rather
+  than a vehicle that happens to be near right now. `base_range_min_m` is the
+  closest it has come.
+
+`profile.behaviour` names the behaviours those scalars support, and is empty for
+about four vehicles in five. A name there means this track stands apart from the
+other 226 in the day, not merely that it moved:
+
+- `waited_then_moved` - a long halt, then a burst well above its own average.
+- `sustained_approach_to_base` - most of its steps closed the range to base, and
+  at a rate in the top tenth. A steady approach, not momentary proximity.
+- `doubled_back` - three or more sharp reversals; it turned around repeatedly.
+- `direct_run` - near a straight line, moving throughout. Purposeful travel.
+
+Each is derived from the numbers in the same profile, so check it against them
+rather than taking it on trust. All of this is context for your judgement, not a
+rule - a behaviour alone never makes a vehicle need attention, and the absence of
+one never clears a vehicle the geometry has raised.
+
 Also consider the two residues. `untracked_detections` is a vehicle detected with
 no movement record - but one flagged `likely_duplicate_of` is the same vehicle
 counted twice, not a new object. `expected_not_seen` is a movement record whose

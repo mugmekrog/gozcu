@@ -19,7 +19,6 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { api } from '@/api';
 import { T } from '@/domain/strings';
 import { useAppStore, type SimSpeed, type ViewName } from '@/store/useAppStore';
 import {
@@ -101,7 +100,6 @@ export function useVoice(bindings: VoiceHostBindings): UseVoiceResult {
     return {
       setView: (view: ViewName) => store().setView(view),
       selectFrame: (imageId: string) => store().openFrame(imageId),
-      assess: (imageId: string) => store().assess(imageId),
       get selectedFrameId() {
         return store().selectedFrameId;
       },
@@ -137,7 +135,7 @@ export function useVoice(bindings: VoiceHostBindings): UseVoiceResult {
         return store().modal !== null;
       },
       record: (verdict: Decision['verdict'], note: string) => store().record(verdict, note),
-      ask: (question: string) => api().ask(question),
+      ask: (question: string) => store().askAgent(question),
     };
   }, [bindings]);
 

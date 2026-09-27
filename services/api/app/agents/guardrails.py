@@ -221,6 +221,16 @@ def vehicle_numbers(bundle: EvidenceBundle, track_id: str) -> set[float]:
             ):
                 _admit_into(values, value)
         _admit_into(values, vehicle.confidence)
+        if vehicle.profile is not None:
+            for key, value in vehicle.profile.model_dump().items():
+                if isinstance(value, (int, float)) and not isinstance(value, bool):
+                    kind = (
+                        "distance" if key.endswith("_m")
+                        else "speed" if key.endswith("_mps")
+                        else "duration" if key.endswith("_s")
+                        else "plain"
+                    )
+                    _admit_into(values, value, kind)
         for zone in vehicle.zones:
             _admit_into(values, zone.dist_now_m, "distance")
             _admit_into(values, zone.cpa_m, "distance")

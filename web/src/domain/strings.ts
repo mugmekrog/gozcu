@@ -2,10 +2,7 @@
  *
  * The wireframes are in Turkish and so is the operator, so Turkish is the
  * product language, not a translation of an English original. Collecting the
- * copy here is not i18n scaffolding -- it is so that the vocabulary stays
- * consistent: the button that says "Değerlendir" produces a step list headed
- * "Değerlendir" and a log row that reads the same, which is how an operator
- * learns their way around.
+ * copy here is not i18n scaffolding -- it keeps the operator vocabulary consistent.
  *
  * Keep these as an operator would say them: no system vocabulary ("bundle",
  * "hysteresis"), no apologies in errors, and an empty state that says what to do
@@ -21,6 +18,12 @@ export const T = {
     loadFailedHint:
       'Fikstürler henüz üretilmemiş olabilir. Depo kökünde şunu çalıştırın: python web/scripts/export_fixtures.py',
     retry: 'Yeniden dene',
+  },
+
+  login: {
+    brand: 'SUYLA',
+    signingIn: 'Giriş yapılıyor',
+    note: 'Bölge izleme oturumu hazırlanıyor',
   },
 
   view: {
@@ -63,6 +66,16 @@ export const T = {
     toOff: 'Isı haritasını kapat: araç görünümüne dön',
     legend: 'Yoğunluk',
     ramp: 'Yoğunluk: açıktan koyuya',
+  },
+
+  layers: {
+    name: 'KATMANLAR',
+    title: 'Katmanlar',
+    hint: 'Haritada neyin çizileceğini seçin',
+    open: 'Katman menüsünü aç',
+    close: 'Katman menüsünü kapat',
+    reset: 'Varsayılana dön',
+    unavailable: 'Şehir haritası yüklenmedi',
   },
 
   map: {
@@ -141,8 +154,13 @@ export const T = {
     safe: 'Güvenli',
     review: 'Şüpheli',
     threat: 'Tehlike',
+    unassessed: 'Değerlendirilmedi',
+    judged: 'Değerlendirilenler',
     base: 'Merkez üs',
     zones: 'Bölgeler',
+    levels: 'Uyarı seviyesi',
+    only: (what: string) => `Yalnızca ${what} göster`,
+    clear: 'Temizle',
   },
 
   band: {
@@ -161,6 +179,10 @@ export const T = {
     speed: 'HIZ',
     scrub: 'Tatbikat saatini seç',
     frameMarker: 'kare',
+    prevFrame: 'Önceki kare',
+    nextFrame: 'Sonraki kare',
+    noFrame: 'Kare seçilmedi',
+    frameCount: (n: number) => `${n} araç`,
   },
 
   vehicle: {
@@ -202,11 +224,9 @@ export const T = {
     column: 'AGENT OUTPUTS',
     targetFrame: 'HEDEF KARE',
     frameCount: (n: number) => `${n} kare · tatbikat günü`,
-    evaluate: '▶ Değerlendir',
-    evaluateLocked: '▶ Değerlendir · kilitli',
     camera: '📷 Kamera',
     steps: 'AJAN ADIMLARI',
-    stepsIdle: 'Kare seçip Değerlendir’e basın.',
+    stepsIdle: 'Değerlendirme için AJANA SOR alanına yazın.',
     stepsRunning: (done: number, total: number, secs: string) =>
       `${done} / ${total} · ${secs} sn`,
     stepsDone: (total: number, tools: number, secs: string) =>
@@ -230,10 +250,8 @@ export const T = {
     scoreBase: 'Temel',
     scoreAgent: 'LLM düzeltmesi',
     ask: 'AJANA SOR',
-    askPlaceholder: 'Örn. T0029 neden iki kez durdu?',
+    askPlaceholder: 'Örn. Güney bölgesindeki resimleri değerlendir',
     askSend: 'Gönder',
-    askOffline:
-      'Kopilot yalnızca LLM bağlıyken yanıt verir. Şu an kural tabanlı modda çalışılıyor.',
     noVehicles: 'Bu karede araç tespit edilmedi.',
     noVehiclesHint:
       'Adım 3’te 0 araç bulundu; hareket ve rapor adımları atlandı, risk skoru hesaplanmadı. Başka bir kare seçin ya da kamerayı açıp görüntüyü kontrol edin.',
@@ -510,6 +528,11 @@ export const T = {
       NO_SPEECH_HEARD: 'Hiç konuşma duyulmadı.',
       CANCELLED: 'Vazgeçildi.',
     } as Record<string, string>,
+  },
+
+  frame: {
+    openImage: 'Görüntü',
+    pickFirst: 'Kare seçin',
   },
 
   cls: {

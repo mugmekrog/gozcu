@@ -11,10 +11,11 @@ Two commands, from the **repo root**:
 
 ```bash
 # 1. Generate the fixtures from the real pipeline (~2 s, needs the Python venv).
-.venv/Scripts/python web/scripts/export_fixtures.py
+#    Windows: use .venv/Scripts/python instead of .venv/bin/python.
+.venv/bin/python web/scripts/export_fixtures.py
 
 # 2. Start the dev server.
-cd web && npm install && npm run dev
+npm --prefix web install && npm --prefix web run dev
 ```
 
 Vite prints the URL it bound to. It is normally <http://localhost:5173>, but if
@@ -27,7 +28,7 @@ still works; the camera view shows a placeholder and says why.
 
 ```bash
 npm run typecheck   # tsc, no emit
-npm test            # 85 tests, no network
+npm test            # 88 tests, no network
 npm run build       # production bundle
 ```
 
@@ -44,6 +45,11 @@ VITE_API_BASE_URL=http://localhost:8000 npm run dev
 
 `src/api/http.ts` marks the four places where PLAN's REST surface does not yet
 cover what the screens need, each tagged `NEEDS-BACKEND`.
+
+`AJANA SOR` accepts questions and evaluation requests. In fixture mode it uses
+the agent service at `http://localhost:8000`; set `VITE_AGENT_API_BASE_URL` if
+the service runs elsewhere. The input stays available and shows a connection
+error when the service is down.
 
 ## Layout
 

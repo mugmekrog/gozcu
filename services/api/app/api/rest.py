@@ -294,24 +294,27 @@ def get_budget() -> dict[str, float]:
     summary="Reviewer copilot Q&A",
     dependencies=[Depends(require_client_header)],
 )
-def ask_copilot(req: AskRequest) -> dict[str, str]:
+def ask_copilot(req: AskRequest) -> dict[str, Any]:
     """The copilot's answer over the engine's analyses, wired as `cli ask` wires it.
 
-    An unreachable model is answered honestly by the copilot itself. Anything else
-    surfaces as an HTTP error: a canned reply claiming the data was verified would
-    tell the operator something nobody checked.
+    An unreachable model is answered honestly by the copilot itself; anything else is
+    a 503 that says so. Never a canned reply claiming the data was verified. The names
+    are the module's own, not re-imported here, so tests can route them offline.
     """
     cfg = get_cfg()
-    dataset = load_dataset(cfg)
-    pipeline = Pipeline(dataset, cfg)
-    tools = ReadOnlyTools(
-        analyses=pipeline.analyse_all(),
-        zone_names={zone.zone_id: zone.name for zone in dataset.zones},
-        cfg=cfg,
-    )
-    stack = build_agent_stack(cfg, interactive=True)
-    answer = ReviewerCopilot(stack.runner, cfg, tools).ask(req.question)
-    return {"answer": answer.text}
+    try:
+        dataset = load_dataset(cfg)
+        pipeline = Pipeline(dataset, cfg)
+        tools = ReadOnlyTools(
+            analyses=pipeline.analyse_all(),
+            zone_names={zone.zone_id: zone.name for zone in dataset.zones},
+            cfg=cfg,
+        )
+        stack = build_agent_stack(cfg, interactive=False)
+        answer = ReviewerCopilot(stack.runner, cfg, tools).ask(req.question)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Agent unavailable: {exc}") from exc
+    return {"answer": answer.text, "assessment_image_ids": answer.assessment_image_ids}
 
 
 @app.post(

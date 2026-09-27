@@ -176,3 +176,60 @@
     font-size: var(--text-score);
   }
 }
+
+/* The frame stepper: the control an operator uses most, so it is the biggest
+ * thing on the row and sits at the left where the eye starts. */
+.timeline__stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex: none;
+  /* The axis draws its first tick label centred on 0%, so it spills half a
+   * label to the left. Clear of it, or "08:10" sits under the next button. */
+  margin-right: var(--space-8);
+}
+
+.timeline__step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 32px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.timeline__step:hover:not(:disabled) {
+  background: var(--surface-active);
+  border-color: var(--ink);
+}
+
+.timeline__step:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.timeline__here {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  min-width: 86px;
+  padding: 0 var(--space-2);
+  line-height: var(--leading-tight);
+  text-align: center;
+}
+
+.timeline__here b {
+  font-size: var(--text-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.timeline__here-meta {
+  font-size: var(--text-micro);
+  color: var(--ink-muted);
+}

@@ -21,19 +21,27 @@
   letter-spacing: 0.05em;
   white-space: nowrap;
 }
-.app-header__mark { color: var(--risk-safe); font-size: 24px; line-height: 1; }
 .app-header__sub { margin-left: auto; color: var(--ink-muted); font-size: var(--text-small); }
 
-/* The logo tile: the radar rings in ink, the one mark the product carries. */
+/* The house mark: the real artwork when web/public/logo-suyla.png is there,
+ * the drawn stand-in until then. No tile behind it -- the mark is the mark. */
 .app-header__mark {
-  width: 30px;
-  height: 30px;
   flex: none;
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-control);
-  background: var(--ink);
-  color: var(--ink-inverse);
+  width: auto;
+  height: 26px;
+  color: var(--ink);
+}
+
+/* SUYLA owns the line; the product name follows it behind a rule. */
+.app-header__suyla {
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.app-header__rule {
+  width: 1px;
+  height: 16px;
+  background: var(--hairline);
 }
 
 .app-header__divider {

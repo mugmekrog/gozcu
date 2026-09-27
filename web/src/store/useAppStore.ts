@@ -17,6 +17,8 @@ import type { AgentStep } from '@/api';
 import { DEFAULT_SCALE } from '@/domain/polar';
 import { prepareBasemap, type PreparedBasemap } from '@/domain/basemap';
 import { minutesOf } from '@/domain/format';
+import type { LevelFilter } from '@/domain/live';
+import { DEFAULT_LAYERS, type MapLayerId, type MapLayers } from '@/domain/mapLayers';
 import type {
   Alert,
   Brief,
@@ -87,22 +89,26 @@ interface State {
   // --- filters ------------------------------------------------------------- //
   zoneFilter: string | 'all';
   classFilter: VehicleClass | 'all';
+  /** Set from the map legend: show one warning level on its own. */
+  levelFilter: LevelFilter;
   /** Visible map radius in kilometres; set continuously by the mouse wheel. */
   scaleKm: number;
   showSuppressed: boolean;
   showAllInMotion: boolean;
   /**
-   * The density view (PLAN 6.12).
+   * Which map layers are drawn (see domain/mapLayers.ts).
    *
-   * A map control rather than a fifth view: the reviewer is not leaving the map,
-   * they are changing how the same clock is drawn. So it lives here beside
-   * `scaleKm` instead of in `view`, which also puts it within reach of the
-   * timeline, the filters and a voice command without a new code path.
+   * Map controls rather than views: the reviewer is not leaving the map, they
+   * are changing how the same clock is drawn. So they live here beside
+   * `scaleKm` instead of in `view`, which also puts the density field within
+   * reach of the timeline, the filters and a voice command without a new code
+   * path -- `setHeat`/`toggleHeat` are `layers.heat` under another name.
    */
-  heatOn: boolean;
+  layers: MapLayers;
 
   // --- the opened frame and its evaluation --------------------------------- //
   frame: FrameDetail | null;
+  evaluatedFrames: ReadonlyMap<string, FrameDetail>;
   frameLoading: boolean;
   steps: AgentStep[];
   brief: Brief | null;
@@ -151,10 +157,13 @@ interface Actions {
 
   setZoneFilter(zoneId: string | 'all'): void;
   setClassFilter(cls: VehicleClass | 'all'): void;
+  setLevelFilter(level: LevelFilter): void;
   /** Continuous zoom from the mouse wheel. */
   setZoom(scaleKm: number): void;
   setShowSuppressed(show: boolean): void;
   setShowAllInMotion(show: boolean): void;
+  setLayer(id: MapLayerId, on: boolean): void;
+  toggleLayer(id: MapLayerId): void;
   setHeat(on: boolean): void;
   toggleHeat(): void;
 
@@ -162,6 +171,7 @@ interface Actions {
   openFrame(imageId: string, opts?: { seek?: boolean }): Promise<void>;
   focusMap(enu: Enu): void;
   assess(imageId: string): Promise<void>;
+  askAgent(question: string): Promise<string>;
   setStepsExpanded(expanded: boolean): void;
 
   openModal(kind: ModalKind): void;
@@ -216,12 +226,14 @@ export const useAppStore = create<State & Actions>((set, get) => ({
 
   zoneFilter: 'all',
   classFilter: 'all',
+  levelFilter: 'all',
   scaleKm: DEFAULT_SCALE,
   showSuppressed: false,
   showAllInMotion: false,
-  heatOn: false,
+  layers: DEFAULT_LAYERS,
 
   frame: null,
+  evaluatedFrames: new Map(),
   frameLoading: false,
   steps: [],
   brief: null,
@@ -344,6 +356,9 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   setClassFilter(classFilter) {
     set({ classFilter });
   },
+  setLevelFilter(levelFilter) {
+    set({ levelFilter });
+  },
   setZoom(scaleKm) {
     set({ scaleKm });
   },
@@ -353,30 +368,36 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   setShowAllInMotion(showAllInMotion) {
     set({ showAllInMotion });
   },
-  setHeat(heatOn) {
-    set({ heatOn });
+  setLayer(id, on) {
+    set({ layers: { ...get().layers, [id]: on } });
+  },
+  toggleLayer(id) {
+    get().setLayer(id, !get().layers[id]);
+  },
+  setHeat(on) {
+    get().setLayer('heat', on);
   },
   toggleHeat() {
-    set({ heatOn: !get().heatOn });
+    get().toggleLayer('heat');
   },
 
   async openFrame(imageId, opts = {}) {
-    const { dataset, selectedFrameId, frame } = get();
+    const { dataset, selectedFrameId, frame, evaluatedFrames } = get();
     const summary = dataset?.frames.find((f) => f.image_id === imageId);
+    const evaluated = evaluatedFrames.get(imageId);
 
-    // Selecting the frame that is already open keeps its evaluation; switching
-    // frames discards it, because a brief belongs to one frame only.
+    // Keep completed evaluations by frame so a region request can be reviewed later.
     const isSame = selectedFrameId === imageId && frame?.image_id === imageId;
     set({
       selectedFrameId: imageId,
-      frameLoading: !isSame,
+      frameLoading: !isSame && !evaluated,
       ...(isSame
         ? {}
         : {
-            frame: null,
+            frame: evaluated ?? null,
             steps: [],
-            brief: null,
-            assessPhase: 'idle' as AssessPhase,
+            brief: evaluated?.brief ?? null,
+            assessPhase: (evaluated ? 'done' : 'idle') as AssessPhase,
             assessElapsedMs: 0,
             assessToolCalls: 0,
             assessError: null,
@@ -384,7 +405,7 @@ export const useAppStore = create<State & Actions>((set, get) => ({
       ...(opts.seek !== false && summary ? { tMin: summary.capture_min, playing: false } : {}),
     });
 
-    if (isSame) return;
+    if (isSame || evaluated) return;
     try {
       const detail = await api().frame(imageId);
       // A later click may have won the race; only the current frame may land.
@@ -431,6 +452,10 @@ export const useAppStore = create<State & Actions>((set, get) => ({
           break;
         }
         case 'brief':
+          if (get().frame?.image_id === imageId) {
+            const updated = { ...get().frame!, brief: event.brief };
+            set({ evaluatedFrames: new Map(get().evaluatedFrames).set(imageId, updated) });
+          }
           set({
             brief: event.brief,
             frame: get().frame?.image_id === imageId
@@ -440,7 +465,13 @@ export const useAppStore = create<State & Actions>((set, get) => ({
           break;
         case 'decision':
           hasLiveFrame = true;
-          set({ frame: event.frame, frameLoading: false });
+          set({
+            frame: event.frame,
+            frameLoading: false,
+            evaluatedFrames: new Map(get().evaluatedFrames).set(imageId, event.frame),
+            alertsByFrame: new Map(get().alertsByFrame).set(imageId, event.frame.alerts),
+            alerts: [...get().alerts.filter((alert) => alert.image_id !== imageId), ...event.frame.alerts],
+          });
           break;
         case 'done': {
           set({
@@ -453,7 +484,10 @@ export const useAppStore = create<State & Actions>((set, get) => ({
           // guarantees the brief and the map agree on which frame is open.
           if (!hasLiveFrame) {
             const detail = await api().frame(imageId);
-            if (get().selectedFrameId === imageId) set({ frame: detail, frameLoading: false });
+            if (get().selectedFrameId === imageId) set({
+              frame: detail, frameLoading: false,
+              evaluatedFrames: new Map(get().evaluatedFrames).set(imageId, detail),
+            });
           }
           break;
         }
@@ -468,6 +502,25 @@ export const useAppStore = create<State & Actions>((set, get) => ({
           break;
       }
     }
+  },
+
+  async askAgent(question) {
+    const selected = get().selectedFrameId;
+    const prompt = selected ? `${question}\n\nSeçili kare kimliği: ${selected}` : question;
+    const reply = await api().ask(prompt);
+    let completed = 0;
+    for (const imageId of reply.assessment_image_ids) {
+      if (!get().dataset?.frames.some((frame) => frame.image_id === imageId)) {
+        throw new Error(`Ajan bilinmeyen kare seçti: ${imageId}`);
+      }
+      await get().openFrame(imageId);
+      await get().assess(imageId);
+      if (get().assessPhase !== 'done') {
+        throw new Error(`${imageId} değerlendirilemedi: ${get().assessError ?? 'bilinmeyen hata'}`);
+      }
+      completed++;
+    }
+    return completed ? `${completed} kare değerlendirildi. ${reply.answer}` : reply.answer;
   },
 
   setStepsExpanded(stepsExpanded) {

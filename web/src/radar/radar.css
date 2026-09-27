@@ -97,53 +97,11 @@
   opacity: 0.25;
 }
 
-/* Small, semi-transparent, bottom-right. It sits over the map, so it stays
- * faint until it is wanted -- and never while it is the active view. */
-.radar-heat-toggle {
-  cursor: pointer;
-  opacity: 0.55;
-  transition: opacity var(--dur-quick) var(--ease);
-}
-
-.radar-heat-toggle:hover,
-.radar-heat-toggle:focus-visible,
-.radar-heat-toggle[data-on] {
-  opacity: 1;
-}
-
-.radar-heat-toggle rect {
-  fill: var(--surface-map);
-  stroke: var(--hairline);
-}
-
-.radar-heat-toggle:hover rect {
-  stroke: var(--ink);
-}
-
-.radar-heat-toggle[data-on] rect {
-  fill: var(--surface);
-  stroke: var(--heat);
-}
-
-.radar-heat-toggle__label {
-  fill: var(--ink);
-  font-weight: 700;
-  letter-spacing: var(--tracking-label);
-}
-
-/* The caption is the control explaining itself: which view is on, and which
- * zone the field is pointing at. */
-.radar-heat-toggle__caption {
+/* The caption the density field prints over the map: which zone is heaviest.
+ * The switch itself is in the layers menu. */
+.radar-heat-caption {
   fill: var(--ink-muted);
-}
-
-.radar-heat-toggle:focus {
-  outline: none;
-}
-
-.radar-heat-toggle:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
+  pointer-events: none;
 }
 
 /* --- zones ---------------------------------------------------------------- */
@@ -215,4 +173,59 @@
   .radar-zone__pulse {
     animation: none;
   }
+}
+
+/* --- heat view: the map goes dark ------------------------------------------
+ * The density ramp (violet into magenta) reads far better on a dark ground, so
+ * while the heat view is on the whole radar swaps to a night palette: the same
+ * --map-* tokens the basemap is drawn with, redefined on the radar only, so the
+ * toolbar and panels around it are untouched. Risk hues are left alone; they
+ * stay the only saturated colours on the map. Turning the view off drops the
+ * attribute and every token falls back to its light value in tokens.css. */
+.radar[data-heat] {
+  --map-land: #1b2230;
+  --map-road: #2e3848;
+  --map-highway: #3b4758;
+  --map-casing: #141a24;
+  --map-casing-strong: #0f141c;
+  --map-tunnel: #232b38;
+  --map-urban: #222a37;
+  --map-campus: #252b3b;
+  --map-grass: #1f2b25;
+  --map-cemetery: #1e2924;
+  --map-forest: #1c2b22;
+  --map-park: #203026;
+  --map-water: #17293b;
+  --map-rail: #4b5668;
+  --map-subway: #3e4859;
+  --map-ring: rgba(148, 163, 184, 0.32);
+  --map-label: #aab4c3;
+  --map-label-muted: #7d8899;
+  --map-label-district: #b9a68d;
+  --map-label-park: #86ab7e;
+  --map-label-water: #6f9fc7;
+  --map-icon: #8d97a7;
+
+  /* Ink and chrome inside the map, inverted for the dark ground. */
+  --surface: #111827;
+  --surface-map: #1b2230;
+  --ink: #e5e7eb;
+  --ink-body: #cbd5e1;
+  --ink-muted: #94a3b8;
+  --ink-faint: #64748b;
+  --hairline: #3b4657;
+  --control-border: #52607a;
+  --terrain-deep: #74c27a;
+}
+
+.radar[data-heat] .map-label {
+  stroke: var(--map-land);
+}
+
+/* The swap fades rather than snaps. */
+.radar rect,
+.radar .basemap g {
+  transition:
+    fill var(--dur-shift) var(--ease),
+    stroke var(--dur-shift) var(--ease);
 }

@@ -471,3 +471,11 @@ svg {
   font-weight: 700;
   letter-spacing: var(--tracking-label);
 }
+
+/* Figures that are read against each other keep fixed-width digits. */
+.timeline__clock-value,
+.map-toolbar__zoom output,
+.logs-view__table tbody th,
+.logs-view__time {
+  font-family: var(--font-mono);
+}

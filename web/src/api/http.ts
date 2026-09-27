@@ -23,7 +23,7 @@ import type {
   TrackHistory,
 } from '@/domain/types';
 import type { BasemapFile } from '@/domain/basemap';
-import { ApiError, type AgentBudget, type AgentEvent, type AgentStep, type GoruApi } from './port';
+import { ApiError, type AgentBudget, type AgentEvent, type AgentReply, type AgentStep, type GoruApi } from './port';
 import { loadBasemap } from './basemap';
 
 /** Sent on every request. The API refuses spending and writing POSTs without it,
@@ -168,13 +168,12 @@ export class HttpApi implements GoruApi {
     }
   }
 
-  async ask(question: string, signal?: AbortSignal): Promise<string> {
-    const payload = await this.request<{ answer: string }>('/agents/ask', {
+  async ask(question: string, signal?: AbortSignal): Promise<AgentReply> {
+    return this.request<AgentReply>('/agents/ask', {
       method: 'POST',
       body: JSON.stringify({ question }),
       signal,
     });
-    return payload.answer;
   }
 
   async budget(): Promise<AgentBudget | null> {

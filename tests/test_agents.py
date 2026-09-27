@@ -813,6 +813,7 @@ def tools(analyses, dataset, cfg) -> ReadOnlyTools:
 
 def test_tool_registry_is_read_only(tools):
     assert tools.names == {
+        "request_assessment",
         "get_track_state",
         "get_zone_assessments",
         "get_evidence",
@@ -824,6 +825,27 @@ def test_tool_registry_is_read_only(tools):
         parts = set(schema["function"]["name"].split("_"))
         assert not parts & mutating, schema["function"]["name"]
     assert json.loads(tools.call("set_level", '{"level": "CLEAR"}'))["error"].startswith("no such tool")
+
+
+def test_agent_assessment_request_resolves_only_real_frames(tools, analyses):
+    image_id = analyses[0].image.image_id
+    one = json.loads(tools.call("request_assessment", json.dumps({"image_id": image_id})))
+    assert one["image_ids"] == [image_id]
+
+    track_id = next(iter(analyses[0].match.det_by_track))
+    vehicle = json.loads(tools.call("request_assessment", json.dumps({"track_id": track_id})))
+    expected_vehicle = [
+        a.image.image_id for a in analyses if a.match and track_id in a.match.det_by_track
+    ]
+    assert vehicle["image_ids"] == expected_vehicle
+
+    region = json.loads(tools.call("request_assessment", '{"zone": "Güney"}'))
+    assert region["image_ids"]
+    assert set(region["image_ids"]).issubset({a.image.image_id for a in analyses})
+    assert "error" in json.loads(tools.call("request_assessment", '{"image_id": "img_999999"}'))
+    assert "error" in json.loads(tools.call(
+        "request_assessment", json.dumps({"image_id": image_id, "zone": "Güney"})
+    ))
 
 
 def test_tools_answer_real_questions(tools, analyses):
@@ -872,6 +894,23 @@ def test_copilot_uses_tools_then_answers(offline_cfg, cfg, tools, analyses, tmp_
     assert answer.unverified_citations == []
     assert answer.run.kind == "copilot"
     assert answer.run.valid
+
+
+def test_copilot_requests_region_evaluation_only_through_tool(offline_cfg, tools, tmp_path):
+    from app.llm.port import ToolCall
+
+    turn = ChatResult(
+        text="",
+        tool_calls=(ToolCall(
+            call_id="c1", name="request_assessment", arguments='{"zone": "Güney"}'
+        ),),
+        prompt_tokens=100,
+        completion_tokens=20,
+    )
+    runner = make_runner(offline_cfg, ScriptedGateway([turn, "Güney kareleri seçildi."]), tmp_path, interactive=True)
+    answer = ReviewerCopilot(runner, offline_cfg, tools).ask("Güney bölgesindeki resimleri değerlendir")
+    assert answer.assessment_image_ids
+    assert all(image_id.startswith("img_") for image_id in answer.assessment_image_ids)
 
 
 def test_copilot_flags_a_citation_no_tool_returned(offline_cfg, tools, tmp_path):

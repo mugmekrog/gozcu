@@ -1,21 +1,14 @@
-/* The copilot input.
- *
- * Read-only by construction on the backend -- the tool registry has no mutator --
- * so the worst a question can do is cost a fraction of a cent. When there is no
- * gateway the field is disabled and says why, rather than accepting a question it
- * cannot answer and failing after the operator has typed it.
- */
+/* The copilot input for questions and explicit evaluation requests. */
 
 import { memo, useId, useState } from 'react';
 import { T } from '@/domain/strings';
 import './ask-agent.css';
 
 export interface AskAgentProps {
-  available: boolean;
   onAsk: (question: string) => Promise<string>;
 }
 
-export const AskAgent = memo(function AskAgent({ available, onAsk }: AskAgentProps) {
+export const AskAgent = memo(function AskAgent({ onAsk }: AskAgentProps) {
   const inputId = useId();
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState<string | null>(null);
@@ -51,14 +44,14 @@ export const AskAgent = memo(function AskAgent({ available, onAsk }: AskAgentPro
           className="input ask__input"
           type="text"
           value={question}
-          placeholder={available ? T.agent.askPlaceholder : T.agent.askOffline}
-          disabled={!available || asking}
+          placeholder={T.agent.askPlaceholder}
+          disabled={asking}
           onChange={(event) => setQuestion(event.target.value)}
         />
         <button
           type="submit"
           className="btn btn--action"
-          disabled={!available || asking || question.trim().length === 0}
+          disabled={asking || question.trim().length === 0}
         >
           {asking ? '…' : T.agent.askSend}
         </button>

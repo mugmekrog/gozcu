@@ -28,7 +28,6 @@ import { T } from '@/domain/strings';
 export interface CommandContext {
   setView(view: ViewName): void;
   selectFrame(imageId: string): Promise<void>;
-  assess(imageId: string): Promise<void>;
   selectedFrameId: string | null;
   frameExists(imageId: string): boolean;
   selectTrack(trackId: string | null): void;
@@ -122,17 +121,6 @@ export const COMMANDS: Record<string, Handler> = {
     if (!ctx.frameExists(imageId)) return { ok: false, summary: T.voice.noSuchFrame(imageId) };
     await ctx.selectFrame(imageId);
     return { ok: true, summary: T.voice.didFrame(imageId) };
-  },
-
-  async assess_frame(args, ctx) {
-    // No id is the normal case, not a failure: "bu kareyi değerlendir" means the
-    // one on screen, and the router is told not to guess one.
-    const imageId = asString(args, 'image_id') ?? ctx.selectedFrameId;
-    if (!imageId) return { ok: false, summary: T.voice.needFrame };
-    if (!ctx.frameExists(imageId)) return { ok: false, summary: T.voice.noSuchFrame(imageId) };
-    if (imageId !== ctx.selectedFrameId) await ctx.selectFrame(imageId);
-    await ctx.assess(imageId);
-    return { ok: true, summary: T.voice.didAssess(imageId) };
   },
 
   async select_vehicle(args, ctx) {

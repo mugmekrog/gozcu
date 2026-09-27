@@ -46,7 +46,6 @@ function fakeContext(overrides: Partial<CommandContext> = {}) {
   const ctx: CommandContext = {
     setView: (view) => record(`setView:${view}`),
     selectFrame: async (id) => record(`selectFrame:${id}`),
-    assess: async (id) => record(`assess:${id}`),
     selectedFrameId: 'img_000860',
     frameExists: (id) => id === 'img_000860' || id === 'img_004388',
     selectTrack: (id) => record(`selectTrack:${id}`),
@@ -126,19 +125,11 @@ describe('performing a command', () => {
     expect(calls).toHaveLength(0);
   });
 
-  it('evaluates the frame on screen when the utterance named none', async () => {
-    // "bu kareyi değerlendir" -- the router is told not to guess an id.
+  it('passes evaluation requests to the agent', async () => {
     const { ctx, calls } = fakeContext();
-    const result = await performCommand('assess_frame', {}, ctx);
+    const result = await performCommand('ask_copilot', { question: 'güney bölgesindeki resimleri değerlendir' }, ctx);
     expect(result.ok).toBe(true);
-    expect(calls).toContain('assess:img_000860');
-  });
-
-  it('says what to do when no frame is selected at all', async () => {
-    const { ctx } = fakeContext({ selectedFrameId: null });
-    const result = await performCommand('assess_frame', {}, ctx);
-    expect(result.ok).toBe(false);
-    expect(result.summary).toBeTruthy();
+    expect(calls).toContain('ask:güney bölgesindeki resimleri değerlendir');
   });
 
   it('selects a vehicle and shows it on the map', async () => {
@@ -256,9 +247,9 @@ describe('performing a command', () => {
     // A store action that rejected must not surface as an unhandled rejection,
     // because the operator would see speech do nothing with no explanation.
     const { ctx } = fakeContext({
-      assess: vi.fn().mockRejectedValue(new Error('değerlendirme başarısız')),
+      ask: vi.fn().mockRejectedValue(new Error('değerlendirme başarısız')),
     });
-    const result = await performCommand('assess_frame', { image_id: 'img_000860' }, ctx);
+    const result = await performCommand('ask_copilot', { question: 'img_000860 karesini değerlendir' }, ctx);
     expect(result.ok).toBe(false);
     expect(result.summary).toContain('değerlendirme başarısız');
   });

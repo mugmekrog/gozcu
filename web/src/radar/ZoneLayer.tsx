@@ -33,6 +33,17 @@ export const ZoneLayer = memo(function ZoneLayer({
 }: ZoneLayerProps) {
   return (
     <g>
+      <defs>
+        <pattern
+          id="radar-zone-hatch"
+          width={5}
+          height={5}
+          patternUnits="userSpaceOnUse"
+          patternTransform="rotate(45)"
+        >
+          <line x1={0} y1={0} x2={0} y2={5} stroke="var(--terrain-deep)" strokeWidth={1} strokeOpacity={0.45} />
+        </pattern>
+      </defs>
       {zones.map((zone) => {
         const [x, y] = projection.project(zone.enu);
         const side = labelSide(zone.bearing_deg);
@@ -62,6 +73,18 @@ export const ZoneLayer = memo(function ZoneLayer({
                 }
               : {})}
           >
+            {/* A white casing under both rings: the zone stays readable where it
+                falls on a green park or a busy block of the basemap. */}
+            <circle
+              cx={x}
+              cy={y}
+              r={buffer}
+              fill="none"
+              stroke="var(--map-road)"
+              strokeOpacity={0.9}
+              strokeWidth={selected ? 4.5 : 3}
+              pointerEvents="none"
+            />
             <circle
               className="radar-zone__buffer"
               cx={x}
@@ -71,10 +94,10 @@ export const ZoneLayer = memo(function ZoneLayer({
               fillOpacity={selected ? 0.1 : 0.05}
               // The zone in the zone filter: its dashed buffer turns into a solid
               // ring in the deeper terrain green, with a soft halo behind it.
-              stroke={selected ? 'var(--terrain-deep)' : 'var(--terrain)'}
-              strokeOpacity={selected ? 1 : 0.4}
-              strokeWidth={selected ? 2 : 1}
-              strokeDasharray={selected ? undefined : '2 3'}
+              stroke="var(--terrain-deep)"
+              strokeOpacity={selected ? 1 : 0.75}
+              strokeWidth={selected ? 2 : 1.2}
+              strokeDasharray={selected ? undefined : '3 3'}
             />
             {selected && (
               <circle
@@ -89,14 +112,33 @@ export const ZoneLayer = memo(function ZoneLayer({
               />
             )}
             <circle
+              cx={x}
+              cy={y}
+              r={radius}
+              fill="none"
+              stroke="var(--map-road)"
+              strokeOpacity={0.9}
+              strokeWidth={3.5}
+              pointerEvents="none"
+            />
+            <circle
               className="radar-zone__core"
               cx={x}
               cy={y}
               r={radius}
               fill="var(--terrain)"
-              fillOpacity={selected ? 0.24 : 0.14}
-              stroke={selected ? 'var(--terrain-deep)' : 'var(--terrain)'}
-              strokeOpacity={selected ? 1 : 0.75}
+              fillOpacity={selected ? 0.24 : 0.16}
+              stroke="var(--terrain-deep)"
+              strokeWidth={1.5}
+            />
+            {/* Diagonal hatching: a flat park fill never has it, so the zone core
+                separates from green ground by texture as well as tone. */}
+            <circle
+              cx={x}
+              cy={y}
+              r={radius}
+              fill="url(#radar-zone-hatch)"
+              pointerEvents="none"
             />
             {pulsing && (
               <circle

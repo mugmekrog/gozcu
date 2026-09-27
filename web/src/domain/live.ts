@@ -40,6 +40,12 @@ export interface LiveVehicle {
   stops: { count: number; totalMin: number };
 }
 
+/**
+ * The legend's level chips: one level on its own, everything the rules have
+ * ruled on ('judged'), the grey set they have not reached yet, or no filter.
+ */
+export type LevelFilter = Level | 'judged' | 'unassessed' | 'all';
+
 export interface LiveOptions {
   tMin: number;
   tracks: readonly TrackHistory[];
@@ -49,6 +55,8 @@ export interface LiveOptions {
   classFilter: VehicleClass | 'all';
   /** Restrict to vehicles whose alert names this zone. */
   zoneFilter: string | 'all';
+  /** Restrict to one warning level, or to the not-yet-judged. */
+  levelFilter?: LevelFilter;
 }
 
 /**
@@ -58,6 +66,12 @@ export interface LiveOptions {
  * and one stops array each. At the shipped data's busiest clock this is a few
  * dozen vehicles, and the whole pass is well under a millisecond.
  */
+function levelPasses(level: Level | null, wanted: Exclude<LevelFilter, 'all'>): boolean {
+  if (wanted === 'unassessed') return level === null;
+  if (wanted === 'judged') return level !== null;
+  return level === wanted;
+}
+
 export function liveVehiclesAt(opts: LiveOptions): LiveVehicle[] {
   const { tMin, tracks, frames, alertsByFrame, stationaryDispM } = opts;
 
@@ -97,6 +111,8 @@ export function liveVehiclesAt(opts: LiveOptions): LiveVehicle[] {
 
     // Assessed with no alert means the rules looked and found nothing: CLEAR.
     const level: Level | null = assessed ? (alert?.level ?? 'CLEAR') : null;
+    const wanted = opts.levelFilter ?? 'all';
+    if (wanted !== 'all' && !levelPasses(level, wanted)) continue;
     const stops = stopsOf(track, stationaryDispM);
 
     out.push({

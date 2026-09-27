@@ -17,6 +17,9 @@ import { Toast } from '@/components/Toast';
 import { VoiceDock } from '@/components/VoiceDock';
 import { VoiceConfirm } from '@/components/VoiceConfirm';
 import { Radar } from '@/radar/Radar';
+import { LayersMenu } from '@/components/LayersMenu';
+import { LoginSplash } from '@/components/LoginSplash';
+import { MapLegend } from '@/components/MapLegend';
 import { LogsView } from '@/views/LogsView';
 import { VoiceView } from '@/views/VoiceView';
 import { api } from '@/api';
@@ -31,10 +34,23 @@ import { useVoiceStore } from '@/store/useVoiceStore';
 import './app.css';
 
 export function App() {
+  const boot = useAppStore((s) => s.boot);
+  useEffect(() => { void boot(); }, [boot]);
+
+  // The sign-in sits over whatever the boot is doing, so the dataset loads
+  // behind it rather than after it.
+  return (
+    <>
+      <LoginSplash />
+      <Boot />
+    </>
+  );
+}
+
+function Boot() {
   const status = useAppStore((s) => s.status);
   const error = useAppStore((s) => s.error);
   const boot = useAppStore((s) => s.boot);
-  useEffect(() => { void boot(); }, [boot]);
 
   if (status === 'loading') return <div className="app-gate" role="status"><b>{T.app.loading}</b></div>;
   if (status === 'error') return (
@@ -57,8 +73,8 @@ function Workspace() {
   const view = useAppStore((s) => s.view);
   const zoneFilter = useAppStore((s) => s.zoneFilter);
   const classFilter = useAppStore((s) => s.classFilter);
+  const levelFilter = useAppStore((s) => s.levelFilter);
   const scaleKm = useAppStore((s) => s.scaleKm);
-  const heatOn = useAppStore((s) => s.heatOn);
   const selectedTrackId = useAppStore((s) => s.selectedTrackId);
   const pins = useAppStore((s) => s.pins);
   const selectedFrameId = useAppStore((s) => s.selectedFrameId);
@@ -85,7 +101,7 @@ function Workspace() {
   const selectTrack = useAppStore((s) => s.selectTrack);
   const togglePin = useAppStore((s) => s.togglePin);
   const openFrame = useAppStore((s) => s.openFrame);
-  const assess = useAppStore((s) => s.assess);
+  const askAgent = useAppStore((s) => s.askAgent);
   const focusMap = useAppStore((s) => s.focusMap);
   const openModal = useAppStore((s) => s.openModal);
   const closeModal = useAppStore((s) => s.closeModal);
@@ -125,10 +141,11 @@ function Workspace() {
     const all = liveVehiclesAt({
       tMin, tracks, frames: dataset.frames, alertsByFrame,
       stationaryDispM: dataset.thresholds.stationary_disp_m, classFilter, zoneFilter: 'all',
+      levelFilter,
     });
     return zoneFilter === 'all' ? all
       : all.filter((vehicle) => nearestZoneId(vehicle.sample.enu, dataset.zones) === zoneFilter);
-  }, [tMin, tracks, dataset, alertsByFrame, classFilter, zoneFilter]);
+  }, [tMin, tracks, dataset, alertsByFrame, classFilter, levelFilter, zoneFilter]);
   const timelineFrames = useMemo(() => zoneFilter === 'all' ? dataset.frames
     : framesOverZone(dataset.frames, dataset.zones, zoneFilter), [dataset.frames, dataset.zones, zoneFilter]);
   /* The phone is the system's push, not the map's view: it ignores the filters. */
@@ -192,11 +209,6 @@ function Workspace() {
   const inspectVehicle = async () => {
     if (!selectedVehicle?.imageId || !selectedVehicle.alert) return;
     await openFrame(selectedVehicle.imageId);
-    try {
-      await assess(selectedVehicle.imageId);
-    } catch (error) {
-      showToast({ message: error instanceof Error ? error.message : String(error) });
-    }
     const alert = useAppStore.getState().frame?.alerts.find(
       (item) => item.track_id === selectedVehicle.trackId,
     ) ?? selectedVehicle.alert;
@@ -215,7 +227,7 @@ function Workspace() {
         <main className="app__map panel">
           <MapToolbar view={view === 'logs' ? 'logs' : 'map'} onView={setView}
             zones={dataset.zones} zoneFilter={zoneFilter} classFilter={classFilter}
-            scaleKm={scaleKm} selectedFrame={selectedSummary} heatOn={heatOn}
+            scaleKm={scaleKm} selectedFrame={selectedSummary}
             onZoneFilter={setZoneFilter} onClassFilter={setClassFilter}
             onScale={setScale} onCamera={openCamera} />
           <div className="app__stage">
@@ -229,6 +241,8 @@ function Workspace() {
                 />
               : <>
               <Radar />
+              <MapLegend />
+              <LayersMenu />
               <PinList pins={pins} vehicles={vehicles} onUnpin={togglePin} onSelect={selectTrack} />
               {selectedVehicle && <VehicleInfobox
                 vehicle={selectedVehicle}
@@ -281,14 +295,13 @@ function Workspace() {
               ? { level: brief.level, score: brief.score, vehicleCount: brief.vehicleCount }
               : null}
             onSelect={(imageId) => void openFrame(imageId)}
-            onAssess={() => selectedFrameId && void assess(selectedFrameId)}
             onCamera={openCamera} />
           {selectedVehicle && <TargetCrop vehicle={selectedVehicle} loadFrame={loadFrame} imageUrl={imageUrlOf} />}
           <AgentSteps steps={steps} phase={assessPhase} elapsedMs={assessElapsedMs}
             toolCalls={assessToolCalls} expanded={stepsExpanded} onExpandedChange={setStepsExpanded} />
           <BriefCard brief={brief} phase={assessPhase} imageId={selectedFrameId}
             error={assessError} stepsDone={stepsDone} />
-          <AskAgent available={client.mode === 'http'} onAsk={(question) => client.ask(question)} />
+          <AskAgent onAsk={askAgent} />
           <VoiceDock
             available={voice.available}
             unavailableReason={voice.unavailableReason}

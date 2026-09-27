@@ -62,7 +62,7 @@ export const BriefCard = memo(function BriefCard({
         <div className="brief__body brief__error" role="alert">
           <b>{error ?? 'Değerlendirme tamamlanamadı.'}</b>
           <span className="muted">
-            Kare yeniden seçilip Değerlendir’e basılabilir. Kural tabanlı seviye etkilenmedi.
+            AJANA SOR alanından yeniden değerlendirme istenebilir. Kural tabanlı seviye etkilenmedi.
           </span>
         </div>
       )}
