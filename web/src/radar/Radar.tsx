@@ -75,7 +75,7 @@ const WHEEL_ZOOM_PER_PX = Math.log(1.15) / 100;
 
 /** The radius recentring settles at, in km: close on one zone, wide on the base. */
 const RECENTRE_ZONE_KM = 2.25;
-const RECENTRE_ALL_KM = 7;
+const RECENTRE_ALL_KM = 5;
 
 /**
  * How long the map counts as still moving after its last frame, in ms. While
@@ -429,6 +429,8 @@ export const Radar = memo(function Radar() {
       role="img"
       aria-label={`Bölge haritası, ${dataset.base.name} merkezli, ${scaleKm.toFixed(1)} km yarıçap, ${vehicles.length} araç`}
       data-dragging={dragging || undefined}
+      // Switches the map to its dark palette (radar.css) while the heat view is on.
+      data-heat={heatOn || undefined}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}

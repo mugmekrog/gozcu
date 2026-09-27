@@ -38,8 +38,11 @@
 .map-toolbar__risk i[data-risk="safe"] { background: var(--risk-safe); }
 .map-toolbar__risk i[data-risk="watch"] { background: var(--risk-review); }
 .map-toolbar__risk i[data-risk="alert"] { background: var(--risk-threat); }
-.map-toolbar__heat { display: inline-flex; align-items: center; gap: 2px; }
-.map-toolbar__heat i { width: 9px; height: 9px; background: var(--heat); }
+.map-toolbar__heat { display: inline-flex; align-items: center; gap: 1px; }
+/* With the heat ramp in the legend there is no room for the group titles; the
+   dividers still separate the groups, and the ramp carries its own label. */
+.map-toolbar__legend:has(.map-toolbar__heat) .map-toolbar__legend-title { display: none; }
+.map-toolbar__heat i { width: 8px; height: 8px; background: var(--heat); }
 .map-toolbar__heat i:first-of-type { margin-left: 3px; }
 .map-toolbar__zoom { display: flex; align-items: center; border: 1px solid var(--rule); border-radius: 9px; overflow: hidden; white-space: nowrap; }
 .map-toolbar__zoom button { width: 32px; height: 33px; display: grid; place-items: center; padding: 0; border: 0; background: var(--surface-sunken); color: var(--ink); cursor: pointer; }
