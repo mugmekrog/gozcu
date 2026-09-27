@@ -1,10 +1,8 @@
-"""Read-only tools for the reviewer copilot (PLAN.md 6.9, 7.4.2).
+"""Lookup and assessment selection tools for the reviewer copilot.
 
 The copilot answers questions about what is on the display. It needs to look
-things up, and it must not be able to change anything. Both properties come from
-this class rather than from a prompt: `ReadOnlyTools` holds analyses and exposes
-five lookups. There is no tool that raises a level, edits a threshold or
-acknowledges an alert, so no amount of persuasion can produce one.
+things up. An explicit assessment request selects verified image ids for the
+UI to evaluate. There is no tool that edits a threshold or acknowledges an alert.
 
 Results are JSON text, trimmed to what a question needs. Every value in them was
 computed by the engine, so a copilot answer can be checked against the same ids
@@ -14,7 +12,8 @@ the reviewer sees on screen.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+import unicodedata
+from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
 from goru_core.config import Config
@@ -33,11 +32,12 @@ class ToolError(ValueError):
 
 @dataclass
 class ReadOnlyTools:
-    """Five lookups over the engine's results. No mutation is possible."""
+    """Lookups and validated assessment selection over engine results."""
 
     analyses: Sequence[ImageAnalysis]
     zone_names: Mapping[str, str]
     cfg: Config
+    assessment_image_ids: list[str] = field(default_factory=list)
 
     # --- schemas ---------------------------------------------------------- #
 
@@ -60,6 +60,12 @@ class ReadOnlyTools:
             }
 
         return [
+            tool(
+                "request_assessment",
+                "Start evaluation of an image, all images showing a vehicle, or all images in a region. Use only when the operator explicitly asks to evaluate. Supply exactly one selector.",
+                {"image_id": {"type": "string"}, "track_id": {"type": "string"}, "zone": {"type": "string"}},
+                [],
+            ),
             tool(
                 "get_track_state",
                 "Kinematics and identity of one vehicle track: speed, heading, whether it is "
@@ -124,6 +130,7 @@ class ReadOnlyTools:
             return json.dumps({"error": "arguments must be a JSON object"})
 
         handler = {
+            "request_assessment": self._request_assessment,
             "get_track_state": self._get_track_state,
             "get_zone_assessments": self._get_zone_assessments,
             "get_evidence": self._get_evidence,
@@ -138,6 +145,52 @@ class ReadOnlyTools:
             return json.dumps({"error": str(exc)})
 
     # --- implementations --------------------------------------------------- #
+
+    def _request_assessment(self, args: dict[str, Any]) -> dict[str, Any]:
+        selectors = [key for key in ("image_id", "track_id", "zone") if args.get(key)]
+        if len(selectors) != 1:
+            raise ToolError("provide exactly one of image_id, track_id, or zone")
+        key = selectors[0]
+        value = str(args[key]).casefold()
+        if key == "image_id":
+            ids = [
+                a.image.image_id for a in self.analyses
+                if a.image.image_id.casefold() == value
+            ]
+        elif key == "track_id":
+            ids = [
+                a.image.image_id for a in self.analyses
+                if a.match and value.upper() in a.match.det_by_track
+            ]
+        else:
+            def fold(s: str) -> str:
+                return "".join(
+                    c for c in unicodedata.normalize("NFKD", s.casefold())
+                    if not unicodedata.combining(c)
+                )
+            zones = [
+                z for z in self.analyses[0].zones
+                if fold(z.zone_id) == fold(value) or fold(z.name) == fold(value)
+            ] if self.analyses else []
+            if not zones and self.analyses:
+                zones = [z for z in self.analyses[0].zones if fold(z.name).startswith(fold(value))]
+            if not zones:
+                raise ToolError(f"unknown zone: {args[key]}")
+
+            def nearest(a: ImageAnalysis) -> str:
+                points = a.image.footprint_enu
+                east = sum(p.e_m for p in points) / len(points)
+                north = sum(p.n_m for p in points) / len(points)
+                return min(
+                    a.zones,
+                    key=lambda z: (z.center_enu.e_m-east)**2 + (z.center_enu.n_m-north)**2,
+                ).zone_id
+            zone_ids = {z.zone_id for z in zones}
+            ids = [a.image.image_id for a in self.analyses if nearest(a) in zone_ids]
+        if not ids:
+            raise ToolError(f"no images found for {args[key]}")
+        self.assessment_image_ids.extend(i for i in ids if i not in self.assessment_image_ids)
+        return {"image_ids": ids}
 
     def _find_track(self, track_id: str) -> tuple[ImageAnalysis, Any]:
         for analysis in reversed(list(self.analyses)):

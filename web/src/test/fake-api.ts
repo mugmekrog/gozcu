@@ -348,7 +348,7 @@ export class FakeApi implements GoruApi {
     yield { type: 'brief', brief: frameDetail(imageId, imageId === 'img_0001').brief };
     yield { type: 'done', elapsedMs: 12, toolCalls: 1 };
   }
-  async ask(_question: string): Promise<string> {
+  async ask(_question: string): Promise<import('@/api/port').AgentReply> {
     throw new Error('offline');
   }
   async budget() {

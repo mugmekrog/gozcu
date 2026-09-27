@@ -84,12 +84,18 @@ def test_budget():
     assert data["cap_usd"] == 15.0
 
 
-def test_ask_copilot():
-    response = client.post("/agents/ask", json={"question": "why is T0187 red?"})
-    assert response.status_code == 200
-    data = response.json()
+def test_ask_copilot(monkeypatch):
+    from types import SimpleNamespace
+    from app.api import rest
+    from app.agents.copilot import ReviewerCopilot
+
+    monkeypatch.setattr(ReviewerCopilot, "ask", lambda self, question: SimpleNamespace(
+        text="Bir kare seçildi.", assessment_image_ids=["img_000860"]
+    ))
+    data = rest.ask_copilot(rest.AskRequest(question="img_000860 karesini değerlendir"))
     assert "answer" in data
     assert len(data["answer"]) > 0
+    assert data["assessment_image_ids"] == ["img_000860"]
 
 
 def test_assess_stream(monkeypatch):

@@ -1,10 +1,10 @@
-"""The reviewer copilot: a bounded, read-only tool loop (PLAN.md 6.9, task M3.5).
+"""The reviewer copilot: a bounded tool loop (PLAN.md 6.9, task M3.5).
 
 The reviewer asks "why is T0187 red?" and gets an answer that cites the same ids
-they can click on screen. The agent reaches that answer by calling read-only
+they can click on screen. The agent reaches that answer by calling lookup
 lookups, at most `agents.max_tool_calls` of them per question - the DoS control
 from the threat model, and the reason this loop is written out by hand rather than
-delegated: the bound, the read-only registry and the spend guard are the whole
+delegated: the bound, validated tools and the spend guard are the whole
 point, and they are ten lines each.
 
 Transport, cache, budget and audit come from `AgentRunner`, so the copilot spends
@@ -46,6 +46,7 @@ class CopilotAnswer:
     """What the reviewer sees, plus how it was produced."""
 
     text: str
+    assessment_image_ids: list[str] = field(default_factory=list)
     citations: list[str] = field(default_factory=list)
     tool_calls: list[tuple[str, str]] = field(default_factory=list)
     run: AgentRun | None = None
@@ -195,6 +196,7 @@ class ReviewerCopilot:
 
         return CopilotAnswer(
             text=answer,
+            assessment_image_ids=list(self._tools.assessment_image_ids),
             citations=citations,
             tool_calls=calls_made,
             run=run,

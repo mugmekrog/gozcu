@@ -103,6 +103,7 @@ interface State {
 
   // --- the opened frame and its evaluation --------------------------------- //
   frame: FrameDetail | null;
+  evaluatedFrames: ReadonlyMap<string, FrameDetail>;
   frameLoading: boolean;
   steps: AgentStep[];
   brief: Brief | null;
@@ -162,6 +163,7 @@ interface Actions {
   openFrame(imageId: string, opts?: { seek?: boolean }): Promise<void>;
   focusMap(enu: Enu): void;
   assess(imageId: string): Promise<void>;
+  askAgent(question: string): Promise<string>;
   setStepsExpanded(expanded: boolean): void;
 
   openModal(kind: ModalKind): void;
@@ -222,6 +224,7 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   heatOn: false,
 
   frame: null,
+  evaluatedFrames: new Map(),
   frameLoading: false,
   steps: [],
   brief: null,
@@ -361,22 +364,22 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   },
 
   async openFrame(imageId, opts = {}) {
-    const { dataset, selectedFrameId, frame } = get();
+    const { dataset, selectedFrameId, frame, evaluatedFrames } = get();
     const summary = dataset?.frames.find((f) => f.image_id === imageId);
+    const evaluated = evaluatedFrames.get(imageId);
 
-    // Selecting the frame that is already open keeps its evaluation; switching
-    // frames discards it, because a brief belongs to one frame only.
+    // Keep completed evaluations by frame so a region request can be reviewed later.
     const isSame = selectedFrameId === imageId && frame?.image_id === imageId;
     set({
       selectedFrameId: imageId,
-      frameLoading: !isSame,
+      frameLoading: !isSame && !evaluated,
       ...(isSame
         ? {}
         : {
-            frame: null,
+            frame: evaluated ?? null,
             steps: [],
-            brief: null,
-            assessPhase: 'idle' as AssessPhase,
+            brief: evaluated?.brief ?? null,
+            assessPhase: (evaluated ? 'done' : 'idle') as AssessPhase,
             assessElapsedMs: 0,
             assessToolCalls: 0,
             assessError: null,
@@ -384,7 +387,7 @@ export const useAppStore = create<State & Actions>((set, get) => ({
       ...(opts.seek !== false && summary ? { tMin: summary.capture_min, playing: false } : {}),
     });
 
-    if (isSame) return;
+    if (isSame || evaluated) return;
     try {
       const detail = await api().frame(imageId);
       // A later click may have won the race; only the current frame may land.
@@ -431,6 +434,10 @@ export const useAppStore = create<State & Actions>((set, get) => ({
           break;
         }
         case 'brief':
+          if (get().frame?.image_id === imageId) {
+            const updated = { ...get().frame!, brief: event.brief };
+            set({ evaluatedFrames: new Map(get().evaluatedFrames).set(imageId, updated) });
+          }
           set({
             brief: event.brief,
             frame: get().frame?.image_id === imageId
@@ -440,7 +447,13 @@ export const useAppStore = create<State & Actions>((set, get) => ({
           break;
         case 'decision':
           hasLiveFrame = true;
-          set({ frame: event.frame, frameLoading: false });
+          set({
+            frame: event.frame,
+            frameLoading: false,
+            evaluatedFrames: new Map(get().evaluatedFrames).set(imageId, event.frame),
+            alertsByFrame: new Map(get().alertsByFrame).set(imageId, event.frame.alerts),
+            alerts: [...get().alerts.filter((alert) => alert.image_id !== imageId), ...event.frame.alerts],
+          });
           break;
         case 'done': {
           set({
@@ -453,7 +466,10 @@ export const useAppStore = create<State & Actions>((set, get) => ({
           // guarantees the brief and the map agree on which frame is open.
           if (!hasLiveFrame) {
             const detail = await api().frame(imageId);
-            if (get().selectedFrameId === imageId) set({ frame: detail, frameLoading: false });
+            if (get().selectedFrameId === imageId) set({
+              frame: detail, frameLoading: false,
+              evaluatedFrames: new Map(get().evaluatedFrames).set(imageId, detail),
+            });
           }
           break;
         }
@@ -468,6 +484,25 @@ export const useAppStore = create<State & Actions>((set, get) => ({
           break;
       }
     }
+  },
+
+  async askAgent(question) {
+    const selected = get().selectedFrameId;
+    const prompt = selected ? `${question}\n\nSeçili kare kimliği: ${selected}` : question;
+    const reply = await api().ask(prompt);
+    let completed = 0;
+    for (const imageId of reply.assessment_image_ids) {
+      if (!get().dataset?.frames.some((frame) => frame.image_id === imageId)) {
+        throw new Error(`Ajan bilinmeyen kare seçti: ${imageId}`);
+      }
+      await get().openFrame(imageId);
+      await get().assess(imageId);
+      if (get().assessPhase !== 'done') {
+        throw new Error(`${imageId} değerlendirilemedi: ${get().assessError ?? 'bilinmeyen hata'}`);
+      }
+      completed++;
+    }
+    return completed ? `${completed} kare değerlendirildi. ${reply.answer}` : reply.answer;
   },
 
   setStepsExpanded(stepsExpanded) {

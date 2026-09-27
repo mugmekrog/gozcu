@@ -46,16 +46,6 @@
       "utterances": ["img_000860 karesini seç", "sekiz yüz altmış numaralı kareyi aç"]
     },
     {
-      "name": "assess_frame",
-      "effect": "compute",
-      "confirm": false,
-      "summary": "Seçili kareyi değerlendir. Ajan katmanını çalıştırır ve bütçeden harcar.",
-      "args": {
-        "image_id": { "type": "string", "pattern": "^img_[0-9]{6}$", "required": false }
-      },
-      "utterances": ["bu kareyi değerlendir", "img_004388'i değerlendir", "değerlendirmeyi başlat"]
-    },
-    {
       "name": "select_vehicle",
       "effect": "view",
       "confirm": false,

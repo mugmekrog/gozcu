@@ -1,7 +1,6 @@
-/* The frame picker and the two actions that start everything.
+/* The frame picker and its status.
  *
- * "Değerlendir" is locked while an evaluation runs, because a second run would
- * interleave two step streams into one list. The state marker on the right is the
+ * The state marker on the right is the
  * frame's current standing: not yet evaluated, running with its step count, the
  * finished level and score, or that the frame holds no vehicles at all.
  */
@@ -24,7 +23,6 @@ export interface TargetFrameProps {
   /** Set once an evaluation has finished for the selected frame. */
   result: { level: Level; score: number; vehicleCount: number } | null;
   onSelect: (imageId: string) => void;
-  onAssess: () => void;
   onCamera: () => void;
 }
 
@@ -36,7 +34,6 @@ export const TargetFrame = memo(function TargetFrame({
   stepsTotal,
   result,
   onSelect,
-  onAssess,
   onCamera,
 }: TargetFrameProps) {
   const selected = frames.find((f) => f.image_id === selectedId) ?? null;
@@ -75,14 +72,6 @@ export const TargetFrame = memo(function TargetFrame({
         </label>
 
         <div className="target-frame__actions">
-          <button
-            type="button"
-            className="btn btn--primary"
-            onClick={onAssess}
-            disabled={running || !selectedId}
-          >
-            {running ? T.agent.evaluateLocked : T.agent.evaluate}
-          </button>
           <button type="button" className="btn" onClick={onCamera} disabled={!selectedId}>
             {T.agent.camera}
           </button>

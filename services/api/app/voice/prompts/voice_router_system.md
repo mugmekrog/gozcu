@@ -52,7 +52,10 @@ Söz: "img_000860 karesini seç"
 → select_frame(image_id="img_000860")
 
 Söz: "bu kareyi değerlendir"
-→ assess_frame()
+→ ask_copilot(question="bu kareyi değerlendir")
+
+Söz: "güney bölgesindeki resimleri değerlendir"
+→ ask_copilot(question="güney bölgesindeki resimleri değerlendir")
 
 Söz: "T0132'yi sabitle"
 → pin_vehicle(track_id="T0132", pinned=true)

@@ -85,7 +85,7 @@ function Workspace() {
   const selectTrack = useAppStore((s) => s.selectTrack);
   const togglePin = useAppStore((s) => s.togglePin);
   const openFrame = useAppStore((s) => s.openFrame);
-  const assess = useAppStore((s) => s.assess);
+  const askAgent = useAppStore((s) => s.askAgent);
   const focusMap = useAppStore((s) => s.focusMap);
   const openModal = useAppStore((s) => s.openModal);
   const closeModal = useAppStore((s) => s.closeModal);
@@ -192,11 +192,6 @@ function Workspace() {
   const inspectVehicle = async () => {
     if (!selectedVehicle?.imageId || !selectedVehicle.alert) return;
     await openFrame(selectedVehicle.imageId);
-    try {
-      await assess(selectedVehicle.imageId);
-    } catch (error) {
-      showToast({ message: error instanceof Error ? error.message : String(error) });
-    }
     const alert = useAppStore.getState().frame?.alerts.find(
       (item) => item.track_id === selectedVehicle.trackId,
     ) ?? selectedVehicle.alert;
@@ -281,14 +276,13 @@ function Workspace() {
               ? { level: brief.level, score: brief.score, vehicleCount: brief.vehicleCount }
               : null}
             onSelect={(imageId) => void openFrame(imageId)}
-            onAssess={() => selectedFrameId && void assess(selectedFrameId)}
             onCamera={openCamera} />
           {selectedVehicle && <TargetCrop vehicle={selectedVehicle} loadFrame={loadFrame} imageUrl={imageUrlOf} />}
           <AgentSteps steps={steps} phase={assessPhase} elapsedMs={assessElapsedMs}
             toolCalls={assessToolCalls} expanded={stepsExpanded} onExpandedChange={setStepsExpanded} />
           <BriefCard brief={brief} phase={assessPhase} imageId={selectedFrameId}
             error={assessError} stepsDone={stepsDone} />
-          <AskAgent available={client.mode === 'http'} onAsk={(question) => client.ask(question)} />
+          <AskAgent onAsk={askAgent} />
           <VoiceDock
             available={voice.available}
             unavailableReason={voice.unavailableReason}
