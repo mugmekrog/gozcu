@@ -17,6 +17,8 @@ import type { AgentStep } from '@/api';
 import { DEFAULT_SCALE } from '@/domain/polar';
 import { prepareBasemap, type PreparedBasemap } from '@/domain/basemap';
 import { minutesOf } from '@/domain/format';
+import type { LevelFilter } from '@/domain/live';
+import { DEFAULT_LAYERS, type MapLayerId, type MapLayers } from '@/domain/mapLayers';
 import type {
   Alert,
   Brief,
@@ -87,19 +89,22 @@ interface State {
   // --- filters ------------------------------------------------------------- //
   zoneFilter: string | 'all';
   classFilter: VehicleClass | 'all';
+  /** Set from the map legend: show one warning level on its own. */
+  levelFilter: LevelFilter;
   /** Visible map radius in kilometres; set continuously by the mouse wheel. */
   scaleKm: number;
   showSuppressed: boolean;
   showAllInMotion: boolean;
   /**
-   * The density view (PLAN 6.12).
+   * Which map layers are drawn (see domain/mapLayers.ts).
    *
-   * A map control rather than a fifth view: the reviewer is not leaving the map,
-   * they are changing how the same clock is drawn. So it lives here beside
-   * `scaleKm` instead of in `view`, which also puts it within reach of the
-   * timeline, the filters and a voice command without a new code path.
+   * Map controls rather than views: the reviewer is not leaving the map, they
+   * are changing how the same clock is drawn. So they live here beside
+   * `scaleKm` instead of in `view`, which also puts the density field within
+   * reach of the timeline, the filters and a voice command without a new code
+   * path -- `setHeat`/`toggleHeat` are `layers.heat` under another name.
    */
-  heatOn: boolean;
+  layers: MapLayers;
 
   // --- the opened frame and its evaluation --------------------------------- //
   frame: FrameDetail | null;
@@ -152,10 +157,13 @@ interface Actions {
 
   setZoneFilter(zoneId: string | 'all'): void;
   setClassFilter(cls: VehicleClass | 'all'): void;
+  setLevelFilter(level: LevelFilter): void;
   /** Continuous zoom from the mouse wheel. */
   setZoom(scaleKm: number): void;
   setShowSuppressed(show: boolean): void;
   setShowAllInMotion(show: boolean): void;
+  setLayer(id: MapLayerId, on: boolean): void;
+  toggleLayer(id: MapLayerId): void;
   setHeat(on: boolean): void;
   toggleHeat(): void;
 
@@ -218,10 +226,11 @@ export const useAppStore = create<State & Actions>((set, get) => ({
 
   zoneFilter: 'all',
   classFilter: 'all',
+  levelFilter: 'all',
   scaleKm: DEFAULT_SCALE,
   showSuppressed: false,
   showAllInMotion: false,
-  heatOn: false,
+  layers: DEFAULT_LAYERS,
 
   frame: null,
   evaluatedFrames: new Map(),
@@ -347,6 +356,9 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   setClassFilter(classFilter) {
     set({ classFilter });
   },
+  setLevelFilter(levelFilter) {
+    set({ levelFilter });
+  },
   setZoom(scaleKm) {
     set({ scaleKm });
   },
@@ -356,11 +368,17 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   setShowAllInMotion(showAllInMotion) {
     set({ showAllInMotion });
   },
-  setHeat(heatOn) {
-    set({ heatOn });
+  setLayer(id, on) {
+    set({ layers: { ...get().layers, [id]: on } });
+  },
+  toggleLayer(id) {
+    get().setLayer(id, !get().layers[id]);
+  },
+  setHeat(on) {
+    get().setLayer('heat', on);
   },
   toggleHeat() {
-    set({ heatOn: !get().heatOn });
+    get().toggleLayer('heat');
   },
 
   async openFrame(imageId, opts = {}) {

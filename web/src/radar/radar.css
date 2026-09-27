@@ -97,53 +97,11 @@
   opacity: 0.25;
 }
 
-/* Small, semi-transparent, bottom-right. It sits over the map, so it stays
- * faint until it is wanted -- and never while it is the active view. */
-.radar-heat-toggle {
-  cursor: pointer;
-  opacity: 0.55;
-  transition: opacity var(--dur-quick) var(--ease);
-}
-
-.radar-heat-toggle:hover,
-.radar-heat-toggle:focus-visible,
-.radar-heat-toggle[data-on] {
-  opacity: 1;
-}
-
-.radar-heat-toggle rect {
-  fill: var(--surface-map);
-  stroke: var(--hairline);
-}
-
-.radar-heat-toggle:hover rect {
-  stroke: var(--ink);
-}
-
-.radar-heat-toggle[data-on] rect {
-  fill: var(--surface);
-  stroke: var(--heat);
-}
-
-.radar-heat-toggle__label {
-  fill: var(--ink);
-  font-weight: 700;
-  letter-spacing: var(--tracking-label);
-}
-
-/* The caption is the control explaining itself: which view is on, and which
- * zone the field is pointing at. */
-.radar-heat-toggle__caption {
+/* The caption the density field prints over the map: which zone is heaviest.
+ * The switch itself is in the layers menu. */
+.radar-heat-caption {
   fill: var(--ink-muted);
-}
-
-.radar-heat-toggle:focus {
-  outline: none;
-}
-
-.radar-heat-toggle:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
+  pointer-events: none;
 }
 
 /* --- zones ---------------------------------------------------------------- */

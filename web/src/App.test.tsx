@@ -1,7 +1,7 @@
 /* Smoke tests for the map shell against a fake API: navigation, symbols, zoom
  * and the reviewer path run without network or fixture files. */
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from './App';
 import { setApi } from './api';
@@ -346,10 +346,13 @@ describe('Harita odaklı arayüz', () => {
     expect(screen.getByRole('heading', { name: /GÖZCÜ/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Harita' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Kayıtlar' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /Değerlendir/ })).toBeNull();
+    // Main removed the button: assessments start from AJANA SOR. Anchored,
+    // because the map legend now carries a "Değerlendirilmedi" chip.
+    expect(screen.queryByRole('button', { name: /Değerlendir$/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /OYNAT|Hareket/ })).toBeNull();
-    expect(document.querySelector('[data-vehicle-class="truck"] polygon')).toBeTruthy();
-    expect(document.querySelector('[data-risk-level="ALERT"]')).toBeTruthy();
+    // APP-6: the frame carries the level, the icon inside carries the type.
+    expect(document.querySelector('[data-vehicle-class="truck"] .vehicle-symbol__icon')).toBeTruthy();
+    expect(document.querySelector('[data-risk-level="ALERT"][data-frame="diamond"]')).toBeTruthy();
   });
 
   it('starts every agent-selected evaluation from AJANA SOR', async () => {
@@ -369,7 +372,7 @@ describe('Harita odaklı arayüz', () => {
     setApi(client);
     render(<App />);
     await waitFor(() => expect(screen.getByRole('complementary', { name: 'AGENT OUTPUTS' })).toBeTruthy());
-    expect(screen.queryByRole('button', { name: /Değerlendir/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Değerlendir$/ })).toBeNull();
 
     await act(async () => {
       fireEvent.change(screen.getByRole('textbox', { name: 'AJANA SOR' }), { target: { value: 'bölgedeki resimleri değerlendir' } });
@@ -400,27 +403,92 @@ describe('Harita odaklı arayüz', () => {
   it('ısı haritasına geçer, araçları soldurur ve geri döner', async () => {
     render(<App />);
     await waitFor(() => expect(screen.getByRole('img', { name: /Bölge haritası/ })).toBeTruthy());
-
-    const off = screen.getByRole('button', { name: /Isı haritasına geç/ });
-    expect(off.getAttribute('aria-pressed')).toBe('false');
     expect(document.querySelector('.radar-heat')).toBeNull();
 
-    fireEvent.click(off);
-    await waitFor(() => expect(document.querySelector('.radar-heat')).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: /Katman menüsünü aç/ }));
+    const heat = screen.getByRole('checkbox', { name: /Isı haritası/ });
+    expect((heat as HTMLInputElement).checked).toBe(false);
 
-    const on = screen.getByRole('button', { name: /Isı haritasını kapat/ });
-    expect(on.getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(heat);
+    await waitFor(() => expect(document.querySelector('.radar-heat')).toBeTruthy());
+    expect((screen.getByRole('checkbox', { name: /Isı haritası/ }) as HTMLInputElement).checked).toBe(true);
     // The glyphs step back but stay selectable: changing how the clock is drawn
     // must not cost the operator track of who is who (PLAN F5.4).
     expect(document.querySelector('.radar-vehicles--dimmed')).toBeTruthy();
     expect(screen.queryAllByRole('button', { name: /T0001, kamyon/ }).length).toBeGreaterThan(0);
-    // The control explains its own state rather than just holding an icon.
-    expect(document.querySelector('.radar-heat-toggle__caption')?.textContent).toBeTruthy();
-    expect(document.querySelector('.map-toolbar__heat')?.textContent).toContain('Yoğunluk');
+    // The view still explains itself: which zone the field is pointing at.
+    expect(document.querySelector('.radar-heat-caption')?.textContent).toBeTruthy();
+    expect(document.querySelector('.map-legend__heat')?.textContent).toContain('Yoğunluk');
 
-    fireEvent.click(on);
+    fireEvent.click(screen.getByRole('checkbox', { name: /Isı haritası/ }));
     await waitFor(() => expect(document.querySelector('.radar-heat')).toBeNull());
     expect(document.querySelector('.radar-vehicles--dimmed')).toBeNull();
+  });
+
+  it('kare adımlayıcı bir sonraki kareye geçer ve süpürgeç kare saatlerine oturur', async () => {
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole('img', { name: /Bölge haritası/ })).toBeTruthy());
+    const here = () => document.querySelector('.timeline__here')?.textContent ?? '';
+    const first = here();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sonraki kare' }));
+    await waitFor(() => expect(here()).not.toBe(first));
+
+    // A drag between two captures lands on a capture, not on a dead minute.
+    const scrub = screen.getByLabelText('Tatbikat saatini seç') as HTMLInputElement;
+    const captures = useAppStore.getState().dataset!.frames.map((f) => f.capture_min);
+    fireEvent.change(scrub, { target: { value: String(captures[0]! + 2) } });
+    await waitFor(() => expect(captures).toContain(useAppStore.getState().tMin));
+  });
+
+  it('lejant tıklanabilir: bir uyarı seviyesini yalnız bırakır ve geri alır', async () => {
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole('img', { name: /Bölge haritası/ })).toBeTruthy());
+    const glyphs = () => document.querySelectorAll('.radar-vehicles [aria-label]').length;
+    expect(glyphs()).toBe(1);
+
+    // T0001 has been judged, so asking for the not-yet-judged empties the map.
+    const grey = screen.getByRole('button', { name: /Değerlendirilmedi/ });
+    fireEvent.click(grey);
+    await waitFor(() => expect(glyphs()).toBe(0));
+    expect(grey.getAttribute('aria-pressed')).toBe('true');
+
+    fireEvent.click(screen.getByRole('button', { name: /Değerlendirilmedi/ }));
+    await waitFor(() => expect(glyphs()).toBe(1));
+  });
+
+  it('lejant araç türünü süzer ve temizle düğmesi hepsini geri getirir', async () => {
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole('img', { name: /Bölge haritası/ })).toBeTruthy());
+    const glyphs = () => document.querySelectorAll('.radar-vehicles [aria-label]').length;
+
+    // T0001 is a kamyon: asking for otomobil leaves nothing.
+    const legend = within(document.querySelector('.map-legend') as HTMLElement);
+    fireEvent.click(legend.getByRole('button', { name: 'otomobil' }));
+    await waitFor(() => expect(glyphs()).toBe(0));
+    // The toolbar dropdown reads the same filter, so the two cannot disagree.
+    expect(screen.getByLabelText(/Araç türü: otomobil/)).toBeTruthy();
+
+    fireEvent.click(legend.getByRole('button', { name: /Temizle/ }));
+    await waitFor(() => expect(glyphs()).toBe(1));
+    expect(legend.queryByRole('button', { name: /Temizle/ })).toBeNull();
+  });
+
+  it('katman menüsünden bölgeleri ve kareleri kapatır, varsayılana döner', async () => {
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole('img', { name: /Bölge haritası/ })).toBeTruthy());
+    expect(document.querySelector('.radar-zone__core')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /Katman menüsünü aç/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /Bölgeler/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /Görüntü kareleri/ }));
+    await waitFor(() => expect(document.querySelector('.radar-zone__core')).toBeNull());
+    expect(document.querySelector('.radar-frame')).toBeNull();
+    // The base and the vehicles are layers of their own: they stay.
+    expect(screen.queryAllByRole('button', { name: /T0001, kamyon/ }).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole('button', { name: /Varsayılana dön/ }));
+    await waitFor(() => expect(document.querySelector('.radar-zone__core')).toBeTruthy());
   });
 
   it('şehri, operasyon alanını ve OSM atfını haritanın altına çizer', async () => {

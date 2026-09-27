@@ -1,7 +1,6 @@
 import { memo } from 'react';
 import { T } from '@/domain/strings';
 import { MAX_SCALE, MIN_SCALE, zoomScale } from '@/domain/polar';
-import { HEAT_RAMP } from '@/radar/HeatLayer';
 import type { FrameSummary, VehicleClass, Zone } from '@/domain/types';
 import type { ViewName } from '@/store/useAppStore';
 import './map-toolbar.css';
@@ -17,8 +16,6 @@ export interface MapToolbarProps {
   classFilter: VehicleClass | 'all';
   scaleKm: number;
   selectedFrame: FrameSummary | null;
-  /** Shows the density ramp while the heat view is on (PLAN F5.4). */
-  heatOn?: boolean;
   onZoneFilter: (value: string | 'all') => void;
   onClassFilter: (value: VehicleClass | 'all') => void;
   onScale: (value: number) => void;
@@ -26,7 +23,7 @@ export interface MapToolbarProps {
 }
 
 export const MapToolbar = memo(function MapToolbar({
-  view, onView, zones, zoneFilter, classFilter, scaleKm, selectedFrame, heatOn = false,
+  view, onView, zones, zoneFilter, classFilter, scaleKm, selectedFrame,
   onZoneFilter, onClassFilter, onScale, onCamera,
 }: MapToolbarProps) {
   const zoneName = zones.find((zone) => zone.zone_id === zoneFilter)?.name ?? T.filter.all;
@@ -70,31 +67,6 @@ export const MapToolbar = memo(function MapToolbar({
     </div>
 
     <div className="map-toolbar__spacer" />
-    {/* Two questions, two groups: the shape says what the vehicle is, the colour
-        says how worried to be. Mixed in one run they read as one scale. */}
-    <div className="map-toolbar__legend" aria-label="Araç işaretleri ve uyarı renkleri">
-      <div className="map-toolbar__legend-group" role="group" aria-label="Araç türü">
-        <span className="map-toolbar__legend-title" aria-hidden="true">Araç türü</span>
-        <span className="map-toolbar__class"><b>■</b> Otomobil</span>
-        <span className="map-toolbar__class"><b>▲</b> Minibüs</span>
-        <span className="map-toolbar__class"><b>★</b> Kamyon</span>
-        <span className="map-toolbar__class"><b>●</b> Otobüs</span>
-      </div>
-      <span className="map-toolbar__legend-divider" aria-hidden="true" />
-      <div className="map-toolbar__legend-group" role="group" aria-label="Risk">
-        <span className="map-toolbar__legend-title" aria-hidden="true">Risk</span>
-        <span className="map-toolbar__risk"><i data-risk="safe" />Güvenli</span>
-        <span className="map-toolbar__risk"><i data-risk="watch" />Şüpheli</span>
-        <span className="map-toolbar__risk"><i data-risk="alert" />Tehlike</span>
-      </div>
-      {heatOn && <>
-        <span className="map-toolbar__legend-divider" aria-hidden="true" />
-        <span className="map-toolbar__heat" aria-label={T.heat.ramp}>
-          {T.heat.legend}
-          {HEAT_RAMP.map((colour) => <i key={colour} style={{ background: colour }} aria-hidden="true" />)}
-        </span>
-      </>}
-    </div>
     <div className="map-toolbar__zoom" role="group" aria-label="Harita ölçeği">
       <button type="button" aria-label="Yakınlaştır" disabled={scaleKm <= MIN_SCALE}
         onClick={() => onScale(zoomScale(scaleKm, -1))}>
@@ -107,7 +79,7 @@ export const MapToolbar = memo(function MapToolbar({
       </button>
     </div>
     <button type="button" className="map-toolbar__camera" disabled={!selectedFrame} onClick={onCamera}>
-      <span aria-hidden="true">▣</span> {selectedFrame?.image_id ?? 'Kare seçin'} · Görüntü
+      <span aria-hidden="true">▣</span> {selectedFrame ? T.frame.openImage : T.frame.pickFirst}
     </button>
   </div>;
 });

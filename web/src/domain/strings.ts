@@ -20,6 +20,12 @@ export const T = {
     retry: 'Yeniden dene',
   },
 
+  login: {
+    brand: 'SUYLA',
+    signingIn: 'Giriş yapılıyor',
+    note: 'Bölge izleme oturumu hazırlanıyor',
+  },
+
   view: {
     kicker: 'BÖLGE HARİTASI /',
     map: 'HARİTA',
@@ -60,6 +66,16 @@ export const T = {
     toOff: 'Isı haritasını kapat: araç görünümüne dön',
     legend: 'Yoğunluk',
     ramp: 'Yoğunluk: açıktan koyuya',
+  },
+
+  layers: {
+    name: 'KATMANLAR',
+    title: 'Katmanlar',
+    hint: 'Haritada neyin çizileceğini seçin',
+    open: 'Katman menüsünü aç',
+    close: 'Katman menüsünü kapat',
+    reset: 'Varsayılana dön',
+    unavailable: 'Şehir haritası yüklenmedi',
   },
 
   map: {
@@ -138,8 +154,13 @@ export const T = {
     safe: 'Güvenli',
     review: 'Şüpheli',
     threat: 'Tehlike',
+    unassessed: 'Değerlendirilmedi',
+    judged: 'Değerlendirilenler',
     base: 'Merkez üs',
     zones: 'Bölgeler',
+    levels: 'Uyarı seviyesi',
+    only: (what: string) => `Yalnızca ${what} göster`,
+    clear: 'Temizle',
   },
 
   band: {
@@ -158,6 +179,10 @@ export const T = {
     speed: 'HIZ',
     scrub: 'Tatbikat saatini seç',
     frameMarker: 'kare',
+    prevFrame: 'Önceki kare',
+    nextFrame: 'Sonraki kare',
+    noFrame: 'Kare seçilmedi',
+    frameCount: (n: number) => `${n} araç`,
   },
 
   vehicle: {
@@ -503,6 +528,11 @@ export const T = {
       NO_SPEECH_HEARD: 'Hiç konuşma duyulmadı.',
       CANCELLED: 'Vazgeçildi.',
     } as Record<string, string>,
+  },
+
+  frame: {
+    openImage: 'Görüntü',
+    pickFirst: 'Kare seçin',
   },
 
   cls: {

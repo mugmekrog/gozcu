@@ -1,0 +1,156 @@
+/* Bottom-right of the stage, where the density toggle used to sit. */
+.layers-menu {
+  position: absolute;
+  right: var(--space-6);
+  bottom: var(--space-6);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-3);
+}
+
+.layers-menu__button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  align-self: flex-end;
+  height: var(--control-h);
+  padding: 0 var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-control);
+  box-shadow: var(--lift-panel);
+  color: var(--ink);
+  cursor: pointer;
+  opacity: 0.82;
+  transition: opacity var(--dur-quick) var(--ease);
+}
+
+.layers-menu__button:hover,
+.layers-menu__button:focus-visible,
+.layers-menu[data-open] .layers-menu__button {
+  opacity: 1;
+}
+
+.layers-menu[data-open] .layers-menu__button {
+  border-color: var(--ink);
+}
+
+.layers-menu__caption {
+  font-size: var(--text-micro);
+  font-weight: 700;
+  letter-spacing: var(--tracking-label);
+}
+
+.layers-menu__count {
+  min-width: 16px;
+  padding: 1px 4px;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-micro);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-muted);
+  text-align: center;
+}
+
+/* Opens upward: the panel must not cover what the ticks are revealing. */
+.layers-menu__panel {
+  width: var(--menu-w);
+  max-height: min(56vh, 420px);
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--lift-panel);
+}
+
+.layers-menu__head {
+  padding: var(--space-4) var(--space-5);
+  border-bottom: var(--rule-width) solid var(--rule);
+}
+
+.layers-menu__title {
+  font-size: var(--text-micro);
+  font-weight: 700;
+  letter-spacing: var(--tracking-label);
+}
+
+.layers-menu__hint {
+  margin-top: 2px;
+  font-size: var(--text-micro);
+  color: var(--ink-muted);
+}
+
+.layers-menu__group {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.layers-menu__group:last-of-type {
+  border-bottom: none;
+}
+
+.layers-menu__group-title {
+  padding: 0 var(--space-5) var(--space-2);
+  font-size: var(--text-micro);
+  font-weight: 700;
+  letter-spacing: var(--tracking-kicker);
+  color: var(--ink-faint);
+}
+
+.layers-menu__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  cursor: pointer;
+}
+
+.layers-menu__row:hover {
+  background: var(--surface-active);
+}
+
+.layers-menu__row[data-disabled] {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.layers-menu__row input {
+  margin-top: 2px;
+  accent-color: var(--ink);
+  cursor: inherit;
+}
+
+.layers-menu__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.layers-menu__name {
+  font-size: var(--text-small);
+  line-height: var(--leading-tight);
+}
+
+.layers-menu__desc {
+  font-size: var(--text-micro);
+  color: var(--ink-muted);
+}
+
+.layers-menu__reset {
+  width: 100%;
+  padding: var(--space-3) var(--space-5);
+  border-top: var(--rule-width) solid var(--rule);
+  background: none;
+  color: var(--ink-muted);
+  font-size: var(--text-micro);
+  letter-spacing: var(--tracking-label);
+  text-align: left;
+  cursor: pointer;
+}
+
+.layers-menu__reset:hover {
+  color: var(--ink);
+  background: var(--surface-active);
+}
