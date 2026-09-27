@@ -35,6 +35,8 @@ export interface AgentStep {
   index: number | null;
   title: string;
   detail: string;
+  /** The values the step produced, one per line; optional for older servers. */
+  lines?: string[];
   state: 'pending' | 'active' | 'done' | 'tool' | 'warn' | 'error';
   /** Measured wall time for this step, once it has finished. */
   ms: number | null;

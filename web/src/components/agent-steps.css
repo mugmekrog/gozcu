@@ -15,46 +15,85 @@
 .agent-steps__list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-4);
-  max-height: 260px;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  max-height: 520px;
   overflow-y: auto;
 }
 
 .agent-steps__row {
   display: flex;
-  align-items: flex-start;
-  gap: var(--space-4);
-  padding: var(--space-2) var(--space-4);
-  border: 1px solid transparent;
-}
-
-.agent-steps__icon {
-  width: 14px;
-  flex: none;
-  font-weight: 700;
+  padding: var(--space-5) var(--space-6);
+  border: 1px solid var(--hairline);
+  background: var(--surface);
 }
 
 .agent-steps__text {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
 .agent-steps__title {
-  display: block;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  font-size: var(--text-micro);
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
 }
 
-.agent-steps__detail {
-  display: block;
-  font-size: var(--text-dense);
+.agent-steps__icon {
+  flex: none;
+  width: 12px;
+  font-weight: 700;
+}
+
+.agent-steps__index {
+  flex: none;
+  font-weight: 700;
+  color: var(--risk-review-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-steps__index::after {
+  content: ' ·';
   color: var(--ink-muted);
+  font-weight: 400;
+}
+
+.agent-steps__name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
 }
 
 .agent-steps__time {
   flex: none;
-  font-size: var(--text-micro);
+  letter-spacing: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-steps__detail {
+  font-size: var(--text-lead);
+  line-height: 1.45;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+
+.agent-steps__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-left: var(--space-4);
+  border-left: 2px solid var(--hairline);
+  font-size: var(--text-small);
+  line-height: 1.5;
   color: var(--ink-muted);
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
 /* One row style per state. The three that mean something went differently -- a
@@ -63,8 +102,7 @@
 
 .agent-steps__row[data-state='active'] {
   background: var(--ground);
-  border-color: var(--hairline);
-  font-weight: 700;
+  border-color: var(--ink);
 }
 
 .agent-steps__row[data-state='pending'] {

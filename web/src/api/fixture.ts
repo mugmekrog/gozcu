@@ -25,6 +25,7 @@ import type {
   TrackHistory,
 } from '@/domain/types';
 import { T } from '@/domain/strings';
+import { describeSteps, type StepId } from '@/domain/steps';
 import { ApiError, type AgentBudget, type AgentEvent, type AgentReply, type AgentStep, type GoruApi } from './port';
 import { HttpApi } from './http';
 import { loadBasemap } from './basemap';
@@ -60,8 +61,9 @@ function step(
   detail: string,
   state: AgentStep['state'],
   ms: number | null = null,
+  lines?: string[],
 ): AgentStep {
-  return { id, index, title, detail, state, ms };
+  return { id, index, title, detail, state, ms, ...(lines ? { lines } : {}) };
 }
 
 /** Let the browser paint between steps so the list visibly fills. */
@@ -172,19 +174,9 @@ export class FixtureApi implements GoruApi {
     if (signal?.aborted) return;
 
     const fetchMs = Math.round(performance.now() - fetchStarted);
-    const details: Record<string, string> = {
-      open: `${imageId} · ${frame.width_px}×${frame.height_px}`,
-      place: `${frame.capture_hhmm} · köşe koordinatları`,
-      detect: `${frame.funnel?.raw ?? frame.detections.length} kutu → ${
-        frame.funnel?.kept ?? frame.detections.filter((d) => d.kept).length
-      } tespit`,
-      georef: `${frame.matches.length} / ${frame.detections.filter((d) => d.kept).length} eşlendi`,
-      tracks: `son 2 saat · ${frame.track_states.length} iz`,
-      kinematics: `hız, yön, duraklama`,
-      reports: `${frame.reports.length} rapor karşılaştırıldı`,
-      score: `${frame.alerts.length} uyarı`,
-      assess: frame.brief.source === 'rules' ? T.agent.briefRules : 'LLM',
-    };
+    // The base anchors the ENU frame, so coordinates can be shown as lat/lon.
+    const dataset = await this.dataset().catch(() => null);
+    const texts = describeSteps(frame, { base: dataset?.base ?? null, zones: dataset?.zones ?? [] });
 
     for (const entry of plan) {
       if (signal?.aborted) return;
@@ -202,7 +194,8 @@ export class FixtureApi implements GoruApi {
       }
 
       const stepStarted = performance.now();
-      const active = step(entry.id, entry.index, entry.title, details[entry.id] ?? '', 'active');
+      const text = texts[entry.id as StepId];
+      const active = step(entry.id, entry.index, entry.title, text.detail, 'active');
       yield { type: 'step', step: active };
       await yieldFrame();
 
@@ -230,9 +223,10 @@ export class FixtureApi implements GoruApi {
         entry.id,
         entry.index,
         entry.title,
-        details[entry.id] ?? '',
+        text.detail,
         'done',
         entry.id === 'open' ? fetchMs : Math.max(1, Math.round(performance.now() - stepStarted)),
+        text.lines,
       );
       emitted.push(done);
       yield { type: 'step', step: done };
