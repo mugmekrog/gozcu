@@ -19,18 +19,28 @@ def test_one_jev_request_asks_about_each_track_with_the_full_bundle(pipeline):
     assert all(track_id in q.instructions for track_id, q in request.questions.items())
 
 
+def _roles(bundle):
+    """Pick vehicles by their rule baseline, not by id: the tests are about the merge,
+    and which track sits at which level is the rule engine's business."""
+    watch = next(v.track_id for v in bundle.vehicles if v.baseline_level is Level.WATCH)
+    clear = [v.track_id for v in bundle.vehicles if v.baseline_level is Level.CLEAR]
+    assert len(clear) >= 2, "img_002256 needs two CLEAR vehicles for these tests"
+    return watch, clear[0], clear[1]
+
+
 def test_rule_floor_keeps_warning_and_exposes_jev_confidence(pipeline):
     from app.agents.threat_decisions import resolve_answers
 
     bundle = pipeline.bundle_for("img_002256")
+    watch, raised, silent = _roles(bundle)
     answers = {
-        "T0088": {
+        watch: {
             "type": "choice",
             "choice": "CLEAR",
             "probabilities": {"CLEAR": 0.8, "WATCH": 0.1, "ALERT": 0.1},
             "confidence": 0.7,
         },
-        "T0009": {
+        raised: {
             "type": "choice",
             "choice": "ALERT",
             "probabilities": {"CLEAR": 0.1, "WATCH": 0.1, "ALERT": 0.8},
@@ -40,16 +50,16 @@ def test_rule_floor_keeps_warning_and_exposes_jev_confidence(pipeline):
 
     decisions = resolve_answers(bundle, answers)
 
-    assert decisions["T0088"].level is Level.WATCH
-    assert decisions["T0088"].jev_level is Level.CLEAR
-    assert decisions["T0088"].jev_confidence == 0.7
-    assert decisions["T0088"].source == "rules_floor"
-    assert decisions["T0009"].level is Level.ALERT
-    assert decisions["T0009"].jev_confidence == 0.6
-    assert decisions["T0009"].source == "jev"
-    assert decisions["T0071"].level is Level.CLEAR
-    assert decisions["T0071"].jev_confidence is None
-    assert decisions["T0071"].source == "rules_fallback"
+    assert decisions[watch].level is Level.WATCH
+    assert decisions[watch].jev_level is Level.CLEAR
+    assert decisions[watch].jev_confidence == 0.7
+    assert decisions[watch].source == "rules_floor"
+    assert decisions[raised].level is Level.ALERT
+    assert decisions[raised].jev_confidence == 0.6
+    assert decisions[raised].source == "jev"
+    assert decisions[silent].level is Level.CLEAR
+    assert decisions[silent].jev_confidence is None
+    assert decisions[silent].source == "rules_fallback"
 
 
 def test_invalid_jev_answer_falls_back_only_for_its_track(pipeline):
@@ -204,10 +214,11 @@ def test_jev_raise_creates_alert_without_chat_assessment(pipeline, cfg):
 
     analysis = pipeline.analyse_image("img_002256")
     bundle = pipeline.bundle_of(analysis)
+    watch, raised_id, _ = _roles(bundle)
     decisions = resolve_answers(
         bundle,
         {
-            "T0009": {
+            raised_id: {
                 "type": "choice",
                 "choice": "ALERT",
                 "probabilities": {"CLEAR": 0.05, "WATCH": 0.05, "ALERT": 0.9},
@@ -220,9 +231,9 @@ def test_jev_raise_creates_alert_without_chat_assessment(pipeline, cfg):
         analysis.alerts, bundle, decisions, ts=analysis.as_of, rules_version=cfg.rules_version
     )
 
-    raised = next(alert for alert in alerts if alert.track_id == "T0009")
+    raised = next(alert for alert in alerts if alert.track_id == raised_id)
     assert raised.baseline_level is Level.CLEAR
     assert raised.level is Level.ALERT
     assert raised.jev_confidence == 0.85
     assert raised.agent_rationale is None
-    assert any(alert.track_id == "T0088" and alert.level is Level.WATCH for alert in alerts)
+    assert any(alert.track_id == watch and alert.level is Level.WATCH for alert in alerts)

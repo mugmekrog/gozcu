@@ -32,8 +32,11 @@ matching:
   duplicate_radius_m: 12        # an unmatched detection this close to an already
                                 # matched track is a double-detection, not a new object
   nn_reference_gate_m: 60       # only for reproducing the PLAN 2.8 reference figure
-  report_gate_m: 150
-  report_time_window_min: 15
+  report_gate_m: 150            # a report belongs to an image when it lies within this of the footprint
+  # MEASURED 2026-09-27: a report's coordinates are where its vehicle stands at the
+  # image's capture (33 of 72 within 2 m), filed up to 120 min before it.
+  report_lookback_min: 120
+  report_claim_radius_m: 50     # the detections a report's type and count are tested against
 
 kinematics:
   fit_points: 4
@@ -44,6 +47,29 @@ zones:
   default_radius_m: 250
   default_buffer_m: 750
   overrides: {}
+
+# The protected asset (team decision, 2026-09-27): Merkez Us. The eight zones are
+# observation sectors - they name where a vehicle is and which reports apply, and
+# raise nothing by themselves. Rings measured against the data: 37 tracks come
+# inside 1 km during their record (closest 488 m); the innermost images sit at
+# 1.6-1.8 km; the observation sectors sit on a 3.19-3.20 km ring.
+base:
+  critical_radius_m: 1000
+  warning_radius_m: 2000
+  observation_radius_m: 3200
+
+# Whole-record behaviour (the brief: read direction and speed from the whole
+# record; vehicles turn, stop and circle the base). Measured on the 226 tracks:
+# 81 close >= 1.5 km on the base in 60 min, 7 circle it at a steady ~1.6 km.
+threat:
+  approach_window_min: 60
+  approach_min_closing_m: 1500
+  approach_heading_cos: 0.7       # last 30 min of movement points at the base
+  circling_min_sweep_deg: 90
+  circling_strong_sweep_deg: 180
+  circling_max_range_spread: 0.35 # (max - min) / mean range over the record
+  loiter_min: 30                  # stopped this long within dwell_radius_m
+  dwell_radius_m: 3000
 
 warning:
   horizon_min: 30

@@ -14,7 +14,9 @@ import pytest
 
 from goru_core.schemas import ENU, LatLon, Level, TrackState
 from goru_core.timeline import Timeline, TimeFormatError
+from app.kinematics.behaviour import BehaviourProfile
 from app.perception.postprocess import class_agnostic_nms
+from app.risk.base import base_target
 from app.risk.engine import Hysteresis, ReportSupport, RuleEngine
 from app.risk.zones import assess_zones, most_likely_destination
 
@@ -315,64 +317,123 @@ def test_most_likely_destination_needs_confidence(cfg, dataset):
 # --------------------------------------------------------------------------- #
 
 
-def test_alert_when_inside_a_zone(cfg, dataset):
-    engine = RuleEngine(cfg, {z.zone_id: z.name for z in dataset.zones})
-    zone = dataset.zones[0].model_copy(
-        update={"center_enu": ENU(e_m=0.0, n_m=0.0), "radius_m": 250.0, "buffer_m": 750.0}
+def _engine(cfg, dataset) -> RuleEngine:
+    return RuleEngine(cfg, {z.zone_id: z.name for z in dataset.zones})
+
+
+def _base(cfg, dataset, state, histories=None):
+    """The base assessment: Merkez Us as a target, radius = critical ring."""
+    target = base_target(dataset.base, dataset.base_name, cfg)
+    return assess_zones({state.track_id: state}, histories or {}, [target], cfg, state.as_of_ts)[
+        state.track_id
+    ][0]
+
+
+def _behaviour(state, **overrides) -> BehaviourProfile:
+    """A quiet record: nothing closed, no sweep, no stops - override what the case needs."""
+    range_m = math.hypot(state.pos.e_m, state.pos.n_m)
+    values = dict(
+        range_m=range_m,
+        closest_m=range_m,
+        closest_min_ago=0.0,
+        closing_m={30: 0.0, 60: 0.0, 120: 0.0},
+        heading_to_base_cos=None,
+        sweep_deg=0.0,
+        range_spread=0.0,
+        stop_spells=0,
+        loiter_min=0.0,
+        record_min=120.0,
+        came_in_from_m=None,
     )
-    state = _state("TX", 100.0, 0.0, 1.0, 0.0)
-    items = assess_zones({"TX": state}, {}, [zone], cfg, state.as_of_ts)["TX"]
-    verdict = engine.evaluate(state, items)
+    values.update(overrides)
+    return BehaviourProfile(**values)
+
+
+def _evaluate(cfg, dataset, state, *, histories=None, **behaviour):
+    return _engine(cfg, dataset).evaluate(
+        state,
+        _base(cfg, dataset, state, histories),
+        _behaviour(state, **behaviour),
+        sector_id=dataset.zones[0].zone_id,
+    )
+
+
+def test_alert_inside_the_critical_ring(cfg, dataset):
+    verdict = _evaluate(cfg, dataset, _state("TX", 0.0, 800.0, 0.0, 0.0))
     assert verdict.level is Level.ALERT
-    assert any("inside" in reason for reason in verdict.reasons)
+    assert (verdict.category, verdict.likelihood) == ("approach", "high")
+    assert [s.kind for s in verdict.signals] == ["inside_critical"]
 
 
-def test_alert_on_imminent_entry(cfg, dataset):
-    engine = RuleEngine(cfg, {z.zone_id: z.name for z in dataset.zones})
-    zone = dataset.zones[0].model_copy(
-        update={"center_enu": ENU(e_m=0.0, n_m=0.0), "radius_m": 250.0, "buffer_m": 750.0}
-    )
-    # 1250 m out at 5 m/s: 200 s to the radius, inside the 10 minute ALERT window.
+def test_alert_on_imminent_entry_to_the_critical_ring(cfg, dataset):
+    # 1250 m south at 5 m/s north: 50 s to the 1 km ring, inside the 10 minute ALERT window.
     state = _state("TX", 0.0, -1250.0, 0.0, 5.0)
     histories = {"TX": np.array([[0.0, -1550.0], [0.0, -1450.0], [0.0, -1350.0], [0.0, -1250.0]])}
-    items = assess_zones({"TX": state}, histories, [zone], cfg, state.as_of_ts)["TX"]
-    verdict = engine.evaluate(state, items)
+    verdict = _evaluate(cfg, dataset, state, histories=histories)
     assert verdict.level is Level.ALERT
-    assert any("ETA" in reason for reason in verdict.reasons)
+    assert "imminent_entry" in [s.kind for s in verdict.signals]
     assert verdict.priority > 0.5
 
 
-def test_clear_when_far_and_stationary(cfg, dataset):
-    engine = RuleEngine(cfg, {z.zone_id: z.name for z in dataset.zones})
-    zone = dataset.zones[0].model_copy(
-        update={"center_enu": ENU(e_m=0.0, n_m=0.0), "radius_m": 250.0, "buffer_m": 750.0}
-    )
-    state = _state("TX", 0.0, -8000.0, 0.0, 0.0)
-    items = assess_zones({"TX": state}, {}, [zone], cfg, state.as_of_ts)["TX"]
-    verdict = engine.evaluate(state, items)
+def test_a_sustained_approach_far_out_is_a_possible_threat(cfg, dataset):
+    # 3.5 km out, closed 3 km in the last hour pointing at the base - but no entry soon.
+    state = _state("TX", 0.0, 3500.0, 0.0, 0.0)
+    verdict = _evaluate(cfg, dataset, state, closing_m={30: 1500.0, 60: 3000.0, 120: 4000.0}, heading_to_base_cos=0.95)
+    assert verdict.level is Level.WATCH
+    assert (verdict.category, verdict.likelihood) == ("approach", "possible")
+    assert [s.kind for s in verdict.signals] == ["sustained_approach"]
+    assert verdict.zone_id == dataset.zones[0].zone_id  # the observation sector, not a target
+
+
+def test_a_heavy_vehicle_approaching_inside_the_warning_ring_is_high(cfg, dataset):
+    state = _state("TX", 0.0, 1700.0, 0.0, 0.0).model_copy(update={"class_hint": "truck"})
+    verdict = _evaluate(cfg, dataset, state, closing_m={30: 1500.0, 60: 3000.0, 120: 4000.0}, heading_to_base_cos=0.95)
+    assert verdict.level is Level.ALERT
+    assert verdict.likelihood == "high"
+
+
+def test_coming_inside_the_critical_ring_and_pulling_back_is_possible_surveillance(cfg, dataset):
+    state = _state("TX", 0.0, 2600.0, 0.0, 0.0)
+    verdict = _evaluate(cfg, dataset, state, closest_m=490.0, closest_min_ago=10.0, came_in_from_m=3500.0)
+    assert verdict.level is Level.WATCH
+    assert (verdict.category, verdict.likelihood) == ("surveillance", "possible")
+    assert [s.kind for s in verdict.signals] == ["probe"]
+
+
+def test_leaving_from_near_the_base_is_not_a_probe(cfg, dataset):
+    # Its record starts 500 m out and it drives away: a departure, not a probe.
+    state = _state("TX", 0.0, 4500.0, 0.0, 0.0)
+    verdict = _evaluate(cfg, dataset, state, closest_m=500.0, closest_min_ago=120.0, came_in_from_m=None)
+    assert "probe" not in [s.kind for s in verdict.signals]
+
+
+def test_clear_when_far_and_quiet(cfg, dataset):
+    verdict = _evaluate(cfg, dataset, _state("TX", 0.0, -8000.0, 0.0, 0.0))
     assert verdict.level is Level.CLEAR
+    assert verdict.category is None and verdict.signals == ()
     assert verdict.reasons  # it still explains itself
 
 
 def test_a_report_can_raise_but_never_lower(cfg, dataset):
-    engine = RuleEngine(cfg, {z.zone_id: z.name for z in dataset.zones})
-    zone = dataset.zones[0].model_copy(
-        update={"center_enu": ENU(e_m=0.0, n_m=0.0), "radius_m": 250.0, "buffer_m": 750.0}
-    )
-    state = _state("TX", 0.0, -8000.0, 0.0, 0.0)
-    items = assess_zones({"TX": state}, {}, [zone], cfg, state.as_of_ts)["TX"]
-
+    engine = _engine(cfg, dataset)
+    far = _state("TX", 0.0, -8000.0, 0.0, 0.0)
     raised = engine.evaluate(
-        state, items, report_support=ReportSupport(cap=Level.WATCH, report_ids=("R001",), note="official sighting")
+        far,
+        _base(cfg, dataset, far),
+        _behaviour(far),
+        sector_id=dataset.zones[0].zone_id,
+        report_support=ReportSupport(cap=Level.WATCH, report_ids=("R001",), note="official sighting"),
     )
     assert raised.level is Level.WATCH
     assert "R001" in raised.evidence
 
-    # An inside-zone vehicle stays ALERT no matter what a report caps at.
-    inside = _state("TY", 100.0, 0.0, 1.0, 0.0)
-    inside_items = assess_zones({"TY": inside}, {}, [zone], cfg, inside.as_of_ts)["TY"]
+    inside = _state("TY", 0.0, 800.0, 0.0, 0.0)
     held = engine.evaluate(
-        inside, inside_items, report_support=ReportSupport(cap=Level.CLEAR, report_ids=("R002",))
+        inside,
+        _base(cfg, dataset, inside),
+        _behaviour(inside),
+        sector_id=dataset.zones[0].zone_id,
+        report_support=ReportSupport(cap=Level.CLEAR, report_ids=("R002",)),
     )
     assert held.level is Level.ALERT
 

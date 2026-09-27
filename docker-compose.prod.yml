@@ -14,7 +14,9 @@ services:
       dockerfile: Dockerfile
     container_name: goru-backend-prod
     ports:
-      - "8080:8080"
+      # Loopback only: the API spends the $15 budget. GORU_API_PORT moves the host
+      # side when 8080 is taken on this machine (the container still listens on 8080).
+      - "127.0.0.1:${GORU_API_PORT:-8080}:8080"
     environment:
       - PORT=8080
       - PYTHONUNBUFFERED=1
@@ -58,11 +60,11 @@ services:
       dockerfile: Dockerfile
       target: preview
       args:
-        - VITE_API_BASE_URL=http://localhost:8080
+        - VITE_API_BASE_URL=http://localhost:${GORU_API_PORT:-8080}
         - VITE_STT_URL=http://127.0.0.1:8800
     container_name: goru-frontend-prod
     ports:
-      - "5173:5173"
+      - "127.0.0.1:5173:5173"
     depends_on:
       backend:
         condition: service_healthy

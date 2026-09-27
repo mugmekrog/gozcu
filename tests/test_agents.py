@@ -698,18 +698,34 @@ def test_hostile_report_text_cannot_change_a_level(offline_cfg, pipeline, datase
 # --------------------------------------------------------------------------- #
 
 
+def _unclassified(dataset, text: str = "Kuzey Yolu bolgesinde garip bir hareketlilik var."):
+    """A report in wording none of the 32 templates covers: the model parser's job."""
+    from datetime import datetime, timezone
+
+    from goru_core.schemas import FieldReport, SourceRefModel
+    from app.fusion.reports import parse_report_text
+
+    return FieldReport(
+        report_id="R900",
+        ts=datetime(2026, 9, 26, 9, 0, tzinfo=timezone.utc),
+        source="official",
+        text=text,
+        parsed=parse_report_text(text, dataset.zones),
+        source_ref=SourceRefModel(file_name="field_reports.json", file_sha256="0" * 64, record_key="900"),
+    )
+
+
 def test_report_parser_only_runs_on_what_the_rules_could_not_do(dataset):
-    candidates = [r for r in dataset.reports if needs_llm_parse(r)]
-    assert candidates, "expected some unclassified reports"
-    assert len(candidates) < len(dataset.reports) / 2  # the rules do most of the work
-    for report in candidates:
-        assert report.parsed.kind == "unknown" or (
-            report.parsed.geo is None and report.parsed.zone_ref is None
-        )
+    # The rules cover every one of the 137 shipped reports ...
+    assert [r.report_id for r in dataset.reports if needs_llm_parse(r)] == []
+    # ... and new wording still reaches the model rather than being guessed at.
+    novel = _unclassified(dataset)
+    assert novel.parsed.kind == "unknown"
+    assert needs_llm_parse(novel)
 
 
 def test_report_parser_accepts_a_sane_classification(offline_cfg, dataset, tmp_path):
-    report = next(r for r in dataset.reports if needs_llm_parse(r))
+    report = _unclassified(dataset)
     payload = ReportParsePayload(report=report, zones=tuple(dataset.zones))
     answer = json.dumps(
         {
@@ -733,7 +749,7 @@ def test_report_parser_accepts_a_sane_classification(offline_cfg, dataset, tmp_p
 
 
 def test_report_parser_rejects_invented_coordinates(offline_cfg, dataset, tmp_path):
-    report = next(r for r in dataset.reports if needs_llm_parse(r) and r.parsed.geo is None)
+    report = _unclassified(dataset)
     payload = ReportParsePayload(report=report, zones=tuple(dataset.zones))
     answer = json.dumps(
         {
@@ -755,7 +771,7 @@ def test_report_parser_rejects_invented_coordinates(offline_cfg, dataset, tmp_pa
 
 
 def test_report_parser_rejects_an_unknown_zone(offline_cfg, dataset, tmp_path):
-    report = next(r for r in dataset.reports if needs_llm_parse(r))
+    report = _unclassified(dataset)
     payload = ReportParsePayload(report=report, zones=tuple(dataset.zones))
     answer = json.dumps(
         {

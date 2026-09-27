@@ -72,6 +72,52 @@ def _load(args: argparse.Namespace) -> tuple[Config, Dataset, Pipeline]:
 # --------------------------------------------------------------------------- #
 
 
+def cmd_threat_report(args: argparse.Namespace) -> int:
+    """The base-centred threat picture over the whole day, for review and the pitch."""
+    import collections
+
+    cfg, dataset, pipeline = _load(args)
+    analyses = pipeline.analyse_all()
+    hhmm = dataset.timeline.hhmm
+    zone_names = {z.zone_id: z.name for z in dataset.zones}
+
+    levels = collections.Counter()
+    categories = collections.Counter()
+    signals = collections.Counter()
+    threats = []
+    for analysis in analyses:
+        for track_id, verdict in analysis.verdicts.items():
+            levels[verdict.level.value] += 1
+            categories[(verdict.level.value, verdict.category or "-")] += 1
+            for signal in verdict.signals:
+                signals[signal.kind] += 1
+            threat = analysis.threats.get(track_id)
+            if threat is not None:
+                threats.append((hhmm(analysis.as_of), analysis.image.image_id, verdict, threat))
+
+    reports = {r.report_id: r for a in analyses for r in a.reports}.values()
+    located = [r for r in reports if r.parsed.geo is not None]
+    print(f"rules_version {cfg.rules_version} | protected: {dataset.base_name} | "
+          f"rings {cfg.base.critical_radius_m:.0f}/{cfg.base.warning_radius_m:.0f}/"
+          f"{cfg.base.observation_radius_m:.0f} m")
+    print("levels:", dict(levels))
+    print("level x category:", dict(sorted(categories.items())))
+    print("signals:", dict(sorted(signals.items())))
+    print("located report verdicts:", dict(collections.Counter(r.verdict for r in located)))
+    print("  by source:", dict(sorted(collections.Counter((r.source, r.verdict) for r in located).items())))
+    print(f"scenarios for the human: {sum(1 for r in reports if r.scenario)}")
+
+    print(f"\nthreats, most confident first ({len(threats)}):")
+    threats.sort(key=lambda row: (-row[2].level.rank, -row[3].confidence))
+    shown = threats if args.all else threats[: args.top]
+    for when, image_id, verdict, threat in shown:
+        flags = f" [{', '.join(threat.flags)}]" if threat.flags else ""
+        print(f"  {when} {image_id} {threat.track_id} {verdict.level.value:5s} {threat.category or '-':12s} "
+              f"conf {threat.confidence:.2f} {zone_names.get(verdict.zone_id or '', '-'):22s} "
+              f"{verdict.reasons[0][:70] if verdict.reasons else ''}{flags}")
+    return 0
+
+
 def cmd_data_report(args: argparse.Namespace) -> int:
     """Recompute every figure PLAN 2 claims, from the shipped files."""
     cfg, dataset, pipeline = _load(args)
@@ -691,6 +737,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="run even when intake validation reported errors",
     )
     sub = parser.add_subparsers(dest="command", required=True)
+
+    p = sub.add_parser("threat-report", help="the base-centred threat picture over the day")
+    p.add_argument("--top", type=int, default=25, help="threats to list (default 25)")
+    p.add_argument("--all", action="store_true", help="list every threat")
+    p.set_defaults(func=cmd_threat_report)
 
     sub.add_parser("data-report", help="recompute every measured number").set_defaults(
         func=cmd_data_report

@@ -1,20 +1,12 @@
-"""Field report parsing, matching, trust policy and consistency (PLAN.md 6.8, 2.7).
+"""Field report parsing (PLAN.md 6.8 step 1, 2.7).
 
-The brief's rule is the point of the whole exercise: *some reports are correct,
-some are wrong or irrelevant, and they are not marked; compare them against your
-own findings, and where they conflict, rely on your detection.*
+The 137 shipped reports are written in 32 templates (measured, 2026-09-27). This
+module turns each into a testable claim - location, vehicle type, count, what the
+vehicle is said to be doing, whether it is claimed as friendly - and nothing more.
+Testing those claims against our own data is `report_resolver`'s job, and no report
+ever moves a level on its own say-so.
 
-This module therefore does four separable things, each a pure function so each
-can be tested on the real 137 reports:
-
-1. `parse_report_text`   - rules-first parse: coordinates, zone names, count and
-                           vehicle type, and the template `kind`.
-2. `evaluate_consistency`- does the report agree with what we detected?
-3. `report_evidence_cap` - the strongest level this report alone may justify.
-4. `match_reports_to_tracks` - located reports to nearby tracks in the window.
-
-Text is Turkish, ASCII-folded in the data. No report ever lowers a level; that
-invariant lives in `report_evidence_cap` and in the risk engine, never in a prompt.
+Text is Turkish, ASCII-folded in the data.
 """
 
 from __future__ import annotations
@@ -40,10 +32,6 @@ from goru_core.schemas import (
 
 __all__ = [
     "parse_report_text",
-    "evaluate_consistency",
-    "report_evidence_cap",
-    "match_reports_to_tracks",
-    "NearbyDetection",
     "VEHICLE_WORDS",
     "HEAVY_CLASSES",
 ]
@@ -54,13 +42,14 @@ COORD_RE = re.compile(
 )
 
 COUNT_TYPE_RE = re.compile(
-    r"(?P<count>\d+)\s+(?P<word>kamyonet|kamyon|minibus|otobus|otomobil|van|arac)",
+    r"(?P<count>\d+)\s+(?:agir\s+)?(?P<word>kamyonet|kamyon|minibus|otobus|otomobil|panelvan|van|arac)",
     re.IGNORECASE,
 )
 
 # Longest first: "kamyonet" must not be read as "kamyon".
 VEHICLE_WORDS: dict[str, str] = {
     "kamyonet": "van",
+    "panelvan": "van",
     "minibus": "van",
     "van": "van",
     "kamyon": "truck",
@@ -85,21 +74,53 @@ VEHICLE_LABELS = {
 def _vehicle_label(cls: str) -> str:
     return VEHICLE_LABELS.get(cls, cls)
 
-# Template keyword rules, most specific first (PLAN 2.7). Each entry is
-# (kind, pattern, area_wide).
+# The 32 templates the 137 reports are written in (measured, 2026-09-27), as an
+# ordered table: the first rule whose pattern matches sets the kind. Order matters
+# where templates share words - "ihbar" is both a verified-yesterday rumour
+# ("dogrulanmamis bir ihbar") and a located tip ("ihbar alindi"), and a friendly
+# claim contains a movement verb. Each entry is (kind, pattern, area_wide).
 _TEMPLATE_RULES: tuple[tuple[ReportKind, re.Pattern[str], bool], ...] = (
     ("degraded_coverage", re.compile(r"telsiz\s+baglantisi.*kurulam", re.I), False),
-    ("identified_friendly", re.compile(r"kimlik\s+teyidi\s+yapilmis|planli\s+ikmal", re.I), False),
-    ("area_wide", re.compile(r"tatbikat|dost\s+unsurlar", re.I), True),
-    ("unverified", re.compile(r"dogrulanmamis|dogrulanamad|\bihbar\b", re.I), False),
+    (
+        "identified_friendly",
+        re.compile(r"kimlik\s+teyidi\s+yapilmis|planli\s+ikmal|bize\s+bagli|dost\s+devriye|teyitlidir", re.I),
+        False,
+    ),
+    ("area_wide", re.compile(r"tatbikat|dost\s+unsurlar|lojistik\s+konvoyu", re.I), True),
+    ("unverified", re.compile(r"dogrulanmamis|dogrulanamad", re.I), False),
+    ("irrelevant", re.compile(r"hava\s+(acik|kapali|bulutlu)|gorus\s+mesafesi|sis\b|yagis", re.I), False),
     ("negative_claim", re.compile(r"(hareket(i|liligi)?|arac)\s+yok|yalnizca\s+binek", re.I), False),
     (
         "zone_status",
-        re.compile(r"trafik\s+akisi\s+normal|olagandisi\s+bir\s+durum\s+bildirmedi|sakin", re.I),
+        re.compile(
+            r"trafik\s+akisi\s+normal|olagandisi\s+bir\s+durum\s+bildirmedi|"
+            r"kayda\s+deger\s+bir\s+hareketlilik\s+bulunmuyor|sakin",
+            re.I,
+        ),
         False,
     ),
-    ("irrelevant", re.compile(r"hava\s+(acik|kapali|bulutlu)|gorus\s+mesafesi|sis\b|yagis", re.I), False),
-    ("sighting", re.compile(r"goruldu|tespit\s+edildi|gozlemlendi|ilerleyen|seyreden", re.I), False),
+    ("density", re.compile(r"(genellikle|olagan\s+trafik)\s+\d+\s+arac", re.I), False),
+)
+
+_USUAL_COUNT_RE = re.compile(r"(?:genellikle|olagan\s+trafik)\s+(\d+)\s+arac", re.I)
+_HEAVY_RE = re.compile(r"agir\s+(?:bir\s+)?arac|\(kamyon/otobus\)", re.I)
+_TIP_RE = re.compile(r"ihbar\s+alindi|bir\s+ihbara\s+gore|bir\s+kaynak", re.I)
+# A singular vehicle noun ("bir kamyon", "konumundaki otomobil") is one vehicle; a
+# plural ("araclar") is not a count.
+_SINGULAR_RE = re.compile(r"\b(kamyonet|kamyon|minibus|otobus|otomobil|panelvan|van|arac)(?!lar|ler)\w*", re.I)
+# Most specific first: "usse dogru ilerleyen" is a direction, not just movement.
+_MOTION_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("toward_base", re.compile(r"usse\s+(dogru\s+ilerleyen|gelen)", re.I)),
+    ("receding", re.compile(r"bolgeden\s+uzaklasiyor", re.I)),
+    ("moving", re.compile(r"transit\s+geciyor|ilerliyor", re.I)),
+    (
+        "stopped",
+        re.compile(r"durdugu|beklemede|bekliyor|hareketsiz|park\s+halinde|yerinden\s+ayrilmadi", re.I),
+    ),
+)
+_STILL_FOR_RULES: tuple[tuple[int, re.Pattern[str]], ...] = (
+    (60, re.compile(r"bir\s+saatten\s+uzun", re.I)),
+    (30, re.compile(r"uzun\s+suredir", re.I)),
 )
 
 
@@ -128,8 +149,10 @@ def _find_zone(folded: str, zones: Sequence[Zone]) -> Zone | None:
 
 
 def _find_vehicle_word(folded: str) -> str | None:
+    # Boundary at the start only: Turkish case endings follow the noun, so
+    # "kamyonun" and "aracin" are still a truck and a vehicle.
     for word in VEHICLE_WORDS:  # dict preserves the longest-first order above
-        if re.search(rf"\b{re.escape(word)}\b", folded):
+        if re.search(rf"\b{re.escape(word)}", folded):
             return word
     return None
 
@@ -156,17 +179,7 @@ def parse_report_text(text: str, zones: Sequence[Zone]) -> ParsedReport:
             geo = LatLon(lat=lat, lon=lon)
 
     zone = _find_zone(folded, zones)
-
-    count: int | None = None
-    vehicle_type: str | None = None
-    count_match = COUNT_TYPE_RE.search(folded)
-    if count_match:
-        count = int(count_match.group("count"))
-        vehicle_type = VEHICLE_WORDS[count_match.group("word").lower()]
-    else:
-        word = _find_vehicle_word(folded)
-        if word:
-            vehicle_type = VEHICLE_WORDS[word]
+    located = geo is not None or zone is not None
 
     kind: ReportKind = "unknown"
     area_wide = False
@@ -174,14 +187,45 @@ def parse_report_text(text: str, zones: Sequence[Zone]) -> ParsedReport:
         if pattern.search(folded):
             kind, area_wide = candidate, is_area_wide
             break
+    # The remaining templates in the data are located reports about vehicles. A text
+    # that names neither a vehicle nor a count stays unknown - new wording the rules
+    # were not written for, which is what the model-backed parser is for.
+    if kind == "unknown":
+        if not located:
+            kind = "irrelevant"
+        elif _find_vehicle_word(folded) or COUNT_TYPE_RE.search(folded):
+            kind = "sighting"
 
-    # A located report that names a count and a type is a sighting even when no
-    # template verb matched.
-    if kind == "unknown" and count is not None and (geo is not None or zone is not None):
-        kind = "sighting"
-    # No location at all and nothing else matched: context only.
-    if kind == "unknown" and geo is None and zone is None:
-        kind = "irrelevant"
+    count: int | None = None
+    vehicle_type: str | None = None
+    usual_count: int | None = None
+    if kind == "density":
+        usual = _USUAL_COUNT_RE.search(folded)
+        usual_count = int(usual.group(1)) if usual else None
+    else:
+        count_match = COUNT_TYPE_RE.search(folded)
+        if count_match:
+            count = int(count_match.group("count"))
+            vehicle_type = VEHICLE_WORDS[count_match.group("word").lower()]
+            if vehicle_type == "vehicle":
+                # "3 araclik bir kamyon konvoyu": the count counts vehicles, the noun
+                # says what they are.
+                word = _find_vehicle_word(folded)
+                if word and VEHICLE_WORDS[word] != "vehicle":
+                    vehicle_type = VEHICLE_WORDS[word]
+        else:
+            word = _find_vehicle_word(folded)
+            if word:
+                vehicle_type = VEHICLE_WORDS[word]
+    if kind == "sighting":
+        if _HEAVY_RE.search(folded):
+            vehicle_type = "heavy"
+        if count is None and _SINGULAR_RE.search(folded):
+            count = 1
+
+    motion = next((name for name, pattern in _MOTION_RULES if pattern.search(folded)), None)
+    still_for = next((minutes for minutes, pattern in _STILL_FOR_RULES if pattern.search(folded)), None)
+    vehicle_claim = kind in {"sighting", "identified_friendly"}
 
     return ParsedReport(
         geo=geo,
@@ -190,125 +234,9 @@ def parse_report_text(text: str, zones: Sequence[Zone]) -> ParsedReport:
         count=count,
         kind=kind,
         area_wide=area_wide or geo is None and zone is None and kind == "area_wide",
+        motion=motion if vehicle_claim else None,  # type: ignore[arg-type]
+        still_for_min=still_for if vehicle_claim and motion == "stopped" else None,
+        friendly=kind == "identified_friendly",
+        usual_count=usual_count,
+        tip=kind == "sighting" and bool(_TIP_RE.search(folded)),
     )
-
-
-@dataclass(frozen=True, slots=True)
-class NearbyDetection:
-    """A detection close enough in space and time to test a report against."""
-
-    det_id: str
-    cls: str
-    distance_m: float
-    track_id: str | None = None
-
-
-def evaluate_consistency(
-    report: FieldReport,
-    nearby: Sequence[NearbyDetection],
-) -> tuple[ReportConsistency | None, str | None]:
-    """Compare a testable report claim against our own detections (PLAN 6.8.4).
-
-    Returns ``(consistency, note)``. `None` means the report makes no claim this
-    system can test - weather, radio outages, yesterday's rumours.
-    """
-    kind = report.parsed.kind
-    claimed = report.parsed.vehicle_type
-
-    if kind == "negative_claim":
-        heavy = [d for d in nearby if d.cls in HEAVY_CLASSES]
-        if heavy:
-            names = ", ".join(sorted({_vehicle_label(d.cls) for d in heavy}))
-            ids = ", ".join(d.det_id for d in heavy[:3])
-            return (
-                "contradicts",
-                f"Rapor ağır araç hareketi olmadığını bildiriyor; burada {names} tespit edildi ({ids})",
-            )
-        if nearby:
-            return ("agrees", f"Burada ağır araç tespit edilmedi; {len(nearby)} hafif araç görüldü")
-        return ("agrees", "Burada da araç tespit edilmedi")
-
-    if kind in {"sighting", "identified_friendly"}:
-        if not nearby:
-            return ("unrelated", "Eşleşen zaman aralığında bu raporun yakınında tespit yok")
-        if claimed in {None, "vehicle"}:
-            return ("agrees", f"Burada araç tespit edildi ({nearby[0].det_id})")
-        if claimed == "heavy":
-            heavy = [d for d in nearby if d.cls in HEAVY_CLASSES]
-            if heavy:
-                return ("agrees", f"Ağır araç tespit edildi ({heavy[0].det_id})")
-            return (
-                "contradicts",
-                f"Rapor ağır araç bildiriyor; en yakın tespit {_vehicle_label(nearby[0].cls)} ({nearby[0].det_id})",
-            )
-        if any(d.cls == claimed for d in nearby):
-            match = next(d for d in nearby if d.cls == claimed)
-            return ("agrees", f"Tespit edilen {_vehicle_label(claimed)} raporla eşleşiyor ({match.det_id})")
-        return (
-            "contradicts",
-            f"Rapor {_vehicle_label(claimed)} bildiriyor; en yakın tespit {_vehicle_label(nearby[0].cls)} ({nearby[0].det_id})",
-        )
-
-    if kind == "zone_status":
-        if any(d.cls in HEAVY_CLASSES for d in nearby):
-            return ("contradicts", "Rapor bölgeyi normal bildiriyor; burada ağır araç tespit edildi")
-        return ("agrees", "Bildirilen durumla çelişen bir tespit yok")
-
-    return (None, None)
-
-
-def report_evidence_cap(report: FieldReport, *, corroborated: bool) -> Level:
-    """The strongest level this report *alone* may justify (PLAN 6.8.5).
-
-    The trust policy in one function:
-
-    * an `official` located sighting may raise WATCH or ALERT;
-    * a `third_party` report may raise at most WATCH, and only when a detection
-      corroborates it;
-    * nothing else raises anything;
-    * and no report of any kind ever lowers a level - which is why this function
-      returns a cap and never a level to apply.
-    """
-    parsed = report.parsed
-    located = parsed.geo is not None or parsed.zone_ref is not None
-    if not located or parsed.area_wide:
-        return Level.CLEAR
-    if parsed.kind not in {"sighting", "negative_claim"}:
-        return Level.CLEAR
-    if report.source == "official":
-        return Level.ALERT if parsed.kind == "sighting" else Level.WATCH
-    return Level.WATCH if corroborated else Level.CLEAR
-
-
-def match_reports_to_tracks(
-    reports: Iterable[FieldReport],
-    track_states: Mapping[str, TrackState],
-    *,
-    frame: Frame,
-    gate_m: float,
-    window_min: float,
-    as_of: datetime,
-) -> dict[str, list[str]]:
-    """Located reports to nearby tracks (PLAN 6.8.3).
-
-    Coordinate-bearing reports match tracks within `gate_m` and `window_min`
-    (150 m, because *civarinda* means approximately). Zone-named reports attach
-    to the zone rather than to a vehicle, so they deliberately produce an empty
-    match list here.
-
-    Returns report_id -> up to three track ids, nearest first.
-    """
-    matches: dict[str, list[str]] = {}
-    for report in reports:
-        if report.parsed.geo is None:
-            matches[report.report_id] = []
-            continue
-        if abs((as_of - report.ts).total_seconds()) > window_min * 60.0:
-            continue
-        east, north = frame.to_enu(report.parsed.geo.lat, report.parsed.geo.lon)
-        hits = [
-            (math.hypot(state.pos.e_m - east, state.pos.n_m - north), track_id)
-            for track_id, state in track_states.items()
-        ]
-        matches[report.report_id] = [tid for dist, tid in sorted(hits) if dist <= gate_m][:3]
-    return matches

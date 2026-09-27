@@ -15,12 +15,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Mapping, Sequence
+from typing import Any, Mapping, Sequence
 
 from goru_core.config import Config
 from goru_core.provenance import payload_sha256
 from goru_core.schemas import (
     Alert,
+    BaseEvidence,
+    BehaviourEvidence,
     Detection,
     EvidenceBundle,
     ExpectedNotSeen,
@@ -38,7 +40,9 @@ from goru_core.schemas import (
 )
 
 from app.fusion.matching import MatchOutcome
+from app.kinematics.behaviour import CLOSING_WINDOWS_MIN, BehaviourProfile
 from app.perception.postprocess import PostprocessReport
+from app.risk.base import ring_of
 from app.risk.engine import BaselineVerdict
 
 __all__ = ["ImageAnalysis", "build_bundle", "bundle_hash", "ZONES_PER_VEHICLE"]
@@ -56,6 +60,10 @@ class ImageAnalysis:
     postprocess: PostprocessReport | None = None
     track_states: dict[str, TrackState] = field(default_factory=dict)
     zone_assessments: dict[str, list[ZoneAssessment]] = field(default_factory=dict)
+    base_assessments: dict[str, ZoneAssessment] = field(default_factory=dict)
+    behaviours: dict[str, BehaviourProfile] = field(default_factory=dict)
+    sectors: dict[str, str] = field(default_factory=dict)  # track -> observation sector
+    threats: dict[str, Any] = field(default_factory=dict)  # track -> ThreatCandidate (risk.threat)
     destinations: dict[str, str | None] = field(default_factory=dict)
     match: MatchOutcome | None = None
     verdicts: dict[str, BaselineVerdict] = field(default_factory=dict)
@@ -82,6 +90,45 @@ def _zone_evidence(assessment: ZoneAssessment, zone_names: Mapping[str, str]) ->
         approach_conf=round(assessment.approach_conf, 3),
         inside_zone=assessment.inside_zone,
         inside_buffer=assessment.inside_buffer,
+    )
+
+
+def _base_evidence(assessment: ZoneAssessment | None, cfg: Config) -> BaseEvidence | None:
+    if assessment is None:
+        return None
+    return BaseEvidence(
+        range_m=round(assessment.dist_now_m, 1),
+        ring=ring_of(assessment.dist_now_m, cfg),  # type: ignore[arg-type]
+        eta_critical_s=None if assessment.eta_entry_s is None else round(assessment.eta_entry_s, 1),
+        cpa_m=round(assessment.cpa_m, 1),
+        t_cpa_s=round(assessment.t_cpa_s, 1),
+        approach_conf=round(assessment.approach_conf, 3),
+    )
+
+
+def _behaviour_evidence(profile: BehaviourProfile | None) -> BehaviourEvidence | None:
+    if profile is None:
+        return None
+
+    def closed(window: int) -> float | None:
+        value = profile.closing_m.get(window)
+        return None if value is None else round(value, 1)
+
+    return BehaviourEvidence(
+        closing_windows_min=list(CLOSING_WINDOWS_MIN),
+        closing_30_m=closed(30),
+        closing_60_m=closed(60),
+        closing_120_m=closed(120),
+        heading_to_base_cos=None
+        if profile.heading_to_base_cos is None
+        else round(profile.heading_to_base_cos, 3),
+        closest_m=round(profile.closest_m, 1),
+        closest_min_ago=round(profile.closest_min_ago, 1),
+        came_in_from_m=None if profile.came_in_from_m is None else round(profile.came_in_from_m, 1),
+        sweep_deg=round(profile.sweep_deg, 1),
+        range_spread=round(profile.range_spread, 3),
+        loiter_min=round(profile.loiter_min, 1),
+        stop_spells=profile.stop_spells,
     )
 
 
@@ -117,6 +164,7 @@ def build_bundle(
     for track_id in sorted(analysis.track_states):
         state = analysis.track_states[track_id]
         verdict = analysis.verdicts.get(track_id)
+        threat = analysis.threats.get(track_id)
         det_id = analysis.match.det_by_track.get(track_id) if analysis.match else None
         detection = analysis.detection_by_id(det_id) if det_id else None
         match_row = None
@@ -143,6 +191,16 @@ def build_bundle(
                 zones=[_zone_evidence(a, zone_names) for a in ranked],
                 baseline_level=verdict.level if verdict else Level.CLEAR,
                 reasons=list(verdict.reasons) if verdict else [],
+                sector_id=analysis.sectors.get(track_id),
+                sector_name=zone_names.get(analysis.sectors.get(track_id, "")),
+                base=_base_evidence(analysis.base_assessments.get(track_id), cfg),
+                behaviour=_behaviour_evidence(analysis.behaviours.get(track_id)),
+                category=verdict.category if verdict else None,
+                likelihood=verdict.likelihood if verdict else None,
+                signals=[signal.kind for signal in verdict.signals] if verdict else [],
+                confidence=round(threat.confidence, 2) if threat else None,
+                confidence_terms=[(label, round(points, 2)) for label, points in threat.terms] if threat else [],
+                threat_flags=list(threat.flags) if threat else [],
             )
         )
 
@@ -174,6 +232,11 @@ def build_bundle(
             consistency=report.consistency,
             consistency_note=report.consistency_note,
             trust_note=_trust_note(report),
+            motion=report.parsed.motion,
+            verdict=report.verdict,
+            checks=list(report.checks),
+            scenario=report.scenario,
+            needs_identity_check=report.needs_identity_check,
         )
         for report in analysis.reports
     ]
@@ -213,24 +276,21 @@ def build_bundle(
 
 
 def _trust_note(report: FieldReport) -> str | None:
-    """A plain statement of the policy that applies to this report (PLAN 6.8.5).
+    """The policy that applies to this report, in one sentence (team decision 2026-09-27).
 
-    Carried into the bundle so the agent is told the rule rather than asked to
-    infer it - and so the reviewer sees the same sentence the agent saw.
+    Carried into the bundle so the agent is told the rule rather than asked to infer
+    it - and so the reviewer sees the same sentence the agent saw. No source label is
+    trusted and no report moves a level; what counts is what our data made of it.
     """
-    kind = report.parsed.kind
-    if kind == "identified_friendly":
-        return (
-            "de-escalation hint only: a report may never lower a level; "
-            "only the human reviewer may act on this"
-        )
-    if kind == "degraded_coverage":
-        return "reporting from this zone is unreliable for the stated window; detections are unaffected"
-    if kind in {"area_wide", "unverified", "irrelevant"}:
-        return "context only; cannot raise or lower a level"
-    if report.source == "third_party":
-        return "third-party: may raise at most WATCH, and only if a detection corroborates it"
-    return "official: may raise WATCH or ALERT when located and matched"
+    if report.needs_identity_check:
+        return ("dost iddiası: kimlik havadan doğrulanamaz, insan teyit etmeli; "
+                "hiçbir seviyeyi düşürmez")
+    return {
+        "verified": "verimizle doğrulandı: güveni artırır, seviyeyi değiştirmez",
+        "contradicted": "verimizle çelişiyor: tespit esas alınır; senaryo insana gider",
+        "unverifiable": "doğrulanamadı: seviyeyi değiştirmez; senaryo insana gider",
+        "context": "bağlam: hiçbir seviyeyi yükseltmez ya da düşürmez",
+    }.get(report.verdict or "", "bağlam: hiçbir seviyeyi yükseltmez ya da düşürmez")
 
 
 def hhmm_of(ts: datetime, cfg: Config) -> str:

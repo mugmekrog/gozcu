@@ -13,12 +13,7 @@ from datetime import datetime, timezone
 import pytest
 
 from goru_core.schemas import FieldReport, LatLon, Level, ParsedReport, SourceRefModel
-from app.fusion.reports import (
-    NearbyDetection,
-    evaluate_consistency,
-    parse_report_text,
-    report_evidence_cap,
-)
+from app.fusion.reports import parse_report_text
 
 
 def _report(
@@ -141,117 +136,40 @@ def test_turkish_suffixes_do_not_break_the_count(dataset):
 
 
 # --------------------------------------------------------------------------- #
-# Consistency: the brief's core ask
+# Every template in the data becomes a testable claim (Faz 1, 2026-09-27)
 # --------------------------------------------------------------------------- #
 
 
-def test_negative_claim_contradicted_by_a_detected_truck():
-    report = _report("agir arac hareketi yok", kind="negative_claim", vehicle_type="heavy")
-    consistency, note = evaluate_consistency(
-        report, [NearbyDetection(det_id="img_x#001", cls="truck", distance_m=40.0)]
-    )
-    assert consistency == "contradicts"
-    assert "kamyon" in note
+def test_every_report_in_the_data_is_classified(dataset):
+    """137 reports, 32 templates: none may be left for a model to guess at."""
+    assert [r.report_id for r in dataset.reports if r.parsed.kind == "unknown"] == []
 
 
-def test_negative_claim_agrees_when_only_cars_are_seen():
-    report = _report("agir arac hareketi yok", kind="negative_claim", vehicle_type="heavy")
-    consistency, note = evaluate_consistency(
-        report, [NearbyDetection(det_id="img_x#002", cls="car", distance_m=30.0)]
-    )
-    assert consistency == "agrees"
-    assert note == "Burada ağır araç tespit edilmedi; 1 hafif araç görüldü"
-
-
-def test_sighting_agrees_with_a_matching_class():
-    report = _report("1 kamyon goruldu", vehicle_type="truck", count=1)
-    consistency, note = evaluate_consistency(
-        report,
-        [
-            NearbyDetection(det_id="img_x#003", cls="car", distance_m=10.0),
-            NearbyDetection(det_id="img_x#004", cls="truck", distance_m=60.0),
-        ],
-    )
-    assert consistency == "agrees"
-    assert "img_x#004" in note
-
-
-def test_sighting_contradicts_when_no_such_class_is_near():
-    report = _report("1 kamyon goruldu", vehicle_type="truck", count=1)
-    consistency, note = evaluate_consistency(
-        report, [NearbyDetection(det_id="img_x#005", cls="car", distance_m=12.0)]
-    )
-    assert consistency == "contradicts"
-    assert "otomobil" in note
-
-
-def test_report_with_nothing_detected_is_unrelated():
-    report = _report("1 kamyon goruldu", vehicle_type="truck", count=1)
-    consistency, note = evaluate_consistency(report, [])
-    assert consistency == "unrelated"
-    assert note == "Eşleşen zaman aralığında bu raporun yakınında tespit yok"
-
-
-def test_weather_report_makes_no_testable_claim():
-    report = _report("Hava acik", kind="irrelevant")
-    consistency, note = evaluate_consistency(report, [])
-    assert consistency is None and note is None
-
-
-def test_real_dataset_contains_a_genuine_contradiction(analyses):
-    """PLAN task M3.4: at least one real report contradicts our own detection."""
-    contradictions = {
-        report.report_id: report.consistency_note
-        for analysis in analyses
-        for report in analysis.reports
-        if report.consistency == "contradicts"
-    }
-    assert contradictions, "no contradiction found in the shipped data"
-    assert all(note for note in contradictions.values())
-
-
-# --------------------------------------------------------------------------- #
-# Trust policy
-# --------------------------------------------------------------------------- #
-
-
-def test_official_located_sighting_may_raise_alert():
-    report = _report("1 kamyon goruldu", source="official", geo=LatLon(lat=39.94, lon=32.86))
-    assert report_evidence_cap(report, corroborated=True) is Level.ALERT
-
-
-def test_third_party_caps_at_watch_and_needs_corroboration():
-    report = _report("1 kamyon goruldu", source="third_party", geo=LatLon(lat=39.94, lon=32.86))
-    assert report_evidence_cap(report, corroborated=True) is Level.WATCH
-    assert report_evidence_cap(report, corroborated=False) is Level.CLEAR
-
-
-def test_identified_friendly_cannot_lower_or_raise_anything():
-    """The most tempting report in the dataset: it is a hint for the human only."""
-    report = _report(
-        "planli ikmal aracidir, kimlik teyidi yapilmistir",
-        kind="identified_friendly",
-        geo=LatLon(lat=39.94, lon=32.86),
-    )
-    assert report_evidence_cap(report, corroborated=True) is Level.CLEAR
-
-
-@pytest.mark.parametrize("kind", ["area_wide", "unverified", "irrelevant", "degraded_coverage", "zone_status"])
-def test_context_reports_raise_nothing(kind):
-    report = _report("context", kind=kind, geo=LatLon(lat=39.94, lon=32.86))
-    assert report_evidence_cap(report, corroborated=True) is Level.CLEAR
-
-
-def test_unlocated_report_raises_nothing():
-    report = _report("1 kamyon goruldu")  # no geo, no zone
-    assert report_evidence_cap(report, corroborated=True) is Level.CLEAR
-
-
-def test_trust_notes_reach_the_bundle(pipeline, dataset):
-    """The reviewer and the agent see the same policy sentence."""
-    for meta in list(dataset.images.values())[:8]:
-        bundle = pipeline.bundle_for(meta.image_id)
-        for report in bundle.reports_in_window:
-            assert report.trust_note
-            if report.kind == "identified_friendly":
-                assert "never lower" in report.trust_note
+@pytest.mark.parametrize(
+    "report_id, expected",
+    [
+        # "1 agir arac (kamyon/otobus) gozlendi" - an observation the old verbs missed
+        ("R130", dict(kind="sighting", vehicle_type="heavy", count=1)),
+        # "3 kamyon bulundugu yonunde ihbar alindi" - a located tip, not yesterday's rumour
+        ("R005", dict(kind="sighting", vehicle_type="truck", count=3, tip=True)),
+        # "genellikle 4 arac civari gorulur" - the usual count, not a sighting of four
+        ("R020", dict(kind="density", usual_count=4, count=None)),
+        ("R117", dict(kind="density", usual_count=4, count=None)),
+        # "usse gelen otomobil bize bagli unsurdur" - a friendly claim about a base-bound car
+        ("R007", dict(kind="identified_friendly", vehicle_type="car", motion="toward_base", friendly=True)),
+        ("R046", dict(kind="identified_friendly", vehicle_type="vehicle", friendly=True)),
+        ("R015", dict(kind="sighting", vehicle_type="car", count=1, motion="stopped", still_for_min=30)),
+        ("R053", dict(kind="sighting", vehicle_type="truck", count=1, motion="stopped", still_for_min=60)),
+        ("R095", dict(kind="sighting", vehicle_type="van", count=1, motion="stopped")),
+        ("R022", dict(kind="sighting", vehicle_type="truck", count=1, motion="receding")),
+        ("R009", dict(kind="sighting", vehicle_type="truck", count=1, motion="moving")),
+        ("R023", dict(kind="sighting", vehicle_type="car", count=1, motion="stopped")),
+        ("R087", dict(kind="sighting", vehicle_type="truck", count=3, motion="moving")),
+        ("R010", dict(kind="sighting", vehicle_type="truck", count=5, motion="stopped")),
+        ("R042", dict(kind="zone_status")),
+        ("R027", dict(kind="area_wide")),
+    ],
+)
+def test_report_templates_become_testable_claims(dataset, report_id, expected):
+    parsed = next(r for r in dataset.reports if r.report_id == report_id).parsed
+    assert {key: getattr(parsed, key) for key in expected} == expected

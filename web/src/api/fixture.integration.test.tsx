@@ -68,7 +68,7 @@ suite('FixtureApi against the exported data', () => {
     expect(dataset.frames).toHaveLength(40);
     expect(tracks).toHaveLength(226);
     expect(reports).toHaveLength(137);
-    expect(alerts).toHaveLength(149);
+    expect(alerts).toHaveLength(158);
   });
 
   it('assembles a brief for every one of the 40 frames without throwing', async () => {
@@ -152,9 +152,11 @@ suite('FixtureApi against the exported data', () => {
     await waitFor(() => expect(screen.getByRole('alertdialog')).toBeTruthy(), {
       timeout: 5000,
     });
+    // T0062 is a truck 2.73 km out that closed on the base in the last hour: a
+    // possible approach (WATCH), in the Kuzeydogu Kavsagi observation sector.
     const modal = screen.getByRole('alertdialog');
-    expect(modal.textContent).toContain('KRİTİK TEHDİT ALGILANDI');
+    expect(modal.textContent).toContain('İNSAN İNCELEMESİ GEREKMEKTE');
+    expect(modal.textContent).toContain('ŞÜPHELİ');
     expect(modal.textContent).toContain('Kuzeydogu Kavsagi');
-    expect(document.body.textContent).toContain('100');
   });
 });

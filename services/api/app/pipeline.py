@@ -13,7 +13,7 @@ only records with ``ts <= now``. That is enforced in one place,
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from typing import Iterable, Mapping, Sequence
 
@@ -35,22 +35,17 @@ from app.fusion.matching import (
     match_detections_to_tracks,
     nearest_neighbour_reference,
 )
-from app.fusion.reports import (
-    NearbyDetection,
-    evaluate_consistency,
-    match_reports_to_tracks,
-    report_evidence_cap,
-)
+from app.fusion.report_resolver import Scene, report_cap, resolve_reports
 from app.ingest.loaders import Dataset
+from app.kinematics.behaviour import behaviour_profile
 from app.kinematics.velocity import recent_positions, track_state
 from app.perception.postprocess import postprocess_image
-from app.risk.engine import BaselineVerdict, Hysteresis, ReportSupport, RuleEngine
+from app.risk.base import base_target, sector_of
+from app.risk.engine import BaselineVerdict, Hysteresis, ReportSupport, RuleEngine, likelihood_of
+from app.risk.threat import assess_threat
 from app.risk.zones import assess_zones, most_likely_destination
 
 __all__ = ["Pipeline", "MatchQuality"]
-
-REPORT_LOOKBACK_FACTOR = 2
-
 
 @dataclass
 class MatchQuality:
@@ -129,6 +124,7 @@ class Pipeline:
         self._cfg = cfg
         self._zone_names = {z.zone_id: z.name for z in dataset.zones}
         self._engine = RuleEngine(cfg, self._zone_names)
+        self._base = base_target(dataset.base, dataset.base_name, cfg)
         self._hysteresis = Hysteresis(cfg.warning.downgrade_consecutive)
 
     @property
@@ -168,12 +164,16 @@ class Pipeline:
         candidate_ids = dataset.tracks_ending_at(as_of)
         histories: dict[str, object] = {}
         states: dict[str, TrackState] = {}
+        behaviours = {}
+        points_by_track = {}
         for track_id in candidate_ids:
             points = dataset.track_points_as_of(track_id, as_of)
             if not points:
                 continue
             states[track_id] = track_state(points, as_of, cfg, image_id=image_id)
             histories[track_id] = recent_positions(points, count=4)
+            behaviours[track_id] = behaviour_profile(points, as_of, cfg)
+            points_by_track[track_id] = points
 
         match = match_detections_to_tracks(
             detections, states, cfg=cfg, footprint=footprint, frame=dataset.frame
@@ -187,35 +187,68 @@ class Pipeline:
                     update={"class_hint": detection.cls, "class_conf": detection.score}
                 )
 
+        # The zones are observation sectors: their geometry is context for the agent
+        # and the display, never a trigger. The base is the one target the rules read.
         assessments = assess_zones(states, histories, dataset.zones, cfg, as_of)  # type: ignore[arg-type]
+        base_assessments = {
+            track_id: items[0]
+            for track_id, items in assess_zones(
+                states, histories, [self._base], cfg, as_of  # type: ignore[arg-type]
+            ).items()
+        }
+        sectors = {
+            track_id: sector_of(state.pos.e_m, state.pos.n_m, dataset.zones).zone_id
+            for track_id, state in states.items()
+        }
         destinations = {
             track_id: most_likely_destination(items, cfg) for track_id, items in assessments.items()
         }
 
-        reports = self._reports_for(as_of, detections, states, match)
-        support = self._report_support(reports)
-
-        verdicts: dict[str, BaselineVerdict] = {}
-        for track_id, state in states.items():
-            verdict = self._engine.evaluate(
-                state,
-                assessments.get(track_id, []),
+        def evaluate(track_id: str, support: ReportSupport | None = None) -> BaselineVerdict:
+            return self._engine.evaluate(
+                states[track_id],
+                base_assessments[track_id],
+                behaviours[track_id],
+                sector_id=sectors[track_id],
                 detection_id=match.det_by_track.get(track_id),
-                report_support=support.get(track_id),
+                report_support=support,
                 destination_zone_id=destinations.get(track_id),
             )
-            if apply_hysteresis:
+
+        # The data decides first. Reports are then tested against it - including the
+        # sector claims, which read what this frame rates as alarming - and may only
+        # add to a level the data set, under `report_cap`'s policy.
+        verdicts: dict[str, BaselineVerdict] = {track_id: evaluate(track_id) for track_id in states}
+        corners = footprint.corners_enu(dataset.frame)
+        centre_e = sum(e for e, _ in corners) / len(corners)
+        centre_n = sum(n for _, n in corners) / len(corners)
+        reports = resolve_reports(
+            dataset.reports,
+            Scene(
+                as_of=as_of,
+                footprint=footprint,
+                frame=dataset.frame,
+                sector_id=sector_of(centre_e, centre_n, dataset.zones).zone_id,
+                histories=points_by_track,
+                detections=[d for d in detections if d.kept],
+                alarming=frozenset(t for t, v in verdicts.items() if v.level is Level.ALERT),
+            ),
+            cfg,
+        )
+        for track_id, support in self._report_support(reports).items():
+            if track_id in verdicts:
+                verdicts[track_id] = evaluate(track_id, support)
+
+        if apply_hysteresis:
+            for track_id, verdict in verdicts.items():
                 held = self._hysteresis.apply(track_id, verdict.level)
                 if held is not verdict.level:
-                    verdict = BaselineVerdict(
+                    verdicts[track_id] = replace(
+                        verdict,
                         level=held,
-                        zone_id=verdict.zone_id,
-                        priority=verdict.priority,
-                        reasons=[*verdict.reasons, f"held at {held.value} by hysteresis"],
-                        evidence=verdict.evidence,
-                        destination_zone_id=verdict.destination_zone_id,
+                        likelihood=likelihood_of(held),
+                        reasons=[*verdict.reasons, f"histerezis nedeniyle {held.value} seviyesinde tutuldu"],
                     )
-            verdicts[track_id] = verdict
 
         untracked = self._untracked(match, detections, states)
 
@@ -226,6 +259,9 @@ class Pipeline:
             postprocess=post,
             track_states=states,
             zone_assessments=assessments,
+            base_assessments=base_assessments,
+            behaviours=behaviours,
+            sectors=sectors,
             destinations=destinations,
             match=match,
             verdicts=verdicts,
@@ -233,6 +269,11 @@ class Pipeline:
             untracked=untracked,
             zones=list(dataset.zones),
         )
+        analysis.threats = {
+            track_id: threat
+            for track_id, verdict in verdicts.items()
+            if (threat := assess_threat(track_id, verdict, analysis, reports=reports)) is not None
+        }
         analysis.alerts = self._alerts(analysis)
         return analysis
 
@@ -292,109 +333,18 @@ class Pipeline:
     # Reports
     # ------------------------------------------------------------------ #
 
-    def _reports_for(
-        self,
-        as_of: datetime,
-        detections: Sequence[Detection],
-        states: Mapping[str, TrackState],
-        match,
-    ) -> list[FieldReport]:
-        """Reports in the lookback window, with matches and consistency filled in.
-
-        Strictly ``ts <= as_of``: the simulation may not read a report that has
-        not been filed yet, even one filed a minute later.
-        """
-        cfg = self._cfg
-        dataset = self._dataset
-        lookback = timedelta(minutes=cfg.matching.report_time_window_min * REPORT_LOOKBACK_FACTOR)
-        in_window = [r for r in dataset.reports if as_of - lookback <= r.ts <= as_of]
-        if not in_window:
-            return []
-
-        matches = match_reports_to_tracks(
-            in_window,
-            states,
-            frame=dataset.frame,
-            gate_m=cfg.matching.report_gate_m,
-            window_min=cfg.matching.report_time_window_min,
-            as_of=as_of,
-        )
-
-        kept = [d for d in detections if d.kept]
-        out: list[FieldReport] = []
-        for report in in_window:
-            nearby = self._nearby_detections(report, kept, match)
-            consistency, note = evaluate_consistency(report, nearby)
-            out.append(
-                report.model_copy(
-                    update={
-                        "matched_track_ids": matches.get(report.report_id, []),
-                        "consistency": consistency,
-                        "consistency_note": note,
-                    }
-                )
-            )
-        return out
-
-    def _nearby_detections(
-        self, report: FieldReport, kept: Sequence[Detection], match
-    ) -> list[NearbyDetection]:
-        """Kept detections close enough to test this report's claim against."""
-        cfg = self._cfg
-        frame = self._dataset.frame
-        parsed = report.parsed
-
-        if parsed.geo is not None:
-            east, north = frame.to_enu(parsed.geo.lat, parsed.geo.lon)
-            limit = cfg.matching.report_gate_m
-        elif parsed.zone_ref:
-            zone = self._dataset.zone_by_id(parsed.zone_ref)
-            if zone is None:
-                return []
-            east, north = zone.center_enu.e_m, zone.center_enu.n_m
-            limit = zone.radius_m + zone.buffer_m
-        else:
-            return []
-
-        hits: list[NearbyDetection] = []
-        for detection in kept:
-            distance = math.hypot(detection.center_enu.e_m - east, detection.center_enu.n_m - north)
-            if distance <= limit:
-                hits.append(
-                    NearbyDetection(
-                        det_id=detection.det_id,
-                        cls=detection.cls,
-                        distance_m=distance,
-                        track_id=match.track_by_det.get(detection.det_id) if match else None,
-                    )
-                )
-        hits.sort(key=lambda h: h.distance_m)
-        return hits
-
     def _report_support(self, reports: Iterable[FieldReport]) -> dict[str, ReportSupport]:
-        """Per-track caps that field report evidence may justify (PLAN 6.8.5)."""
+        """Per-track caps the reports may justify, under `report_cap`'s policy."""
         support: dict[str, ReportSupport] = {}
         for report in reports:
-            corroborated = report.consistency == "agrees"
-            cap = report_evidence_cap(report, corroborated=corroborated)
+            cap = report_cap(report)
             if cap is Level.CLEAR or not report.matched_track_ids:
                 continue
-            note = (
-                f"{report.source} report {report.report_id} "
-                f"({report.parsed.kind}) supports at most {cap.value}"
-            )
+            note = f"doğrulanmış rapor {report.report_id} ({report.parsed.kind}) en fazla {cap.value} destekler"
             for track_id in report.matched_track_ids:
                 existing = support.get(track_id)
                 if existing is None or cap.rank > existing.cap.rank:
-                    support[track_id] = ReportSupport(
-                        cap=cap, report_ids=(report.report_id,), note=note
-                    )
-                elif cap is existing.cap:
-                    support[track_id] = ReportSupport(
-                        cap=cap,
-                        report_ids=(*existing.report_ids, report.report_id),
-                        note=existing.note,
-                    )
+                    support[track_id] = ReportSupport(cap=cap, report_ids=(report.report_id,), note=note)
         return support
 
     # ------------------------------------------------------------------ #
@@ -429,15 +379,11 @@ class Pipeline:
                 )
                 if nearest_dist is None or distance < nearest_dist:
                     nearest_id, nearest_dist = track_id, distance
+            # Inside the base's warning ring: record the observation sector it is in.
             inside_of: str | None = None
-            for zone in self._dataset.zones:
-                distance = math.hypot(
-                    detection.center_enu.e_m - zone.center_enu.e_m,
-                    detection.center_enu.n_m - zone.center_enu.n_m,
-                )
-                if distance <= zone.radius_m + zone.buffer_m:
-                    inside_of = zone.zone_id
-                    break
+            east, north = detection.center_enu.e_m, detection.center_enu.n_m
+            if math.hypot(east, north) <= self._cfg.base.warning_radius_m:
+                inside_of = sector_of(east, north, self._dataset.zones).zone_id
             out.append(
                 UntrackedDetection(
                     det_id=det_id,
@@ -481,7 +427,8 @@ class Pipeline:
         for untracked in analysis.untracked:
             if not untracked.inside_buffer_of or untracked.likely_duplicate_of:
                 continue
-            zone_name = self._zone_names.get(untracked.inside_buffer_of, untracked.inside_buffer_of)
+            sector_name = self._zone_names.get(untracked.inside_buffer_of, untracked.inside_buffer_of)
+            base_range = self._dataset.frame.range_m(untracked.center_geo.lat, untracked.center_geo.lon)
             alerts.append(
                 Alert(
                     alert_id=f"A-{analysis.image.image_id}-{untracked.det_id}",
@@ -492,9 +439,9 @@ class Pipeline:
                     source="rules",
                     priority=0.3,
                     reasons=[
-                        f"untracked {untracked.cls} (score {untracked.score:.2f}) inside the "
-                        f"buffer of {zone_name}; nearest track "
-                        f"{untracked.nearest_track_id} at {untracked.nearest_track_dist_m} m"
+                        f"İzsiz {untracked.cls} (skor {untracked.score:.2f}) uyarı halkasında: "
+                        f"üsse {base_range / 1000:.2f} km, {sector_name} sektörü; en yakın iz "
+                        f"{untracked.nearest_track_id}, {untracked.nearest_track_dist_m} m"
                     ],
                     evidence=[untracked.det_id],
                     first_raised_ts=ts,

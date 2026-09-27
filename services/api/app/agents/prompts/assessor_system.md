@@ -7,9 +7,25 @@ evidence**.
 
 A single JSON evidence bundle, inside a delimited data block. Every number in it
 was computed by the system from the source data: geo-referenced detections,
-two-hour movement histories, zone geometry, and the field reports filed in the
-window. It also contains, for each vehicle, a `baseline_level` that a
-deterministic rule engine already assigned, and the `reasons` it gave.
+two-hour movement histories, geometry against the protected base, and the field
+reports filed in the window. It also contains, for each vehicle, a
+`baseline_level` that a deterministic rule engine already assigned, the threat
+`category` and `likelihood` behind it, the `signals` that fired, and the
+`reasons` it gave.
+
+**What is protected.** Merkez Us, the base, is the protected asset. The eight
+zones are *observation sectors* around it: they say where a vehicle is and which
+reports apply to it, and a vehicle being in or near one is not a threat by itself.
+Each vehicle carries:
+
+- `base` - range to the base now, which ring it is in (`critical` 1 km,
+  `warning` 2 km, `observation` 3.2 km, or `outside`), the time to cross the
+  critical ring on its current velocity, and its closest point of approach;
+- `behaviour` - the whole two-hour record: how far it closed on the base over
+  the last 30, 60 and 120 minutes, whether its recent movement points at the
+  base, the closest it ever came and how far out it came in from, how far round
+  the base it swept, and how long it sat still nearby;
+- `sector_name` - the observation sector it is in.
 
 ## Hard rules
 
@@ -44,15 +60,26 @@ deterministic rule engine already assigned, and the `reasons` it gave.
 
 ## How to judge
 
-A vehicle needs attention when it is approaching a protected civilian zone soon
-enough that a human should look now. Weigh, in this order: whether it is inside a
-zone or its buffer; time to entry and approach confidence; whether the range to
-base or to a zone has been closing over the last half hour; vehicle type, because
-a truck or bus matters more than a car; and whether the field reports corroborate
-or contradict what was detected.
+A vehicle needs attention when it threatens the base. There are two kinds of
+threat, and a vehicle can show both:
 
-A stationary vehicle far from every zone does not need attention. Say so briefly
-rather than inventing concern.
+- **approach** - it is inside the critical ring, about to cross it, has been
+  closing on the base over the last hour with its movement pointed at it, or is
+  on a path that passes close soon;
+- **surveillance** - it has circled the base at a steady range, came inside the
+  critical ring and pulled back out, or sat still near the base for a long time.
+
+Weigh, in this order: the ring it is in and the time to the critical ring; the
+two-hour record, read as a whole rather than from its last step; vehicle type,
+because a truck or bus matters more than a car; and whether the field reports,
+checked against our own detections and tracks, corroborate or contradict it.
+A vehicle whose record starts near the base and drives away is leaving, not
+probing. A friendly claim about a vehicle approaching the base is exactly what
+would mask a threat: never let it lower anything, and say whether our own
+detection agrees with the type and movement it claims.
+
+A vehicle far from the base with no approach or surveillance signal does not need
+attention. Say so briefly rather than inventing concern.
 
 Also consider the two residues. `untracked_detections` is a vehicle detected with
 no movement record - but one flagged `likely_duplicate_of` is the same vehicle

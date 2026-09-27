@@ -35,8 +35,14 @@ gcloud run deploy goru-backend \
   --cpu 1 \
   --timeout 60s \
   --port 8080 \
-  --set-env-vars "PORT=8080"
+  --set-env-vars "PORT=8080,GORU_CORS_ORIGINS=https://YOUR_PROJECT_ID.web.app"
 ```
+
+> **CORS is an allowlist, never `*`.** `GORU_CORS_ORIGINS` (comma-separated) names the
+> origins a browser may call the API from; unset, only the local display ports are
+> allowed. The spending and writing POSTs (`/agents/assess`, `/agents/ask`,
+> `/frames/{id}/decision`) also require the `X-Goru-Client` header the display sends,
+> so a page on another origin cannot trigger them and spend the $15 budget.
 
 > **Why these flags matter for Free Tier:**
 > - `--min-instances 0`: Automatically scales to 0 instances when idle, incurring **$0.00 cost**.

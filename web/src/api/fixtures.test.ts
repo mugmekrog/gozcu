@@ -96,13 +96,15 @@ suite('dataset.json', () => {
 suite('alerts.json', () => {
   const alerts = present ? read<{ alerts: Alert[] }>('alerts.json').alerts : [];
 
-  it('reproduces the baseline mix the agent log recorded', () => {
+  it('reproduces the baseline mix the threat-model log recorded', () => {
+    // The base-centred rules (logs/step_threat_model_development_logs.md, 2026-09-27):
+    // Merkez Us is protected, the zones are observation sectors.
     const byLevel = alerts.reduce<Record<string, number>>((acc, alert) => {
       acc[alert.level] = (acc[alert.level] ?? 0) + 1;
       return acc;
     }, {});
-    expect(byLevel.ALERT).toBe(23);
-    expect(byLevel.WATCH).toBe(126);
+    expect(byLevel.ALERT).toBe(33);
+    expect(byLevel.WATCH).toBe(125);
   });
 
   it('breaks every score into terms that add up to it', () => {
@@ -132,7 +134,7 @@ suite('alerts.json', () => {
 
   it('marks untracked-detection alerts so they are not looked up as tracks', () => {
     const untracked = alerts.filter((a) => a.track_id.includes('#'));
-    expect(untracked).toHaveLength(7);
+    expect(untracked).toHaveLength(4); // inside the base's 2 km warning ring
     for (const alert of untracked) {
       // No track means no kinematics; the payload must say so rather than zero it.
       expect(alert.eta_entry_s).toBeNull();

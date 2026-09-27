@@ -152,11 +152,23 @@ def check_citations(cited: Iterable[str], allowed: set[str]) -> list[str]:
     return sorted({c for c in cited if c and c not in allowed})
 
 
-def _admit_into(values: set[float], value: float | None) -> None:
-    """Add a bundle value and its usual unit forms to the admissible set."""
+# Each quantity may be restated in its own units only. Converting every number
+# every way admits too much: a 240 s time-to-closest-approach read as km/h is 864,
+# which then vouches for an invented "900 m" - measured on the base-centred bundle.
+_UNIT_FORMS = {
+    "distance": (1.0, 1 / 1000.0),  # metres, kilometres
+    "duration": (1.0, 1 / 60.0),  # seconds, minutes
+    "speed": (1.0, 3.6),  # m/s, km/h
+    "plain": (1.0,),  # degrees, ratios, scores, counts, minutes already
+}
+
+
+def _admit_into(values: set[float], value: float | None, kind: str = "plain") -> None:
+    """Add a bundle value, in the unit forms its kind of quantity allows, to the admissible set."""
     if value is None:
         return
-    for candidate in (value, value / 1000.0, value / 60.0, value * 3.6):
+    for factor in _UNIT_FORMS[kind]:
+        candidate = value * factor
         values.add(round(candidate, 2))
         values.add(round(candidate, 1))
         values.add(float(round(candidate)))
@@ -173,24 +185,54 @@ def vehicle_numbers(bundle: EvidenceBundle, track_id: str) -> set[float]:
     for vehicle in bundle.vehicles:
         if vehicle.track_id != track_id:
             continue
-        _admit_into(values, vehicle.speed_mps)
+        _admit_into(values, vehicle.speed_mps, "speed")
         _admit_into(values, vehicle.heading_deg)
-        _admit_into(values, vehicle.match_dist_m)
+        _admit_into(values, vehicle.match_dist_m, "distance")
         _admit_into(values, vehicle.score)
         for value in vehicle.dist_to_base_m.values():
-            _admit_into(values, value)
+            _admit_into(values, value, "distance")
+        if vehicle.base is not None:
+            base = vehicle.base
+            for value in (base.range_m, base.cpa_m):
+                _admit_into(values, value, "distance")
+            for value in (base.eta_critical_s, base.t_cpa_s):
+                _admit_into(values, value, "duration")
+            _admit_into(values, base.approach_conf)
+        if vehicle.behaviour is not None:
+            record = vehicle.behaviour
+            # The window lengths are part of the evidence: "closed 5.27 km in 60 min".
+            for window in record.closing_windows_min:
+                _admit_into(values, float(window))
+            for value in (
+                record.closing_30_m,
+                record.closing_60_m,
+                record.closing_120_m,
+                record.closest_m,
+                record.came_in_from_m,
+            ):
+                _admit_into(values, value, "distance")
+            for value in (
+                record.heading_to_base_cos,
+                record.closest_min_ago,
+                record.sweep_deg,
+                record.range_spread,
+                record.loiter_min,
+                float(record.stop_spells),
+            ):
+                _admit_into(values, value)
+        _admit_into(values, vehicle.confidence)
         for zone in vehicle.zones:
-            _admit_into(values, zone.dist_now_m)
-            _admit_into(values, zone.cpa_m)
-            _admit_into(values, zone.eta_entry_s)
+            _admit_into(values, zone.dist_now_m, "distance")
+            _admit_into(values, zone.cpa_m, "distance")
+            _admit_into(values, zone.eta_entry_s, "duration")
             _admit_into(values, zone.approach_conf)
     for missing in bundle.expected_not_seen:
         if missing.track_id == track_id:
-            _admit_into(values, missing.dist_to_footprint_m)
+            _admit_into(values, missing.dist_to_footprint_m, "distance")
     for detection in bundle.untracked_detections:
         if detection.nearest_track_id == track_id:
             _admit_into(values, detection.score)
-            _admit_into(values, detection.nearest_track_dist_m)
+            _admit_into(values, detection.nearest_track_dist_m, "distance")
     # Report counts are legitimately quotable by any vehicle's rationale.
     for report in bundle.reports_in_window:
         if report.count is not None:
@@ -207,7 +249,7 @@ def collect_bundle_numbers(bundle: EvidenceBundle) -> set[float]:
         values |= vehicle_numbers(bundle, missing.track_id)
     for detection in bundle.untracked_detections:
         _admit_into(values, detection.score)
-        _admit_into(values, detection.nearest_track_dist_m)
+        _admit_into(values, detection.nearest_track_dist_m, "distance")
     _admit_into(values, float(bundle.image.raw_box_count))
     _admit_into(values, float(bundle.image.kept_box_count))
     _admit_into(values, float(len(bundle.vehicles)))

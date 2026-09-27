@@ -63,12 +63,10 @@ from app.agents.assessor import ImageAssessorPolicy  # noqa: E402
 from app.evidence.bundle import ImageAnalysis  # noqa: E402
 from app.ingest.loaders import Dataset, load_dataset  # noqa: E402
 from app.pipeline import Pipeline  # noqa: E402
+from app.risk.engine import BaselineVerdict  # noqa: E402
 
 OUT_DIR = REPO_ROOT / "web" / "public" / "fixtures"
 
-# Classes the warning table treats as heavy (PLAN 6.7). Mirrored here only to
-# label the score breakdown; the engine remains the authority on the number.
-HEAVY_CLASSES = {"truck", "bus"}
 
 
 # --------------------------------------------------------------------------- #
@@ -133,32 +131,24 @@ class ScoreTerm:
 
 def score_breakdown(
     alert: Alert,
+    verdict: BaselineVerdict | None,
     assessment: ZoneAssessment | None,
-    state: TrackState | None,
-    zone_name: str,
+    sector_name: str,
     cfg: Config,
 ) -> dict[str, Any]:
-    """Decompose `alert.priority` into the terms that produced it.
+    """Present `alert.priority` as the terms the rule engine computed it from.
 
-    `RuleEngine._priority` is `0.5*eta_term + 0.3*cpa_term + 0.2*approach_conf`,
-    scaled by `heavy_vehicle_multiplier` for a truck or bus and clamped to 1.
-    Every row below is one of those terms read back at 100x, so the rows sum to
-    the score the engine computed rather than to a second opinion about it.
-
-    The frontend shows this table verbatim; `web/src/domain/score.ts` holds the
-    same decomposition for the HTTP adapter, and a test pins the two together.
+    The engine owns the formula and hands its weighted terms over on the verdict
+    (`BaselineVerdict.priority_terms`); this function only labels them. It used to
+    recompute the formula here, and when the engine moved from zones to the base
+    the copy kept explaining the old score against a zone - the screen quoted the
+    wrong distance under the right number. Labels read the base assessment: time
+    to the critical ring, range, approach confidence.
     """
-    warning = cfg.warning
-    terms: list[ScoreTerm] = []
-
-    if assessment is None:
-        # An alert with no zone assessment behind it is an *untracked detection*
-        # inside a zone buffer: `RuleEngine.untracked_detection_level` raises a
-        # WATCH on the box alone, and `alert.track_id` carries a det_id rather
-        # than a track id. There is no kinematics for it -- nothing matched it to
-        # a track, so it has no speed, heading or ETA -- and the priority is the
-        # engine's flat figure for that case. Saying so is the honest breakdown;
-        # decomposing a constant into invented terms would not be.
+    if verdict is None or not verdict.priority_terms or assessment is None:
+        # An untracked detection inside the base's warning ring: no track, so no
+        # speed, heading or ETA, and a flat priority. Saying so is the honest
+        # breakdown; decomposing a constant into invented terms would not be.
         score = pct100(shipped_priority(alert))
         return {
             "score": score,
@@ -166,7 +156,7 @@ def score_breakdown(
             "heavy_multiplier": None,
             "terms": [
                 {
-                    "label": "Tampon içinde eşleşmeyen tespit",
+                    "label": "Uyarı halkasında eşleşmeyen tespit",
                     "points": score,
                     "detail": "ize bağlanamadı · hareket verisi yok",
                 }
@@ -178,60 +168,46 @@ def score_breakdown(
             ),
         }
 
-    horizon_s = warning.horizon_s
     eta = assessment.eta_entry_s
-    eta_term = 1.0 - min(1.0, (eta if eta is not None else horizon_s) / horizon_s)
-    span = assessment.dist_now_m - assessment.cpa_m  # not the radius; see below
-    # `_radius_plus_buffer` is private, so recompute the span the same way the
-    # engine does: radius + buffer for the zone this alert names.
-    zone_cfg = cfg.zones
-    span = zone_cfg.default_radius_m + zone_cfg.default_buffer_m
-    cpa_term = 1.0 - min(1.0, assessment.cpa_m / span if span > 0 else 1.0)
-
-    eta_txt = "ufkun ötesinde" if eta is None else f"{eta / 60:.1f} dk"
-    terms.append(
-        ScoreTerm(
-            label=f"Bölgeye giriş süresi · {eta_txt}",
-            points=pct100(0.5 * eta_term),
-            detail=f"{warning.horizon_min} dk ufka göre",
-        )
-    )
-    terms.append(
-        ScoreTerm(
-            label=f"En yakın yaklaşma · {assessment.cpa_m:.0f} m",
-            points=pct100(0.3 * cpa_term),
-            detail=f"{span:.0f} m yarıçap+tampon içinde",
-        )
-    )
-    terms.append(
-        ScoreTerm(
-            label=f"Yaklaşma güveni · {assessment.approach_conf:.2f}",
-            points=pct100(0.2 * assessment.approach_conf),
-            detail=f"{zone_name} yönünde",
-        )
-    )
-
-    base = 0.5 * eta_term + 0.3 * cpa_term + 0.2 * assessment.approach_conf
-    heavy = bool(state and state.class_hint in HEAVY_CLASSES)
-    multiplier = warning.heavy_vehicle_multiplier if heavy else None
+    labels = {
+        "eta_critical": (
+            f"Kritik halkaya giriş süresi · {'ufkun ötesinde' if eta is None else f'{eta / 60:.1f} dk'}",
+            f"{cfg.warning.horizon_min} dk ufka göre",
+        ),
+        "proximity": (
+            f"Üsse yakınlık · {assessment.dist_now_m / 1000:.2f} km",
+            f"{cfg.base.observation_radius_m / 1000:.1f} km gözlem çevresine göre",
+        ),
+        "approach_conf": (
+            f"Üsse yaklaşma güveni · {assessment.approach_conf:.2f}",
+            f"{sector_name} sektöründen" if sector_name else "üsse doğru",
+        ),
+    }
+    terms = [
+        ScoreTerm(label=labels[t.name][0], points=pct100(t.contribution), detail=labels[t.name][1])
+        for t in verdict.priority_terms
+    ]
+    base = sum(t.contribution for t in verdict.priority_terms)
     score = pct100(shipped_priority(alert))
-
-    if heavy:
+    if verdict.heavy_multiplier:
         terms.append(
             ScoreTerm(
-                label=f"Ağır araç · {state.class_hint} (x{multiplier:g})",
+                label=f"Ağır araç (x{verdict.heavy_multiplier:g})",
                 points=score - pct100(base),
                 detail="ağır araç çarpanı",
             )
         )
 
-    # Reconcile. Each term is rounded independently, and `priority` is clamped at
-    # 1.0, so the rows can miss the total by a point or two. A breakdown whose
-    # rows do not add up to the figure above them is worse than useless -- it
-    # invites the reader to distrust both -- so the drift is pushed onto the
-    # largest term, which is the one it came from.
+    # Each term is rounded on its own and `priority` is clamped at 1.0, so the rows
+    # may miss the total by a point or so; that rounding goes onto the largest row.
+    # Anything more means the rows do not explain the engine's number, and hiding
+    # it would repeat the bug above - so it fails loudly instead.
     drift = score - sum(t.points for t in terms)
-    if drift != 0 and terms:
+    if abs(drift) > len(terms):
+        raise ValueError(
+            f"{alert.alert_id}: breakdown misses the engine's score by {drift} points"
+        )
+    if drift:
         biggest = max(range(len(terms)), key=lambda i: abs(terms[i].points))
         terms[biggest] = ScoreTerm(
             label=terms[biggest].label,
@@ -242,7 +218,7 @@ def score_breakdown(
     return {
         "score": score,
         "base_score": pct100(base),
-        "heavy_multiplier": multiplier,
+        "heavy_multiplier": verdict.heavy_multiplier,
         "terms": [{"label": t.label, "points": t.points, "detail": t.detail} for t in terms],
         "note": None,
     }
@@ -333,6 +309,8 @@ def alert_json(
     zone_name: str | None,
     assessment: ZoneAssessment | None,
     state: TrackState | None,
+    verdict: BaselineVerdict | None = None,
+    threat: Any = None,
 ) -> dict[str, Any]:
     """One alert, with the figures the screens quote alongside it.
 
@@ -340,10 +318,18 @@ def alert_json(
     purpose: the motion table and the logs view read the flattened cross-frame
     alert list and would otherwise have to fetch all 40 frame payloads to print
     an ETA. They are copies of the zone assessment the alert already names, not
-    new numbers.
+    new numbers. The geometry is the base assessment (team decision, 2026-09-27):
+    `dist_now_m` is the range to Merkez Us and `eta_entry_s` the time to its
+    critical ring; `zone_name` is the observation sector the vehicle is in.
     """
     return {
         "alert_id": alert.alert_id,
+        "category": verdict.category if verdict else None,
+        "likelihood": verdict.likelihood if verdict else None,
+        "signals": [signal.kind for signal in verdict.signals] if verdict else [],
+        "confidence": round(threat.confidence, 2) if threat else None,
+        "confidence_terms": [{"label": l, "points": round(p, 2)} for l, p in threat.terms] if threat else [],
+        "threat_flags": list(threat.flags) if threat else [],
         "track_id": alert.track_id,
         "zone_id": alert.zone_id,
         "zone_name": zone_name,
@@ -391,6 +377,12 @@ def report_json(report: FieldReport) -> dict[str, Any]:
         "consistency": report.consistency,
         "consistency_note": report.consistency_note,
         "matched_track_ids": report.matched_track_ids,
+        "motion": report.parsed.motion,
+        "friendly": report.parsed.friendly,
+        "verdict": report.verdict,
+        "checks": [check.model_dump() for check in report.checks],
+        "scenario": report.scenario,
+        "needs_identity_check": report.needs_identity_check,
     }
 
 
@@ -449,23 +441,22 @@ def build_frame_payload(
     brief = brief_json(policy.fallback(bundle), analysis)
     footprint = pipeline.dataset.footprints[analysis.image.image_id]
 
-    assessment_by_key: dict[tuple[str, str], ZoneAssessment] = {
-        (track_id, za.zone_id): za
-        for track_id, zas in analysis.zone_assessments.items()
-        for za in zas
-    }
     alerts: list[dict[str, Any]] = []
     for alert in analysis.alerts:
-        assessment = assessment_by_key.get((alert.track_id, alert.zone_id or ""))
+        # The rules read the base, so the figures beside an alert are the base's.
+        assessment = analysis.base_assessments.get(alert.track_id)
+        verdict = analysis.verdicts.get(alert.track_id)
         state = analysis.track_states.get(alert.track_id)
         zone_name = zone_names.get(alert.zone_id or "") if alert.zone_id else None
         alerts.append(
             alert_json(
                 alert,
-                score_breakdown(alert, assessment, state, zone_name or "", cfg),
+                score_breakdown(alert, verdict, assessment, zone_name or "", cfg),
                 zone_name=zone_name,
                 assessment=assessment,
                 state=state,
+                verdict=verdict,
+                threat=analysis.threats.get(alert.track_id),
             )
         )
 

@@ -26,6 +26,12 @@ import type { BasemapFile } from '@/domain/basemap';
 import { ApiError, type AgentBudget, type AgentEvent, type AgentStep, type GoruApi } from './port';
 import { loadBasemap } from './basemap';
 
+/** Sent on every request. The API refuses spending and writing POSTs without it,
+ * and a page on another origin cannot add it without a CORS preflight that the
+ * API's allowlist refuses (services/api/app/api/rest.py). */
+export const CLIENT_HEADER = 'x-goru-client';
+const CLIENT_NAME = 'goru-web';
+
 export interface HttpApiOptions {
   baseUrl: string;
   /** Bearer token from POST /auth/login. */
@@ -40,6 +46,7 @@ export class HttpApi implements GoruApi {
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const headers = new Headers(init.headers);
     headers.set('accept', 'application/json');
+    headers.set(CLIENT_HEADER, CLIENT_NAME);
     if (this.opts.token) headers.set('authorization', `Bearer ${this.opts.token}`);
     if (init.body) headers.set('content-type', 'application/json');
 
@@ -118,6 +125,7 @@ export class HttpApi implements GoruApi {
           signal,
           headers: {
             accept: 'application/x-ndjson',
+            [CLIENT_HEADER]: CLIENT_NAME,
             ...(this.opts.token ? { authorization: `Bearer ${this.opts.token}` } : {}),
           },
         },

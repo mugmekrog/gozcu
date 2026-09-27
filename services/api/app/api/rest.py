@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any, AsyncGenerator
 from zoneinfo import ZoneInfo
 
-from fastapi import FastAPI, HTTPException, Request, Response, status
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
@@ -42,10 +42,12 @@ for _p in (str(_REPO_ROOT / "libs"), str(_REPO_ROOT / "services" / "api")):
 
 from goru_core.config import Config, load_config
 from app.agents.assessor import ImageAssessorPolicy
+from app.agents.copilot import ReviewerCopilot
 from app.agents.factory import build_agent_stack
 from app.agents.jev import JevService, TypeSafeGateway
 from app.agents.situational_report import SituationalReportPolicy
 from app.agents.threat_decisions import apply_threat_decisions
+from app.agents.tools import ReadOnlyTools
 from app.ingest.loaders import load_dataset
 from app.llm.budget import BudgetLedger
 from app.pipeline import Pipeline
@@ -56,14 +58,43 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# Enable CORS for Firebase Hosting and local development
+# Origins allowed to call this API from a browser. The default is the local display
+# (Vite takes the next free port, hence the range); a deployment names its own
+# with GORU_CORS_ORIGINS, e.g. the Firebase Hosting origin. Never "*": the POST
+# routes below spend the organisers' $15 budget or record an operator decision.
+DEFAULT_CORS_ORIGINS = [
+    f"http://{host}:{port}"
+    for host in ("localhost", "127.0.0.1")
+    for port in (5173, 5174, 5175, 5176, 4173)
+]
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("GORU_CORS_ORIGINS", ",".join(DEFAULT_CORS_ORIGINS)).split(",")
+    if origin.strip()
+]
+
+# The display sends this on every request. A page on another origin can only add a
+# custom header after a CORS preflight, which the allowlist refuses - so a hostile
+# page open in the operator's browser cannot trigger a spending POST, which a
+# plain cross-site form post otherwise could.
+CLIENT_HEADER = "X-Goru-Client"
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["accept", "content-type", "authorization", CLIENT_HEADER.lower()],
 )
+
+
+def require_client_header(request: Request) -> None:
+    """Refuse a spending or writing POST that did not come from the display."""
+    if not request.headers.get(CLIENT_HEADER):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"missing {CLIENT_HEADER} header",
+        )
 
 # Configuration & data path resolution
 CONFIG_PATH = Path(os.getenv("GORU_CONFIG", str(_REPO_ROOT / "goru.yaml")))
@@ -258,35 +289,35 @@ def get_budget() -> dict[str, float]:
     }
 
 
-@app.post("/agents/ask", summary="Reviewer copilot Q&A")
+@app.post(
+    "/agents/ask",
+    summary="Reviewer copilot Q&A",
+    dependencies=[Depends(require_client_header)],
+)
 def ask_copilot(req: AskRequest) -> dict[str, str]:
-    cfg = get_cfg()
-    try:
-        from app.agents.copilot import ReviewerCopilot
-        from app.agents.factory import build_agent_stack
-        from app.agents.tools import ReadOnlyTools
-        from app.ingest.loaders import load_dataset
-        from app.pipeline import Pipeline
+    """The copilot's answer over the engine's analyses, wired as `cli ask` wires it.
 
-        dataset = load_dataset(cfg)
-        pipeline = Pipeline(cfg, dataset)
-        analyses = pipeline.analyse_all()
-        tools = ReadOnlyTools(dataset, analyses, cfg)
-        stack = build_agent_stack(cfg, interactive=False)
-        copilot = ReviewerCopilot(tools, stack.runner, cfg)
-        answer = copilot.answer(req.question)
-        return {"answer": answer.text}
-    except Exception as e:
-        return {
-            "answer": f"Copilot yanıtı (deterministik mod): '{req.question}' sorusu incelendi. "
-            f"Tüm radar ve iz verileri deterministik kurallara uygun olarak doğrulanmıştır. "
-            f"(Detay: {e})"
-        }
+    An unreachable model is answered honestly by the copilot itself. Anything else
+    surfaces as an HTTP error: a canned reply claiming the data was verified would
+    tell the operator something nobody checked.
+    """
+    cfg = get_cfg()
+    dataset = load_dataset(cfg)
+    pipeline = Pipeline(dataset, cfg)
+    tools = ReadOnlyTools(
+        analyses=pipeline.analyse_all(),
+        zone_names={zone.zone_id: zone.name for zone in dataset.zones},
+        cfg=cfg,
+    )
+    stack = build_agent_stack(cfg, interactive=True)
+    answer = ReviewerCopilot(stack.runner, cfg, tools).ask(req.question)
+    return {"answer": answer.text}
 
 
 @app.post(
     "/agents/assess/{image_id}",
     summary="Stream agent evaluation steps for a frame as ndjson",
+    dependencies=[Depends(require_client_header)],
 )
 async def assess_frame(image_id: str) -> StreamingResponse:
     cfg = get_cfg()
@@ -384,7 +415,11 @@ class DecisionModel(BaseModel):
     decided_by: str | None = None
 
 
-@app.post("/frames/{image_id}/decision", summary="Record a reviewer decision on a frame")
+@app.post(
+    "/frames/{image_id}/decision",
+    summary="Record a reviewer decision on a frame",
+    dependencies=[Depends(require_client_header)],
+)
 def record_decision(image_id: str, decision: DecisionModel) -> dict[str, Any]:
     item = decision.model_dump()
     item["image_id"] = image_id

@@ -28,6 +28,8 @@ __all__ = [
     "TrackPoint",
     "TrackState",
     "Zone",
+    "ThreatCategory",
+    "Likelihood",
     "Match",
     "ZoneAssessment",
     "Alert",
@@ -35,11 +37,14 @@ __all__ = [
     "ReportConsistency",
     "ParsedReport",
     "FieldReport",
+    "ClaimCheck",
     "AgentRun",
     "AuditEvent",
     "ValidationIssue",
     "ZoneEvidence",
     "VehicleEvidence",
+    "BaseEvidence",
+    "BehaviourEvidence",
     "UntrackedDetection",
     "ExpectedNotSeen",
     "ReportEvidence",
@@ -52,6 +57,10 @@ __all__ = [
 ]
 
 VehicleClass = Literal["car", "van", "truck", "bus"]
+# The two threat families the team asked for (2026-09-27), and how likely one is.
+# A level stays the operator's one-glance summary; these say what kind of threat.
+ThreatCategory = Literal["approach", "surveillance"]
+Likelihood = Literal["high", "possible"]
 Probability = Annotated[float, Field(ge=0.0, le=1.0)]
 
 
@@ -240,9 +249,15 @@ ReportKind = Literal[
     "area_wide",
     "identified_friendly",
     "irrelevant",
+    "density",
     "unknown",
 ]
 ReportConsistency = Literal["agrees", "contradicts", "unrelated"]
+# What a report says the vehicle is doing - the part of a claim the tracks can test.
+ReportMotion = Literal["stopped", "moving", "receding", "toward_base"]
+# What our own data made of a report (team decision 2026-09-27: data wins, no source is trusted).
+ReportVerdict = Literal["verified", "contradicted", "unverifiable", "context"]
+CheckResult = Literal["pass", "fail", "untestable"]
 
 
 class ParsedReport(_Model):
@@ -252,6 +267,19 @@ class ParsedReport(_Model):
     count: Optional[int] = Field(default=None, ge=0)
     kind: ReportKind = "unknown"
     area_wide: bool = False
+    motion: Optional[ReportMotion] = None
+    still_for_min: Optional[int] = Field(default=None, ge=0)  # "bir saatten uzun" = 60
+    friendly: bool = False  # claims the vehicle is one of ours; never verifiable by us
+    usual_count: Optional[int] = Field(default=None, ge=0)  # density: the count said to be normal
+    tip: bool = False  # a tip passed on ("ihbar alindi", "bir kaynak"), not an observation
+
+
+class ClaimCheck(_Model):
+    """One part of a report's claim tested against our data."""
+
+    claim: str  # presence | type | count | motion | identity | density | heavy_absent | calm | location
+    result: CheckResult
+    note: str
 
 
 class FieldReport(_Model):
@@ -265,6 +293,10 @@ class FieldReport(_Model):
     consistency: Optional[ReportConsistency] = None
     consistency_note: Optional[str] = None
     matched_track_ids: list[str] = Field(default_factory=list)
+    verdict: Optional[ReportVerdict] = None
+    checks: list[ClaimCheck] = Field(default_factory=list)
+    scenario: Optional[str] = None  # the hypothesis a contradicted or unverifiable claim leaves the human
+    needs_identity_check: bool = False  # a friendly claim: identity is never checkable from the air
     source_ref: SourceRefModel
 
 
@@ -327,6 +359,37 @@ class ZoneEvidence(_Model):
     inside_buffer: bool
 
 
+Ring = Literal["critical", "warning", "observation", "outside"]
+
+
+class BaseEvidence(_Model):
+    """The vehicle against the protected base, now (team decision, 2026-09-27)."""
+
+    range_m: float
+    ring: Ring
+    eta_critical_s: Optional[float]  # time to cross the critical ring on the current velocity
+    cpa_m: float
+    t_cpa_s: float
+    approach_conf: float
+
+
+class BehaviourEvidence(_Model):
+    """What the whole two-hour record says, as the brief asks it to be read."""
+
+    closing_windows_min: list[int]  # the windows the closing figures cover
+    closing_30_m: Optional[float]
+    closing_60_m: Optional[float]
+    closing_120_m: Optional[float]
+    heading_to_base_cos: Optional[float]
+    closest_m: float
+    closest_min_ago: float
+    came_in_from_m: Optional[float]
+    sweep_deg: float
+    range_spread: float
+    loiter_min: float
+    stop_spells: int
+
+
 class VehicleEvidence(_Model):
     """One vehicle as the agent sees it: computed facts only, no model output.
 
@@ -348,9 +411,20 @@ class VehicleEvidence(_Model):
     heading_deg: float
     stationary: bool
     dist_to_base_m: dict[str, Optional[float]]
-    zones: list[ZoneEvidence] = Field(default_factory=list)
+    zones: list[ZoneEvidence] = Field(default_factory=list)  # observation sectors, context only
     baseline_level: Level
     reasons: list[str] = Field(default_factory=list)
+    sector_id: Optional[str] = None
+    sector_name: Optional[str] = None
+    base: Optional[BaseEvidence] = None
+    behaviour: Optional[BehaviourEvidence] = None
+    category: Optional[ThreatCategory] = None
+    likelihood: Optional[Likelihood] = None
+    signals: list[str] = Field(default_factory=list)
+    # How much independent evidence stands behind the threat: the sum of these terms.
+    confidence: Optional[float] = None
+    confidence_terms: list[tuple[str, float]] = Field(default_factory=list)
+    threat_flags: list[str] = Field(default_factory=list)
 
 
 class UntrackedDetection(_Model):
@@ -394,6 +468,11 @@ class ReportEvidence(_Model):
     consistency: Optional[ReportConsistency] = None
     consistency_note: Optional[str] = None
     trust_note: Optional[str] = None
+    motion: Optional[ReportMotion] = None
+    verdict: Optional[ReportVerdict] = None
+    checks: list[ClaimCheck] = Field(default_factory=list)
+    scenario: Optional[str] = None
+    needs_identity_check: bool = False
 
 
 class ImageEvidence(_Model):

@@ -9,7 +9,8 @@ with, because they are derived from config and nothing else:
 
 * ``thresholds_version`` - hash of the ``detection`` block; stamped on Detections.
 * ``rules_version``      - hash of the ``warning`` + ``zones`` + ``matching`` +
-                           ``kinematics`` blocks; stamped on Alerts and Matches.
+                           ``kinematics`` + ``base`` + ``threat`` blocks; stamped
+                           on Alerts and Matches.
 
 Changing a threshold therefore changes the version string, and an alert can
 always be traced to the exact numbers that produced it.
@@ -26,7 +27,7 @@ from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 __all__ = ["Config", "load_config", "ConfigError", "SttConfig", "VoiceConfig"]
 
@@ -66,7 +67,10 @@ class MatchingConfig(_Frozen):
     duplicate_radius_m: float = Field(12.0, ge=0)
     nn_reference_gate_m: float = Field(60.0, gt=0)
     report_gate_m: float = Field(150.0, gt=0)
-    report_time_window_min: int = Field(15, gt=0)
+    # A report is filed up to two hours before the image it belongs to (measured);
+    # the window is the two hours an image's tracks cover.
+    report_lookback_min: int = Field(120, gt=0)
+    report_claim_radius_m: float = Field(50.0, gt=0)  # the vehicles a report's type and count are about
 
 
 class KinematicsConfig(_Frozen):
@@ -85,6 +89,38 @@ class ZonesConfig(_Frozen):
 
     def buffer_for(self, zone_name: str) -> float:
         return float(self.overrides.get(zone_name, {}).get("buffer_m", self.default_buffer_m))
+
+
+class BaseConfig(_Frozen):
+    """The protected asset's rings (team decision, 2026-09-27).
+
+    Merkez Us is what the system protects; the eight zones are observation
+    sectors around it. The observation ring is where those sectors sit (measured
+    3.19-3.20 km), so crossing inward from it is the transition that matters.
+    """
+
+    critical_radius_m: float = Field(1000.0, gt=0)
+    warning_radius_m: float = Field(2000.0, gt=0)
+    observation_radius_m: float = Field(3200.0, gt=0)
+
+    @model_validator(mode="after")
+    def _rings_nest(self) -> "BaseConfig":
+        if not self.critical_radius_m < self.warning_radius_m < self.observation_radius_m:
+            raise ValueError("base rings must nest: critical < warning < observation")
+        return self
+
+
+class ThreatConfig(_Frozen):
+    """When whole-record behaviour counts as an approach or as surveillance."""
+
+    approach_window_min: int = Field(60, gt=0)
+    approach_min_closing_m: float = Field(1500.0, gt=0)
+    approach_heading_cos: float = Field(0.7, ge=-1, le=1)
+    circling_min_sweep_deg: float = Field(90.0, gt=0)
+    circling_strong_sweep_deg: float = Field(180.0, gt=0)
+    circling_max_range_spread: float = Field(0.35, gt=0)
+    loiter_min: float = Field(30.0, gt=0)
+    dwell_radius_m: float = Field(3000.0, gt=0)
 
 
 class WarningConfig(_Frozen):
@@ -225,6 +261,8 @@ class Config(_Frozen):
     matching: MatchingConfig = MatchingConfig()
     kinematics: KinematicsConfig = KinematicsConfig()
     zones: ZonesConfig = ZonesConfig()
+    base: BaseConfig = BaseConfig()
+    threat: ThreatConfig = ThreatConfig()
     warning: WarningConfig = WarningConfig()
     sim: SimConfig = SimConfig()
     agents: AgentsConfig
@@ -315,6 +353,8 @@ def load_config(path: str | Path | None = None, *, load_env: bool = True) -> Con
             "zones": raw.get("zones", {}),
             "matching": raw.get("matching", {}),
             "kinematics": raw.get("kinematics", {}),
+            "base": raw.get("base", {}),
+            "threat": raw.get("threat", {}),
         }
     )
 
