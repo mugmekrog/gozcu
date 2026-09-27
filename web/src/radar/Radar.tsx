@@ -36,6 +36,7 @@ import {
   type PointerEvent,
 } from 'react';
 import { GridLayer } from './GridLayer';
+import { ChartFurniture } from './ChartFurniture';
 import { Attribution, BasemapLabels, BasemapLayer, OperationArea } from './BasemapLayer';
 import { RouteLayer } from './RouteLayer';
 import { HeatLayer } from './HeatLayer';
@@ -507,17 +508,11 @@ export const Radar = memo(function Radar() {
       </g>
 
       {basemap && <Attribution text={basemap.attribution} />}
-      <text
-        x={VIEW.w - 20}
-        y={26}
-        fontSize={13}
-        fontWeight={700}
-        textAnchor="end"
-        fill="var(--ink)"
-        aria-hidden="true"
-      >
-        K ↑
-      </text>
+      <ChartFurniture
+        projection={projection}
+        base={dataset.base}
+        ground={basemap ? 'var(--map-land)' : 'var(--surface-map)'}
+      />
       {/* The density toggle. Small, semi-transparent, bottom-right -- and it
           states which view is on and which zone the field is pointing at, so the
           control explains its own state rather than just holding an icon
