@@ -12,8 +12,9 @@ from datetime import timedelta
 import numpy as np
 import pytest
 
-from goru_core.schemas import ENU, LatLon, Level, TrackState
+from goru_core.schemas import ENU, LatLon, Level, SourceRefModel, TrackPoint, TrackState
 from goru_core.timeline import Timeline, TimeFormatError
+from app.kinematics.profile import track_profile
 from app.perception.postprocess import class_agnostic_nms
 from app.risk.engine import Hysteresis, ReportSupport, RuleEngine
 from app.risk.zones import assess_zones, most_likely_destination
@@ -400,3 +401,133 @@ def test_alerts_are_ordered_and_stamped(analyses, cfg):
             assert alert.rules_version == cfg.rules_version
             assert alert.status == "open"
             assert alert.level is not Level.CLEAR
+
+
+# --- trajectory profile (app/kinematics/profile.py) ------------------------- #
+
+
+def _straight_track(speeds_mps: list[float], step_s: float = 300.0) -> list[TrackPoint]:
+    """A track heading due east, one step per entry in `speeds_mps`."""
+    from datetime import datetime, timedelta, timezone
+
+    t0 = datetime(2024, 5, 1, 12, 0, tzinfo=timezone.utc)
+    ref = SourceRefModel(file_name="synthetic", file_sha256="0" * 64, record_key="T0001")
+    points, e = [], 0.0
+    for i, speed in enumerate([0.0, *speeds_mps]):
+        e += speed * step_s
+        points.append(
+            TrackPoint(
+                track_id="T0001",
+                ts=t0 + timedelta(seconds=i * step_s),
+                lat=39.9,
+                lon=32.8,
+                e_m=e,
+                n_m=0.0,
+                source_ref=ref,
+            )
+        )
+    return points
+
+
+def test_track_profile_measures_the_whole_history():
+    profile = track_profile(_straight_track([10.0, 10.0, 10.0, 10.0]))
+    assert profile is not None
+    assert profile.n_steps == 4
+    assert profile.speed_mean_mps == pytest.approx(10.0)
+    assert profile.speed_max_mps == pytest.approx(10.0)
+    assert profile.moving_fraction == 1.0
+    assert profile.total_distance_m == pytest.approx(12000.0)
+
+
+def test_track_profile_separates_a_waiting_vehicle_from_a_steady_one():
+    """Same mean speed, very different behaviour - this is what the agent reads."""
+    steady = track_profile(_straight_track([2.0] * 8))
+    waited = track_profile(_straight_track([0.0] * 6 + [8.0, 8.0]))
+    assert steady.speed_mean_mps == pytest.approx(waited.speed_mean_mps)
+    assert waited.moving_fraction < steady.moving_fraction
+    assert waited.speed_max_mps > steady.speed_max_mps
+
+
+def test_track_profile_needs_enough_fixes():
+    assert track_profile(_straight_track([5.0])) is None
+
+
+def _walk(offsets: list[tuple[float, float]], step_s: float = 300.0) -> list[TrackPoint]:
+    """A track visiting each (e_m, n_m) in turn, one step apart."""
+    from datetime import datetime, timedelta, timezone
+
+    t0 = datetime(2024, 5, 1, 12, 0, tzinfo=timezone.utc)
+    ref = SourceRefModel(file_name="synthetic", file_sha256="0" * 64, record_key="T0002")
+    return [
+        TrackPoint(
+            track_id="T0002",
+            ts=t0 + timedelta(seconds=i * step_s),
+            lat=39.9,
+            lon=32.8,
+            e_m=e,
+            n_m=n,
+            source_ref=ref,
+        )
+        for i, (e, n) in enumerate(offsets)
+    ]
+
+
+def test_profile_stop_structure_separates_one_long_wait_from_many_short_ones():
+    one_long = track_profile(_straight_track([0.0] * 6 + [5.0] * 6))
+    many_short = track_profile(_straight_track([0.0, 5.0] * 6))
+    assert one_long.moving_fraction == pytest.approx(many_short.moving_fraction)
+    assert one_long.stop_count == 1
+    assert many_short.stop_count > one_long.stop_count
+    assert one_long.longest_stop_min > many_short.longest_stop_min
+
+
+def test_profile_straightness_separates_a_beeline_from_a_wander():
+    beeline = track_profile(_walk([(0, 0), (1000, 0), (2000, 0), (3000, 0)]))
+    wander = track_profile(_walk([(0, 0), (1000, 0), (1000, 1000), (0, 1000)]))
+    assert beeline.straightness == pytest.approx(1.0)
+    assert wander.straightness < 0.5
+    assert wander.heading_change_deg > beeline.heading_change_deg
+
+
+def test_profile_counts_a_doubling_back_as_a_reversal():
+    there_and_back = track_profile(_walk([(0, 0), (1000, 0), (2000, 0), (1000, 0), (0, 0)]))
+    assert there_and_back.reversals == 1
+
+
+def test_profile_reads_a_sustained_approach_to_base():
+    """Base is the ENU origin, so the range is just the distance from (0, 0)."""
+    closing = track_profile(_walk([(5000, 0), (4000, 0), (3000, 0), (2000, 0), (1000, 0)]))
+    assert closing.base_closing_rate_mps > 0  # positive = closing
+    assert closing.closing_step_fraction == pytest.approx(1.0)
+    assert closing.base_range_start_m == pytest.approx(5000.0)
+    assert closing.base_range_min_m == pytest.approx(1000.0)
+
+    leaving = track_profile(_walk([(1000, 0), (2000, 0), (3000, 0), (4000, 0)]))
+    assert leaving.base_closing_rate_mps < 0
+    assert leaving.closing_step_fraction == pytest.approx(0.0)
+
+
+def test_behaviour_flags_are_silent_on_ordinary_stop_and_go():
+    """The median track in the shipped day moves ~25% of the window and reverses
+    once. Thresholds are calibrated so that shape earns no flag."""
+    ordinary = track_profile(_straight_track([0.0, 0.0, 0.0, 4.0, 0.0, 0.0, 4.0, 0.0]))
+    assert ordinary.behaviour == []
+
+
+def test_waited_then_moved_needs_a_long_halt_and_a_real_burst():
+    waited = track_profile(_straight_track([0.0] * 20 + [20.0, 20.0]))
+    assert "waited_then_moved" in waited.behaviour
+
+
+def test_sustained_approach_needs_most_steps_to_close_the_range():
+    closing = track_profile(_walk([(6000 - 500 * i, 0.0) for i in range(11)]))
+    assert "sustained_approach_to_base" in closing.behaviour
+    # The same distance covered away from base is not an approach.
+    leaving = track_profile(_walk([(1000 + 500 * i, 0.0) for i in range(11)]))
+    assert "sustained_approach_to_base" not in leaving.behaviour
+
+
+def test_a_single_reversal_is_not_yet_doubled_back():
+    once = track_profile(_walk([(0, 0), (1000, 0), (2000, 0), (1000, 0), (0, 0)]))
+    assert once.reversals == 1
+    assert "doubled_back" not in once.behaviour

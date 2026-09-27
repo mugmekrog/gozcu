@@ -23,6 +23,8 @@ from goru_core.config import Config
 from goru_core.geo import bearing_deg
 from goru_core.schemas import ENU, LatLon, TrackPoint, TrackState
 
+from app.kinematics.profile import track_profile
+
 __all__ = ["track_state", "recent_positions"]
 
 
@@ -112,6 +114,7 @@ def track_state(
         class_conf=class_conf,
         dist_to_base_m=_distance_to_base_series(ordered, as_of),
         outlier_steps=outliers,
+        profile=track_profile(ordered),
     )
 
 

@@ -97,6 +97,27 @@ def _rank_zones(assessments: Sequence[ZoneAssessment]) -> list[ZoneAssessment]:
     )
 
 
+def _keep_driving_zone(
+    ranked: Sequence[ZoneAssessment], limit: int, driving_zone_id: str | None
+) -> list[ZoneAssessment]:
+    """Trim to `limit`, but never drop the zone the baseline verdict rests on.
+
+    The verdict's `reasons` quote that zone's geometry, and the agent is told to
+    treat the baseline as a floor. Ranking can push it past the cut - a vehicle
+    inside two buffers has both ahead of the zone whose CPA actually fired the
+    rule - and the agent then sees a level it cannot justify from the evidence,
+    which `check_zone_scope` rejects as reasoning about an unlisted zone.
+    MEASURED: the model reported exactly this on T0032 and T0122 of img_000860.
+    """
+    kept = list(ranked[:limit])
+    if driving_zone_id is None or any(z.zone_id == driving_zone_id for z in kept):
+        return kept
+    driving = next((z for z in ranked if z.zone_id == driving_zone_id), None)
+    if driving is None:
+        return kept
+    return [*kept[: max(0, limit - 1)], driving]
+
+
 def build_bundle(
     analysis: ImageAnalysis,
     cfg: Config,
@@ -122,7 +143,11 @@ def build_bundle(
         match_row = None
         if analysis.match:
             match_row = next((m for m in analysis.match.matches if m.track_id == track_id), None)
-        ranked = _rank_zones(analysis.zone_assessments.get(track_id, []))[:zones_per_vehicle]
+        ranked = _keep_driving_zone(
+            _rank_zones(analysis.zone_assessments.get(track_id, [])),
+            zones_per_vehicle,
+            verdict.zone_id if verdict else None,
+        )
         vehicles.append(
             VehicleEvidence(
                 track_id=track_id,
@@ -140,6 +165,7 @@ def build_bundle(
                     key: (None if value is None else round(value, 1))
                     for key, value in state.dist_to_base_m.items()
                 },
+                profile=state.profile,
                 zones=[_zone_evidence(a, zone_names) for a in ranked],
                 baseline_level=verdict.level if verdict else Level.CLEAR,
                 reasons=list(verdict.reasons) if verdict else [],
