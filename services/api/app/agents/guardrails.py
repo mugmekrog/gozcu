@@ -220,6 +220,16 @@ def vehicle_numbers(bundle: EvidenceBundle, track_id: str) -> set[float]:
                 float(record.stop_spells),
             ):
                 _admit_into(values, value)
+        if vehicle.map_match is not None:
+            match = vehicle.map_match
+            for value in (match.median_offset_m, match.route_length_m):
+                _admit_into(values, value, "distance")
+            for value in (
+                float(match.n_fixes),
+                float(match.n_matched),
+                match.matched_fraction,
+            ):
+                _admit_into(values, value)
         _admit_into(values, vehicle.confidence)
         if vehicle.profile is not None:
             for key, value in vehicle.profile.model_dump().items():

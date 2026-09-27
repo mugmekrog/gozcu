@@ -39,6 +39,7 @@ import { GridLayer } from './GridLayer';
 import { ChartFurniture } from './ChartFurniture';
 import { Attribution, BasemapLabels, BasemapLayer, OperationArea } from './BasemapLayer';
 import { RouteLayer } from './RouteLayer';
+import { RoadMatchLayer } from './RoadMatchLayer';
 import { HeatLayer } from './HeatLayer';
 import { BaseLayer, ZoneLayer } from './ZoneLayer';
 import { ZoneSectorLayer } from './ZoneSectorLayer';
@@ -48,6 +49,7 @@ import { framesOverZone, framesUpTo, liveVehiclesAt, nearestZoneId, type LiveVeh
 import { MAX_SCALE, MIN_SCALE, projectionFor, VIEW } from '@/domain/polar';
 import { operationArea, visibleBox } from '@/domain/basemap';
 import { activityOf } from '@/domain/activity';
+import { matchedTrace } from '@/domain/roadMatch';
 import {
   blobsOf,
   densestZone,
@@ -369,6 +371,14 @@ export const Radar = memo(function Radar() {
       : null;
   }, [dataset, heatOn, layers.routes, selectedTrackId, vehicles, trackIndex, tMin]);
 
+  /** The selected vehicle's snapped trace, on the same terms as its route. */
+  const roadTrace = useMemo(() => {
+    if (!layers.roadmatch || heatOn || !selectedTrackId) return null;
+    if (!vehicles.some((vehicle) => vehicle.trackId === selectedTrackId)) return null;
+    const history = trackIndex.get(selectedTrackId);
+    return history ? matchedTrace(history, tMin) : null;
+  }, [layers.roadmatch, heatOn, selectedTrackId, vehicles, trackIndex, tMin]);
+
   /** Zones any live ALERT names. Drives the pulse. */
   const alertingZones = useMemo(() => {
     const out = new Set<string>();
@@ -501,6 +511,8 @@ export const Radar = memo(function Radar() {
             originIso={dataset.origin_ts}
           />
         )}
+        {/* Over the raw route: the daylight between the two is the point. */}
+        {roadTrace && <RoadMatchLayer trace={roadTrace} projection={projection} />}
         {layers.vehicles && <g className={heatOn ? 'radar-vehicles radar-vehicles--dimmed' : 'radar-vehicles'}>
           <VehicleLayer
             vehicles={vehicles}

@@ -117,6 +117,28 @@ export interface TrackHistory {
   t: number[];
   e: number[];
   n: number[];
+  /**
+   * The same fixes snapped to the OSM road network, parallel to `t`/`e`/`n`.
+   * Null at a fix that matched no road -- about half of them, so the matched
+   * path is drawn as runs with gaps rather than one line. Absent entirely when
+   * the fixtures were baked without a road network.
+   */
+  me?: (number | null)[];
+  mn?: (number | null)[];
+  /** Named roads in order of travel, repeats collapsed. */
+  roads?: string[];
+  matched_fraction?: number;
+  median_offset_m?: number;
+  /** "graph" when the route was found on the OSM topology, "geometry" when not. */
+  match_method?: string;
+  route_length_m?: number;
+  /**
+   * The route driven between consecutive matched fixes, from the graph. `from`
+   * is the index of the leg's first fix; `pts` is [e0, n0, e1, n1, ...] along
+   * the roads. A pair the router could not join has no leg, so the path breaks
+   * rather than cutting through buildings.
+   */
+  legs?: { from: number; pts: number[] }[];
 }
 
 export interface Detection {

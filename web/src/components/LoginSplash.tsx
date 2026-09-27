@@ -42,7 +42,7 @@ export const LoginSplash = memo(function LoginSplash() {
       aria-live="polite"
     >
       <div className="login-splash__mark">
-        <BrandMark height={132} wordmark />
+        <BrandMark height={168} cut="lockup" wordmark />
       </div>
       <p className="login-splash__status">{T.login.signingIn}</p>
       <div className="login-splash__bar" aria-hidden="true">

@@ -25,7 +25,7 @@ describe('LoginSplash', () => {
     vi.useFakeTimers();
     render(<LoginSplash />);
     const mark = screen.getByAltText('SUYLA') as HTMLImageElement;
-    expect(mark.getAttribute('src')).toBe('/logo-suyla.png');
+    expect(mark.getAttribute('src')).toBe('/logo-suyla.jpg');
 
     act(() => void mark.dispatchEvent(new Event('error')));
     expect(screen.queryByAltText('SUYLA')).toBeNull();

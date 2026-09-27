@@ -73,6 +73,21 @@ class MatchingConfig(_Frozen):
     report_claim_radius_m: float = Field(50.0, gt=0)  # the vehicles a report's type and count are about
 
 
+class RoadsConfig(_Frozen):
+    """Map matching (app/roads). `basemap_json` is the file the web app ships."""
+
+    enabled: bool = True
+    #: The routing graph (web/scripts/export_roadgraph.py). When it is present
+    #: matching runs the real HMM on the topology; when it is not, the engine
+    #: falls back to the geometry in `basemap_json`.
+    graph_json: str = "data/processed/roadgraph.json"
+    basemap_json: str = "web/public/basemap/ankara.json"
+    sigma_m: float = Field(20.0, gt=0)
+    gate_m: float = Field(30.0, gt=0)
+    beta_m: float = Field(120.0, gt=0)
+    same_way_bonus: float = Field(1.2, ge=0)
+
+
 class KinematicsConfig(_Frozen):
     fit_points: int = Field(4, ge=2)
     stationary_disp_m: float = Field(25.0, ge=0)
@@ -261,6 +276,7 @@ class Config(_Frozen):
     detection: DetectionConfig = DetectionConfig()
     matching: MatchingConfig = MatchingConfig()
     kinematics: KinematicsConfig = KinematicsConfig()
+    roads: RoadsConfig = RoadsConfig()
     zones: ZonesConfig = ZonesConfig()
     base: BaseConfig = BaseConfig()
     threat: ThreatConfig = ThreatConfig()

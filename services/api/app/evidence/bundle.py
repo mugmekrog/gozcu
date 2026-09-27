@@ -165,6 +165,21 @@ def _keep_driving_zone(
     return [*kept[: max(0, limit - 1)], driving]
 
 
+def _match_summary(match):
+    """The map match, without the geometry.
+
+    The bundle is what an LLM reads. The per-fix trail is 25 snapped positions
+    per vehicle and the routed legs are hundreds of points, and neither says
+    anything the summary fields and the road names do not -- they exist so the
+    map can draw the path. Both stay on the TrackState and come out here.
+    MEASURED: leaving the legs in pushed the busiest image's bundle past the
+    8k-token ceiling test_agents.py holds it to.
+    """
+    if match is None:
+        return None
+    return match.model_copy(update={"fixes": [], "legs": []})
+
+
 def build_bundle(
     analysis: ImageAnalysis,
     cfg: Config,
@@ -214,6 +229,7 @@ def build_bundle(
                     for key, value in state.dist_to_base_m.items()
                 },
                 profile=state.profile,
+                map_match=_match_summary(state.map_match),
                 zones=[_zone_evidence(a, zone_names) for a in ranked],
                 baseline_level=verdict.level if verdict else Level.CLEAR,
                 reasons=list(verdict.reasons) if verdict else [],

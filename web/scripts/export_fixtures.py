@@ -64,6 +64,10 @@ from app.evidence.bundle import ImageAnalysis  # noqa: E402
 from app.ingest.loaders import Dataset, load_dataset  # noqa: E402
 from app.pipeline import Pipeline  # noqa: E402
 from app.risk.engine import BaselineVerdict  # noqa: E402
+from app.roads import load_network, match_track  # noqa: E402
+from app.roads.graph import load_graph  # noqa: E402
+from app.roads.graphmatch import GraphMatchParams, match_on_graph  # noqa: E402
+from app.roads.mapmatch import MatchParams  # noqa: E402
 
 OUT_DIR = REPO_ROOT / "web" / "public" / "fixtures"
 
@@ -601,6 +605,63 @@ def export(cfg_path: Path, with_images: bool) -> dict[str, Any]:
             if state.image_id:
                 track_frame[track_id] = state.image_id
 
+    # Map matching: the same fixes snapped to the OSM road network, as parallel
+    # arrays alongside the raw ones so the map can draw both. Null where a fix
+    # matched nothing -- about half of them here, see app/roads/mapmatch.py.
+    graph = None
+    network = None
+    graph_path = cfg.resolve(cfg.roads.graph_json)
+    roads_path = cfg.resolve(cfg.roads.basemap_json)
+    if cfg.roads.enabled and graph_path.exists():
+        graph = load_graph(graph_path)
+    elif cfg.roads.enabled and roads_path.exists():
+        network = load_network(roads_path)
+
+    def matched_arrays(points: list) -> dict[str, Any]:
+        """Snapped fixes plus, on the graph, the route driven between them.
+
+        `legs` is what the map draws as a path: without it the matched track is
+        a scatter of snapped points, which is what the geometry-only fallback
+        can offer and no more.
+        """
+        if graph is not None:
+            match = match_on_graph(
+                points,
+                graph,
+                params=GraphMatchParams(
+                    sigma_m=cfg.roads.sigma_m, gate_m=cfg.roads.gate_m, beta_m=cfg.roads.beta_m
+                ),
+                with_legs=True,
+            )
+        elif network is not None:
+            match = match_track(
+                points,
+                network,
+                params=MatchParams(
+                    sigma_m=cfg.roads.sigma_m,
+                    gate_m=cfg.roads.gate_m,
+                    beta_m=cfg.roads.beta_m,
+                    same_way_bonus=cfg.roads.same_way_bonus,
+                ),
+            )
+        else:
+            return {}
+        if match is None:
+            return {}
+        return {
+            "me": [None if f.e_m is None else r(f.e_m) for f in match.fixes],
+            "mn": [None if f.n_m is None else r(f.n_m) for f in match.fixes],
+            "roads": match.roads,
+            "matched_fraction": match.matched_fraction,
+            "median_offset_m": match.median_offset_m,
+            "match_method": match.method,
+            "route_length_m": match.route_length_m,
+            "legs": [
+                {"from": leg.from_index, "pts": [c for point in leg.points for c in point]}
+                for leg in match.legs
+            ],
+        }
+
     tracks_payload = {
         "origin_ts": origin.isoformat(),
         "tracks": [
@@ -611,6 +672,7 @@ def export(cfg_path: Path, with_images: bool) -> dict[str, Any]:
                 "t": [minutes_from(origin, p.ts) for p in points],
                 "e": [r(p.e_m) for p in points],
                 "n": [r(p.n_m) for p in points],
+                **matched_arrays(points),
             }
             for track_id, points in sorted(dataset.tracks.items())
         ],

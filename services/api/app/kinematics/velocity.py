@@ -24,8 +24,52 @@ from goru_core.geo import bearing_deg
 from goru_core.schemas import ENU, LatLon, TrackPoint, TrackState
 
 from app.kinematics.profile import track_profile
+from app.roads import load_network, match_track
+from app.roads.graph import load_graph
+from app.roads.graphmatch import GraphMatchParams, match_on_graph
+from app.roads.mapmatch import MatchParams
 
 __all__ = ["track_state", "recent_positions"]
+
+
+def _map_match(points, cfg: Config):
+    """Snap the track to the road network.
+
+    The routing graph first: with it the matcher runs the real HMM on the OSM
+    topology and can hand back the path driven. Without it -- a deployment that
+    never ran export_roadgraph.py -- this falls back quietly to geometry-only
+    matching against the basemap, which still names roads but cannot route. If
+    neither file is there, no match, and nothing else changes: the engine's own
+    answers never depend on this.
+    """
+    if not cfg.roads.enabled:
+        return None
+
+    graph_path = cfg.resolve(cfg.roads.graph_json)
+    if graph_path.exists():
+        return match_on_graph(
+            points,
+            load_graph(graph_path),
+            params=GraphMatchParams(
+                sigma_m=cfg.roads.sigma_m,
+                gate_m=cfg.roads.gate_m,
+                beta_m=cfg.roads.beta_m,
+            ),
+        )
+
+    path = cfg.resolve(cfg.roads.basemap_json)
+    if not path.exists():
+        return None
+    return match_track(
+        points,
+        load_network(path),
+        params=MatchParams(
+            sigma_m=cfg.roads.sigma_m,
+            gate_m=cfg.roads.gate_m,
+            beta_m=cfg.roads.beta_m,
+            same_way_bonus=cfg.roads.same_way_bonus,
+        ),
+    )
 
 
 def _fit_velocity(times_s: np.ndarray, values_m: np.ndarray) -> float:
@@ -115,6 +159,7 @@ def track_state(
         dist_to_base_m=_distance_to_base_series(ordered, as_of),
         outlier_steps=outliers,
         profile=track_profile(ordered),
+        map_match=_map_match(ordered, cfg),
     )
 
 

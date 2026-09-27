@@ -198,6 +198,68 @@ class TrackProfile(_Model):
     )
 
 
+class RoadFix(_Model):
+    """One track fix, snapped to the road network - or not.
+
+    `matched` false means no mapped road came within the gate. That is not a
+    failure to report: the fix is where it is, and inventing the nearest street
+    name for it would be worse than saying nothing.
+    """
+
+    ts: datetime
+    matched: bool
+    road_name: Optional[str] = None
+    road_class: Optional[str] = None
+    #: The snapped position, ENU metres. None when unmatched.
+    e_m: Optional[float] = None
+    n_m: Optional[float] = None
+    #: How far the raw fix sat from the road it was snapped to.
+    offset_m: Optional[float] = None
+    #: Compass bearing of the road itself, which is where a vehicle on it can go.
+    road_bearing_deg: Optional[float] = None
+
+
+class RouteLeg(_Model):
+    """The driven route between two consecutive matched fixes.
+
+    Present only where the graph found a route inside its budget. This is what
+    makes a matched track a path along streets rather than a scatter of snapped
+    points, so a leg is never invented: a pair the router could not join leaves
+    a gap, and the gap is drawn.
+    """
+
+    from_index: int
+    length_m: float
+    #: ENU metres, [[e, n], ...] along the roads driven.
+    points: list[list[float]] = Field(default_factory=list)
+
+
+class MapMatch(_Model):
+    """A track's fixes against the road network (see app/roads/mapmatch.py).
+
+    Read `matched_fraction` before reading `roads`. A low fraction means the
+    track spent its time away from mapped roads, and the names below describe
+    only the part that was on one.
+    """
+
+    n_fixes: int
+    n_matched: int
+    matched_fraction: float = Field(ge=0, le=1)
+    median_offset_m: float = 0.0
+    roads: list[str] = Field(
+        default_factory=list, description="named roads in order of travel, repeats collapsed"
+    )
+    #: How the match was made: "graph" routes on the OSM topology (the real HMM
+    #: transition), "geometry" falls back to straight-line distance when no
+    #: graph is deployed. Read it before trusting `legs`.
+    method: str = "geometry"
+    #: Total length of the routed legs. Not the distance the vehicle travelled:
+    #: it covers only the pairs of fixes the router could join.
+    route_length_m: float = 0.0
+    legs: list[RouteLeg] = Field(default_factory=list)
+    fixes: list[RoadFix] = Field(default_factory=list)
+
+
 class TrackState(_Model):
     track_id: str
     as_of_ts: datetime
@@ -216,6 +278,7 @@ class TrackState(_Model):
     )
     outlier_steps: int = 0
     profile: Optional[TrackProfile] = None
+    map_match: Optional[MapMatch] = None
 
 
 class Zone(_Model):
@@ -450,6 +513,7 @@ class VehicleEvidence(_Model):
     stationary: bool
     dist_to_base_m: dict[str, Optional[float]]
     profile: Optional[TrackProfile] = None
+    map_match: Optional[MapMatch] = None
     zones: list[ZoneEvidence] = Field(default_factory=list)  # observation sectors, context only
     baseline_level: Level
     reasons: list[str] = Field(default_factory=list)

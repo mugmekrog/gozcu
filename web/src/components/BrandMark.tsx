@@ -1,18 +1,31 @@
 /* The SUYLA mark, in one place so the header and the sign-in screen agree.
  *
- * It prefers the real artwork at /logo-suyla.png. Until that file is in
- * web/public it draws the stand-in below -- an approximation of the mark
- * (shield, spread wings, eagle) simplified to what survives at 24 px in a
- * header. Dropping the real file in replaces it everywhere, with no code
- * change: the <img> stops erroring and wins.
+ * Two cuts of the same artwork, because one does not serve both places. The
+ * full lockup carries the wordmark under the emblem and is what the sign-in
+ * shows at 132 px. The header has 26 px of height, where that wordmark is
+ * four pixels tall and reads as a smudge, so it gets the emblem alone and the
+ * name is set in the interface's own type beside it.
+ *
+ * If a file is missing the drawn stand-in below takes over -- an approximation
+ * (shield, spread wings, eagle) simplified to what survives at header size.
  */
 
 import { memo, useState } from 'react';
 import { T } from '@/domain/strings';
 
+export type BrandCut = 'lockup' | 'mark';
+
+/** Emblem plus wordmark, or the emblem on its own. */
+const FILES: Record<BrandCut, string> = {
+  lockup: '/logo-suyla.jpg',
+  mark: '/logo-suyla-mark.png',
+};
+
 export interface BrandMarkProps {
   /** Rendered height in pixels. The mark keeps its own aspect. */
   height: number;
+  /** Which cut of the artwork to show. Defaults to the emblem alone. */
+  cut?: BrandCut;
   className?: string;
   /**
    * Set the name beneath the stand-in. Only the stand-in: the real artwork
@@ -36,6 +49,7 @@ const EAGLE = 'M72 23 L80 11 L90 13 L95 20 L106 24 L95 29 L85 31 L74 29 Z';
 
 export const BrandMark = memo(function BrandMark({
   height,
+  cut = 'mark',
   className,
   wordmark = false,
 }: BrandMarkProps) {
@@ -45,7 +59,7 @@ export const BrandMark = memo(function BrandMark({
     return (
       <img
         className={className}
-        src="/logo-suyla.png"
+        src={FILES[cut]}
         alt={T.login.brand}
         style={{ height, width: 'auto' }}
         onError={() => setMissing(true)}
