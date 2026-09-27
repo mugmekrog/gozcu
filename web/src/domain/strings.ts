@@ -56,16 +56,16 @@ export const T = {
   },
 
   heat: {
-    name: 'SEKTÖR HAREKETLİLİĞİ',
-    title: 'Sektör hareketliliği',
+    name: 'ISI HARİTASI',
+    title: 'Isı haritası',
     /* Against the worst pressure any zone carried all day, so the figure means
      * something on its own rather than only in comparison with the map. */
     densest: (zone: string, pct: number) => `EN YOĞUN · ${zone} · %${pct}`,
     quiet: 'YOĞUNLUK YOK',
-    toOn: 'Sektör hareketliliğini göster',
-    toOff: 'Sektör hareketliliğini kapat: araç görünümüne dön',
-    legend: 'Sektör hareketliliği',
-    ramp: 'Sektör hareketliliği: açıktan koyuya',
+    toOn: 'Isı haritasına geç: bölge yoğunluğunu göster',
+    toOff: 'Isı haritasını kapat: araç görünümüne dön',
+    legend: 'Yoğunluk',
+    ramp: 'Yoğunluk: açıktan koyuya',
   },
 
   layers: {

@@ -68,7 +68,7 @@ export const LAYER_GROUPS: MapLayerGroup[] = [
   {
     title: 'VERİ',
     layers: [
-      { id: 'heat', name: 'Sektör hareketliliği', description: 'Sektör yoğunluğu' },
+      { id: 'heat', name: 'Isı haritası', description: 'Araç yoğunluğu' },
       { id: 'zones', name: 'Bölgeler', description: 'Bölge ve tampon' },
       { id: 'frames', name: 'Görüntü kareleri', description: 'Drone kareleri' },
       { id: 'routes', name: 'Rota ve iz', description: 'Ham geçmiş yol' },
