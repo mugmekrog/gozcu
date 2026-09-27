@@ -1,0 +1,89 @@
+.login-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-5);
+  background: var(--surface);
+  opacity: 1;
+  transition: opacity 320ms var(--ease);
+}
+
+.login-splash[data-leaving] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.login-splash__mark img {
+  display: block;
+  width: min(280px, 56vw);
+  max-height: 40vh;
+  height: auto;
+  object-fit: contain;
+}
+
+/* The drawn stand-in and its name, until logo-suyla.png is dropped into
+ * web/public. Set as the real mark sets it: heavy and widely tracked. */
+.brand-mark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
+  color: var(--ink);
+}
+
+.brand-mark__wordmark {
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-indent: 0.18em;
+  line-height: 1;
+}
+
+.login-splash__status {
+  font-size: var(--text-micro);
+  font-weight: 700;
+  letter-spacing: var(--tracking-label);
+  color: var(--ink-muted);
+  text-transform: uppercase;
+}
+
+/* Determinate: the wait is a fixed two seconds, so the bar says two seconds. */
+.login-splash__bar {
+  width: min(220px, 46vw);
+  height: 2px;
+  background: var(--hairline);
+  overflow: hidden;
+}
+
+.login-splash__bar i {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--ink);
+  transform-origin: left;
+  animation: login-fill linear forwards;
+}
+
+@keyframes login-fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+.login-splash__note {
+  font-size: var(--text-micro);
+  color: var(--ink-faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-splash {
+    transition: none;
+  }
+  .login-splash__bar i {
+    animation: none;
+    transform: scaleX(1);
+  }
+}

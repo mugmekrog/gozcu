@@ -41,6 +41,7 @@ import { Attribution, BasemapLabels, BasemapLayer, OperationArea } from './Basem
 import { RouteLayer } from './RouteLayer';
 import { HeatLayer } from './HeatLayer';
 import { BaseLayer, ZoneLayer } from './ZoneLayer';
+import { ZoneSectorLayer } from './ZoneSectorLayer';
 import { FrameLayer } from './FrameLayer';
 import { VehicleLayer } from './VehicleLayer';
 import { framesOverZone, framesUpTo, liveVehiclesAt, nearestZoneId, type LiveVehicle } from '@/domain/live';
@@ -119,20 +120,21 @@ export const Radar = memo(function Radar() {
   const scaleKm = useAppStore((s) => s.scaleKm);
   const zoneFilter = useAppStore((s) => s.zoneFilter);
   const classFilter = useAppStore((s) => s.classFilter);
+  const levelFilter = useAppStore((s) => s.levelFilter);
   const selectedTrackId = useAppStore((s) => s.selectedTrackId);
   const hoveredTrackId = useAppStore((s) => s.hoveredTrackId);
   const pins = useAppStore((s) => s.pins);
   const selectedFrameId = useAppStore((s) => s.selectedFrameId);
   const frame = useAppStore((s) => s.frame);
-  const heatOn = useAppStore((s) => s.heatOn);
+  const layers = useAppStore((s) => s.layers);
   const basemap = useAppStore((s) => s.basemap);
+  const heatOn = layers.heat;
 
   const selectTrack = useAppStore((s) => s.selectTrack);
   const hoverTrack = useAppStore((s) => s.hoverTrack);
   const openFrame = useAppStore((s) => s.openFrame);
   const setZoneFilter = useAppStore((s) => s.setZoneFilter);
   const setZoom = useAppStore((s) => s.setZoom);
-  const toggleHeat = useAppStore((s) => s.toggleHeat);
   const mapFocus = useAppStore((s) => s.mapFocus);
 
   const projection = useMemo(() => projectionFor(scaleKm), [scaleKm]);
@@ -326,10 +328,11 @@ export const Radar = memo(function Radar() {
       stationaryDispM: dataset.thresholds.stationary_disp_m,
       classFilter,
       zoneFilter: 'all',
+      levelFilter,
     });
     return zoneFilter === 'all' ? all
       : all.filter((vehicle) => nearestZoneId(vehicle.sample.enu, dataset.zones) === zoneFilter);
-  }, [dataset, tracks, alertsByFrame, tMin, classFilter, zoneFilter]);
+  }, [dataset, tracks, alertsByFrame, tMin, classFilter, levelFilter, zoneFilter]);
 
   const visibleFrames = useMemo(
     () => {
@@ -354,7 +357,7 @@ export const Radar = memo(function Radar() {
    * under the heat view, which turns trails off for the same reason (F5.4).
    */
   const route = useMemo(() => {
-    if (!dataset || heatOn || !selectedTrackId) return null;
+    if (!dataset || heatOn || !layers.routes || !selectedTrackId) return null;
     if (!vehicles.some((vehicle) => vehicle.trackId === selectedTrackId)) return null;
     const history = trackIndex.get(selectedTrackId);
     return history
@@ -364,7 +367,7 @@ export const Radar = memo(function Radar() {
           stationaryDispM: dataset.thresholds.stationary_disp_m,
         })
       : null;
-  }, [dataset, heatOn, selectedTrackId, vehicles, trackIndex, tMin]);
+  }, [dataset, heatOn, layers.routes, selectedTrackId, vehicles, trackIndex, tMin]);
 
   /** Zones any live ALERT names. Drives the pulse. */
   const alertingZones = useMemo(() => {
@@ -454,13 +457,19 @@ export const Radar = memo(function Radar() {
       <g
         transform={`translate(${-pan.eKm * projection.unitsPerKm} ${pan.nKm * projection.unitsPerKm})`}
       >
-        {basemap && <BasemapLayer map={basemap} projection={projection} view={ground} />}
-        {area && <OperationArea area={area} projection={projection} />}
-        <GridLayer projection={projection} extentKm={gridExtentKm} />
+        {basemap && layers.basemap && (
+          <BasemapLayer map={basemap} projection={projection} view={ground} />
+        )}
+        {area && layers.area && <OperationArea area={area} projection={projection} />}
+        {/* Under the rings and under the density field: a wash, not a reading. */}
+        {layers.zones && (
+          <ZoneSectorLayer zones={dataset.zones} projection={projection} focus={zoneFilter} />
+        )}
+        {layers.grid && <GridLayer projection={projection} extentKm={gridExtentKm} />}
         {heatOn && (
           <HeatLayer blobs={blobs} projection={projection} reference={references.field} />
         )}
-        {basemap && (
+        {basemap && layers.labels && (
           <BasemapLabels
             map={basemap}
             projection={projection}
@@ -469,21 +478,21 @@ export const Radar = memo(function Radar() {
             baseName={dataset.base.name}
           />
         )}
-        <ZoneLayer
+        {layers.zones && <ZoneLayer
           zones={dataset.zones}
           projection={projection}
           alerting={alertingZones}
           focus={zoneFilter}
           onSelect={(zoneId) => setZoneFilter(zoneFilter === zoneId ? 'all' : zoneId)}
-        />
+        />}
         <BaseLayer name={dataset.base.name} />
-        <FrameLayer
+        {layers.frames && <FrameLayer
           frames={visibleFrames}
           projection={projection}
           selectedId={selectedFrameId}
           footprint={frame?.image_id === selectedFrameId ? frame.footprint_enu : null}
           onSelect={(imageId) => void openFrame(imageId)}
-        />
+        />}
         {route && (
           <RouteLayer
             route={route.route}
@@ -492,7 +501,7 @@ export const Radar = memo(function Radar() {
             originIso={dataset.origin_ts}
           />
         )}
-        <g className={heatOn ? 'radar-vehicles radar-vehicles--dimmed' : 'radar-vehicles'}>
+        {layers.vehicles && <g className={heatOn ? 'radar-vehicles radar-vehicles--dimmed' : 'radar-vehicles'}>
           <VehicleLayer
             vehicles={vehicles}
             histories={trackIndex}
@@ -501,73 +510,37 @@ export const Radar = memo(function Radar() {
             selectedId={selectedTrackId}
             hoveredId={hoveredTrackId}
             pins={pins}
-            trails={!heatOn}
+            trails={layers.routes && !heatOn}
             routedId={route ? selectedTrackId : null}
             onSelect={selectTrack}
             onHover={hoverTrack}
           />
-        </g>
+        </g>}
       </g>
 
       {basemap && <Attribution text={basemap.attribution} />}
+      {/* Main's chart furniture: north arrow top right, scale bar and the
+          base's coordinates bottom left. It supersedes the old "K ↑" text. */}
       <ChartFurniture
         projection={projection}
         base={dataset.base}
         ground={basemap ? 'var(--map-land)' : 'var(--surface-map)'}
       />
-      {/* The density toggle. Small, semi-transparent, bottom-right -- and it
-          states which view is on and which zone the field is pointing at, so the
-          control explains its own state rather than just holding an icon
-          (PLAN F5.3). A map control, not a view: `view` is untouched. */}
-      <g
-        className="radar-heat-toggle"
-        data-on={heatOn || undefined}
-        role="button"
-        tabIndex={0}
-        aria-pressed={heatOn}
-        aria-label={heatOn ? T.heat.toOff : T.heat.toOn}
-        onClick={(event) => {
-          event.stopPropagation();
-          toggleHeat();
-        }}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            toggleHeat();
-          }
-        }}
-      >
-        <title>{heatOn ? T.heat.toOff : T.heat.toOn}</title>
-        {heatOn && (
-          <text
-            className="radar-heat-toggle__caption"
-            x={VIEW.w - 20}
-            y={VIEW.h - 54}
-            fontSize={9}
-            textAnchor="end"
-          >
-            {densest
-              ? T.heat.densest(densest.name, Math.round(densest.value * 100))
-              : T.heat.quiet}
-          </text>
-        )}
-        <rect x={VIEW.w - 82} y={VIEW.h - 46} width={62} height={26} rx={4} />
-        {/* Three rings: the kernel the field is made of, at icon size. */}
-        <g aria-hidden="true" fill="var(--heat)">
-          <circle cx={VIEW.w - 70} cy={VIEW.h - 33} r={6.5} opacity={0.18} />
-          <circle cx={VIEW.w - 70} cy={VIEW.h - 33} r={4} opacity={0.42} />
-          <circle cx={VIEW.w - 70} cy={VIEW.h - 33} r={1.8} opacity={0.85} />
-        </g>
+      {/* While the density field is on it names the zone it is pointing at, so
+          the view explains itself. The switch that turns it on now lives with
+          the other layers (components/LayersMenu.tsx); this is only its
+          readout, and it sits just above that menu's button. */}
+      {heatOn && (
         <text
-          className="radar-heat-toggle__label"
-          x={VIEW.w - 43}
-          y={VIEW.h - 29}
-          fontSize={10}
-          textAnchor="middle"
+          className="radar-heat-caption"
+          x={VIEW.w - 20}
+          y={VIEW.h - 54}
+          fontSize={9}
+          textAnchor="end"
         >
-          {T.heat.name}
+          {densest ? T.heat.densest(densest.name, Math.round(densest.value * 100)) : T.heat.quiet}
         </text>
-      </g>
+      )}
       {offCentre && (
         <g
           className="radar-recentre"

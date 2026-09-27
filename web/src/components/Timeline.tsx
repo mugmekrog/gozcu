@@ -26,6 +26,20 @@ export interface TimelineProps {
   onSelectFrame: (imageId: string) => void;
 }
 
+/** The frame nearest a minute: what a drag on the scrubber lands on. */
+function nearestFrame(frames: readonly FrameSummary[], minute: number): FrameSummary | null {
+  let best: FrameSummary | null = null;
+  let bestGap = Infinity;
+  for (const frame of frames) {
+    const gap = Math.abs(frame.capture_min - minute);
+    if (gap < bestGap) {
+      best = frame;
+      bestGap = gap;
+    }
+  }
+  return best;
+}
+
 /** Tick every 30 sim minutes, labelled every two hours. */
 const TICK_MIN = 30;
 const LABEL_EVERY = 4;
@@ -40,6 +54,28 @@ export const Timeline = memo(function Timeline({
   onSeek,
   onSelectFrame,
 }: TimelineProps) {
+  const ordered = useMemo(
+    () => [...frames].sort((a, b) => a.capture_min - b.capture_min),
+    [frames],
+  );
+
+  /* Which frame the stepper is standing on. The selected one only while the
+   * clock is still on it: scrubbing away and leaving the readout behind would
+   * have it naming a frame the map is no longer showing. */
+  const here = useMemo(() => {
+    const picked = ordered.findIndex((frame) => frame.image_id === selectedFrameId);
+    if (picked >= 0 && Math.round(ordered[picked]!.capture_min) === Math.round(tMin)) return picked;
+    let last = -1;
+    ordered.forEach((frame, i) => {
+      if (frame.capture_min <= tMin) last = i;
+    });
+    return last;
+  }, [ordered, selectedFrameId, tMin]);
+
+  const current = here >= 0 ? ordered[here] ?? null : null;
+  const previous = here > 0 ? ordered[here - 1] ?? null : null;
+  const next = here < ordered.length - 1 ? ordered[here + 1] ?? null : ordered[0] ?? null;
+
   const span = Math.max(endMin - startMin, 1);
   const pct = (minute: number) => `${((minute - startMin) / span) * 100}%`;
 
@@ -55,7 +91,42 @@ export const Timeline = memo(function Timeline({
 
   return (
     <div className="timeline">
-      <span className="timeline__heading">ZAMAN ÇİZELGESİ</span>
+      {/* Stepping frame to frame is what an operator actually does: between
+          two captures nothing has been judged, so a minute-by-minute scrub is
+          mostly dead ground. The buttons are the primary control and the strip
+          behind them is the overview. */}
+      <div className="timeline__stepper">
+        <button
+          type="button"
+          className="timeline__step"
+          disabled={!previous}
+          aria-label={T.transport.prevFrame}
+          onClick={() => previous && onSelectFrame(previous.image_id)}
+        >
+          <span aria-hidden="true">◀</span>
+        </button>
+        <span className="timeline__here">
+          {current ? (
+            <>
+              <b>{fmt.clockOf(originIso, current.capture_min)}</b>
+              <span className="timeline__here-meta">
+                {T.transport.frameCount(current.vehicle_count)}
+              </span>
+            </>
+          ) : (
+            <span className="timeline__here-meta">{T.transport.noFrame}</span>
+          )}
+        </span>
+        <button
+          type="button"
+          className="timeline__step"
+          disabled={!next || next === current}
+          aria-label={T.transport.nextFrame}
+          onClick={() => next && onSelectFrame(next.image_id)}
+        >
+          <span aria-hidden="true">▶</span>
+        </button>
+      </div>
 
       <div className="timeline__axis">
         <div className="timeline__markers">
@@ -100,7 +171,12 @@ export const Timeline = memo(function Timeline({
           max={endMin}
           step={1}
           value={Math.round(tMin)}
-          onChange={(event) => onSeek(Number(event.target.value))}
+          /* Snaps to the nearest capture time: a drag always lands on a frame
+             rather than on a minute where nothing has been assessed. */
+          onChange={(event) => {
+            const minute = Number(event.target.value);
+            onSeek(nearestFrame(ordered, minute)?.capture_min ?? minute);
+          }}
           aria-label={T.transport.scrub}
           aria-valuetext={fmt.clockOf(originIso, tMin)}
         />

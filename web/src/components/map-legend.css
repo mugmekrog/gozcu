@@ -1,0 +1,134 @@
+/* Bottom left of the map, stacked: a column reads down in one pass and leaves
+ * the middle of the map clear, which a centred strip did not. */
+.map-legend {
+  position: absolute;
+  left: var(--space-6);
+  bottom: var(--space-6);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
+  width: max-content;
+  max-height: calc(100% - var(--space-6) * 2);
+  overflow-y: auto;
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--lift-panel);
+}
+
+.map-legend__row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
+}
+
+.map-legend__split {
+  height: 1px;
+  margin: var(--space-2) 0;
+  background: var(--hairline);
+}
+
+/* Touch-sized: this is used standing up, in gloves, on a vehicle bonnet. */
+.map-legend__chip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--ink-body);
+  font-size: var(--text-small);
+  line-height: 1;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--dur-quick) var(--ease), opacity var(--dur-quick) var(--ease);
+}
+
+.map-legend__chip:hover {
+  background: var(--surface-active);
+}
+
+/* Pressed is the one being shown; muted are the ones it is hiding. */
+.map-legend__chip[aria-pressed='true'] {
+  background: var(--surface-active);
+  border-color: var(--ink);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.map-legend__chip[data-muted] {
+  opacity: 0.38;
+}
+
+.map-legend__mark {
+  flex: none;
+  overflow: visible;
+}
+
+.map-legend__clear {
+  min-height: 30px;
+  margin-top: var(--space-2);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--ink-muted);
+  font-size: var(--text-micro);
+  text-align: left;
+  cursor: pointer;
+}
+
+.map-legend__clear:hover {
+  color: var(--ink);
+  background: var(--surface-active);
+}
+
+.map-legend__heat {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: var(--space-2) var(--space-3) 0;
+  font-size: var(--text-micro);
+  color: var(--ink-muted);
+}
+
+/* Main's tighter ramp: smaller swatches, almost no gap between them. */
+.map-legend__heat i {
+  width: 10px;
+  height: 8px;
+}
+
+.map-legend__heat i:first-of-type {
+  margin-left: 3px;
+}
+
+/* Group titles, from main's toolbar legend. They go while the heat view is on:
+ * the ramp needs the room and carries its own label, and the rules between the
+ * groups keep them apart without them. */
+.map-legend__title {
+  padding: var(--space-1) var(--space-3) var(--space-2);
+  font-size: var(--text-micro);
+  font-weight: 700;
+  letter-spacing: var(--tracking-kicker);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/* Only the class names come from the shared lowercase vocabulary; the level
+ * captions are already written as they should read. */
+.map-legend__chip--class {
+  text-transform: capitalize;
+}
+
+/* The one-press clear-down. Rule-lined, so it does not read as a fifth level. */
+.map-legend__chip--wide {
+  border-color: var(--hairline);
+  margin-top: var(--space-2);
+}

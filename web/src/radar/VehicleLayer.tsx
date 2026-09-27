@@ -160,15 +160,17 @@ export const VehicleLayer = memo(function VehicleLayer({
         onPointerEnter={() => onHover(vehicle.trackId)}
         onPointerLeave={() => onHover(null)}
       >
-        {/* A generous invisible hit area: the symbols are 9-14 px and the
-            pointer target has to be comfortable without enlarging the mark. */}
-        <circle cx={x} cy={y} r={11} fill="transparent" />
+        {/* A generous invisible hit area, still wider than the frame. */}
+        <circle cx={x} cy={y} r={14} fill="transparent" />
         <VehicleSymbol
           x={x}
           y={y}
           cls={vehicle.cls}
           level={vehicle.level}
-          size={selected ? 7 : vehicle.level === 'CLEAR' || vehicle.level === null ? 4.5 : 5.5}
+          /* Bigger than the old bare shapes: an APP-6 frame has to hold an
+             icon, and the legend now lets an operator thin the map out rather
+             than relying on small marks to keep it readable. */
+          size={selected ? 11 : vehicle.level === 'CLEAR' || vehicle.level === null ? 7 : 8.5}
           opacity={dimmed ? 0.2 : 1}
         />
       </g>,
