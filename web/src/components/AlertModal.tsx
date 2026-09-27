@@ -45,7 +45,7 @@ export interface AlertModalProps {
   onInfoOpen: (open: boolean) => void;
   onTarget: (detId: string | null) => void;
   onShowSuppressed: (show: boolean) => void;
-  onDecide: (verdict: Decision['verdict'], note: string) => void;
+  onDecide: (verdict: Decision['verdict'], note: string, operator: string) => void;
   onClose: () => void;
 }
 
@@ -83,6 +83,8 @@ export const AlertModal = memo(function AlertModal({
   const dialog = useRef<HTMLDivElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
   const [note, setNote] = useState('');
+  const [operator, setOperator] = useState(() => globalThis.localStorage?.getItem('goru.operator') ?? '');
+  const canDecide = Boolean(note.trim() && operator.trim());
 
   const threat = kind === 'threat';
   const accent = threat ? 'var(--risk-threat)' : 'var(--risk-review)';
@@ -401,6 +403,14 @@ export const AlertModal = memo(function AlertModal({
           </button>
 
           <label className="modal__note">
+            <span className="sr-only">Operatör kimliği</span>
+            <input className="input" type="text" value={operator} placeholder="Operatör kimliği"
+              onChange={(event) => {
+                setOperator(event.target.value);
+                globalThis.localStorage?.setItem('goru.operator', event.target.value);
+              }} />
+          </label>
+          <label className="modal__note">
             <span className="sr-only">{T.modal.noteLabel}</span>
             <input
               className="input"
@@ -416,14 +426,16 @@ export const AlertModal = memo(function AlertModal({
               <button
                 type="button"
                 className="btn btn--action"
-                onClick={() => onDecide('false_alarm', note)}
+                disabled={!canDecide}
+                onClick={() => onDecide('false_alarm', note, operator)}
               >
                 {T.modal.falseAlarm}
               </button>
               <button
                 type="button"
                 className="btn btn--threat"
-                onClick={() => onDecide('confirmed', note)}
+                disabled={!canDecide}
+                onClick={() => onDecide('confirmed', note, operator)}
               >
                 {T.modal.confirmThreat}
               </button>
@@ -433,14 +445,16 @@ export const AlertModal = memo(function AlertModal({
               <button
                 type="button"
                 className="btn btn--action"
-                onClick={() => onDecide('not_threat', note)}
+                disabled={!canDecide}
+                onClick={() => onDecide('not_threat', note, operator)}
               >
                 {T.modal.notThreat}
               </button>
               <button
                 type="button"
                 className="btn btn--review"
-                onClick={() => onDecide('marked_threat', note)}
+                disabled={!canDecide}
+                onClick={() => onDecide('marked_threat', note, operator)}
               >
                 {T.modal.markThreat}
               </button>

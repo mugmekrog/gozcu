@@ -317,6 +317,7 @@ export const LogsView = memo(function LogsView() {
                   <tr>
                     <th scope="col">{T.logs.col.time}</th>
                     <th scope="col">{T.logs.col.frame}</th>
+                    <th scope="col">Hedef</th>
                     <th scope="col">{T.logs.col.agent}</th>
                     <th scope="col">{T.logs.col.decision}</th>
                     <th scope="col">{T.logs.col.note}</th>
@@ -332,6 +333,7 @@ export const LogsView = memo(function LogsView() {
                     >
                       <td className="logs-view__time">{decision.hhmm}</td>
                       <th scope="row">{decision.image_id}</th>
+                      <td>{decision.target_kind === 'scenario' ? 'Senaryo' : 'Tehdit kartı'} · {decision.target_id}</td>
                       <td>
                         <span className="logs-view__agent-cell">
                           <GlyphChip band={bandOf(decision.agent_level, decision.agent_score)} />

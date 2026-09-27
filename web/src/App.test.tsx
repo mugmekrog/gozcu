@@ -406,21 +406,21 @@ describe('Harita odaklı arayüz', () => {
     expect(document.querySelector('.radar-heat')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: /Katman menüsünü aç/ }));
-    const heat = screen.getByRole('checkbox', { name: /Isı haritası/ });
+    const heat = screen.getByRole('checkbox', { name: /Sektör hareketliliği/ });
     expect((heat as HTMLInputElement).checked).toBe(false);
 
     fireEvent.click(heat);
     await waitFor(() => expect(document.querySelector('.radar-heat')).toBeTruthy());
-    expect((screen.getByRole('checkbox', { name: /Isı haritası/ }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole('checkbox', { name: /Sektör hareketliliği/ }) as HTMLInputElement).checked).toBe(true);
     // The glyphs step back but stay selectable: changing how the clock is drawn
     // must not cost the operator track of who is who (PLAN F5.4).
     expect(document.querySelector('.radar-vehicles--dimmed')).toBeTruthy();
     expect(screen.queryAllByRole('button', { name: /T0001, kamyon/ }).length).toBeGreaterThan(0);
     // The view still explains itself: which zone the field is pointing at.
     expect(document.querySelector('.radar-heat-caption')?.textContent).toBeTruthy();
-    expect(document.querySelector('.map-legend__heat')?.textContent).toContain('Yoğunluk');
+    expect(document.querySelector('.map-legend__heat')?.textContent).toContain('Sektör hareketliliği');
 
-    fireEvent.click(screen.getByRole('checkbox', { name: /Isı haritası/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /Sektör hareketliliği/ }));
     await waitFor(() => expect(document.querySelector('.radar-heat')).toBeNull());
     expect(document.querySelector('.radar-vehicles--dimmed')).toBeNull();
   });

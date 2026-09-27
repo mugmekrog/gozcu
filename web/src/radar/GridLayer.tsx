@@ -18,7 +18,10 @@ export const GridLayer = memo(function GridLayer({ projection, extentKm = projec
   projection: Projection;
   extentKm?: number;
 }) {
-  const rings = ringsFor(projection.scaleKm, extentKm);
+  const rings = [...new Set([
+    ...ringsFor(projection.scaleKm, extentKm),
+    ...[1, 2, 3.2].filter((km) => km <= extentKm),
+  ])].sort((a, b) => a - b);
 
   return (
     <g aria-hidden="true">

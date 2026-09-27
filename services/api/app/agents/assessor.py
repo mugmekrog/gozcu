@@ -295,6 +295,9 @@ def apply_assessment_to_alerts(
             alert.model_copy(
                 update={
                     "agent_level": item.level,
+                    "agent_probability": (
+                        item.probability if not fallback_used and "probability" in item.model_fields_set else None
+                    ),
                     "level": level,
                     "source": "rules_fallback" if fallback_used else "agent",
                     "agent_rationale": list(item.rationale),
@@ -321,6 +324,9 @@ def apply_assessment_to_alerts(
                 zone_id=_first_zone_id(item, bundle),
                 baseline_level=Level.CLEAR,
                 agent_level=item.level,
+                agent_probability=(
+                    item.probability if not fallback_used and "probability" in item.model_fields_set else None
+                ),
                 level=item.level,
                 source="agent",
                 priority=item.probability,

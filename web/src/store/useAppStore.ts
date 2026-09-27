@@ -181,7 +181,8 @@ interface Actions {
   openReport(trackId: string): void;
   closeReport(): void;
 
-  record(verdict: Decision['verdict'], note: string): Promise<void>;
+  record(verdict: Decision['verdict'], note: string, operator?: string,
+    target?: { kind: Decision['target_kind']; id: string }): Promise<void>;
   showToast(toast: Toast | null): void;
 }
 
@@ -255,11 +256,12 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   async boot() {
     const client = api();
     try {
-      const [dataset, tracks, reports, alerts] = await Promise.all([
+      const [dataset, tracks, reports, alerts, decisions] = await Promise.all([
         client.dataset(),
         client.tracks(),
         client.reports(),
         client.alerts(),
+        client.decisions().catch(() => [] as Decision[]),
       ]);
 
       // Open on the first frame's capture time rather than at the window's
@@ -274,6 +276,7 @@ export const useAppStore = create<State & Actions>((set, get) => ({
         reports,
         alerts,
         alertsByFrame: groupAlerts(alerts),
+        decisions,
         tMin: firstFrame?.capture_min ?? minutesOf(dataset.origin_ts, dataset.sim.start_hhmm),
         selectedFrameId: firstFrame?.image_id ?? null,
       });
@@ -547,22 +550,30 @@ export const useAppStore = create<State & Actions>((set, get) => ({
     set({ reportTrackId: null });
   },
 
-  async record(verdict, note) {
+  async record(verdict, note, operator, target) {
     const { frame, dataset } = get();
     if (!frame || !dataset) return;
+    const namedOperator = (operator ?? globalThis.localStorage?.getItem('goru.operator') ?? '').trim();
+    if (!namedOperator || !note.trim()) throw new Error('Operatör kimliği ve gerekçe zorunlu.');
 
-    const lead = [...frame.alerts].sort((a, b) => b.priority - a.priority)[0];
+    const lead = target
+      ? frame.alerts.find((alert) => alert.track_id === target.id)
+      : [...frame.alerts].sort((a, b) => b.priority - a.priority)[0];
+    if (!lead) throw new Error('Karar verilecek alarm bulunamadı.');
     const decision: Decision = {
       image_id: frame.image_id,
+      target_kind: target?.kind ?? 'alert',
+      target_id: target?.id ?? lead.track_id,
       hhmm: frame.capture_hhmm,
       verdict,
       note,
-      operator: 'nöbetçi-1',
+      operator: namedOperator,
       agent_level: lead?.level ?? 'CLEAR',
       agent_score: lead?.breakdown.score ?? 0,
     };
 
     const stored = await api().record(decision);
+    globalThis.localStorage?.setItem('goru.operator', namedOperator);
     set({
       decisions: [...get().decisions, stored],
       modal: null,
