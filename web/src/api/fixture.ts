@@ -77,7 +77,7 @@ export class FixtureApi implements GoruApi {
   readonly mode = 'fixture' as const;
   private liveAssessment = false;
   private agentApi() {
-    return new HttpApi({ baseUrl: import.meta.env.VITE_AGENT_API_BASE_URL ?? 'http://localhost:8000' });
+    return new HttpApi({ baseUrl: import.meta.env.VITE_AGENT_API_BASE_URL ?? 'http://127.0.0.1:8080' });
   }
 
   private readonly frameCache = new Map<string, Promise<FrameDetail>>();

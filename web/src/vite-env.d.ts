@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  /** Set to point the app at a live REST API instead of the static fixtures. */
+  /** Override the local live REST API URL or configure a production build. */
   readonly VITE_API_BASE_URL?: string;
   readonly VITE_AGENT_API_BASE_URL?: string;
   readonly VITE_API_TOKEN?: string;

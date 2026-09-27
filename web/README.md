@@ -34,20 +34,19 @@ npm run build       # production bundle
 
 ## Pointing it at the live API
 
-The app talks to one interface, `GoruApi` in `src/api/port.ts`. With no
-configuration it uses `FixtureApi` over the static export. Set a base URL and it
-uses `HttpApi` against the REST surface of PLAN §5.4 instead, with no change to
-any screen:
+The app talks to one interface, `GoruApi` in `src/api/port.ts`. Local Vite
+development uses `HttpApi` against `http://127.0.0.1:8080` by default. Set a
+different base URL if the backend uses another port:
 
 ```bash
-VITE_API_BASE_URL=http://localhost:8000 npm run dev
+VITE_API_BASE_URL=http://127.0.0.1:8081 npm run dev
 ```
 
 `src/api/http.ts` marks the four places where PLAN's REST surface does not yet
 cover what the screens need, each tagged `NEEDS-BACKEND`.
 
 `AJANA SOR` accepts questions and evaluation requests. In fixture mode it uses
-the agent service at `http://localhost:8000`; set `VITE_AGENT_API_BASE_URL` if
+the agent service at `http://127.0.0.1:8080`; set `VITE_AGENT_API_BASE_URL` if
 the service runs elsewhere. The input stays available and shows a connection
 error when the service is down.
 

@@ -1,8 +1,7 @@
 /* Which adapter this build talks to.
  *
- * Fixtures by default, because that is what works with the network off and what
- * exists today. Setting `VITE_API_BASE_URL` switches the whole app onto the live
- * REST API without touching a screen -- which is the point of the seam.
+ * Local development talks to the live REST API. Production builds use the
+ * configured API URL; without one they retain the static fixture adapter.
  */
 
 import { FixtureApi } from './fixture';
@@ -13,7 +12,8 @@ let current: GoruApi | null = null;
 
 export function api(): GoruApi {
   if (current) return current;
-  const baseUrl = import.meta.env.VITE_API_BASE_URL;
+  const baseUrl = import.meta.env.VITE_API_BASE_URL ||
+    (import.meta.env.DEV ? 'http://127.0.0.1:8080' : undefined);
   current = baseUrl
     ? new HttpApi({ baseUrl, token: import.meta.env.VITE_API_TOKEN })
     : new FixtureApi();
