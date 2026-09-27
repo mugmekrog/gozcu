@@ -85,10 +85,13 @@
   --map-tunnel: #f5f6f8;
   --map-urban: #f1e7d6;
   --map-campus: #e6e2ee;
-  --map-grass: #dcead2;
-  --map-cemetery: #d4e2cd;
-  --map-forest: #c8dfbe;
-  --map-park: #cce6c2;
+  /* Vegetation is a pale, slightly yellow meadow green on purpose: the zones
+     are drawn in terrain green, and a park in the same cool green swallowed any
+     zone that sits on one. */
+  --map-grass: #e6eecd;
+  --map-cemetery: #dfe6c9;
+  --map-forest: #d5e3b1;
+  --map-park: #dde9bd;
   --map-water: #aed3ee;
   --map-rail: #a0a9b6;
   --map-subway: #b7bfca;
