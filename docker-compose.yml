@@ -27,6 +27,7 @@ services:
       # Mount application code for local live reloading without rebuilding container
       - ./libs:/app/libs:ro
       - ./services:/app/services:ro
+      - ./web/scripts:/app/web/scripts:ro
       - ./goru.yaml:/app/goru.yaml:ro
       - operator-decisions:/app/data/processed
     command: ["uvicorn", "app.api.rest:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]

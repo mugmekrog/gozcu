@@ -122,7 +122,7 @@ def pct100(fraction: float) -> int:
 
 
 # --------------------------------------------------------------------------- #
-# score breakdown -- a presentation of `RuleEngine._priority`, not a new score
+# score breakdown -- rule terms plus any live assessor uplift, not a new score
 # --------------------------------------------------------------------------- #
 
 
@@ -140,7 +140,7 @@ def score_breakdown(
     sector_name: str,
     cfg: Config,
 ) -> dict[str, Any]:
-    """Present `alert.priority` as the terms the rule engine computed it from.
+    """Present rule priority terms and any assessor probability uplift.
 
     The engine owns the formula and hands its weighted terms over on the verdict
     (`BaselineVerdict.priority_terms`); this function only labels them. It used to
@@ -192,24 +192,33 @@ def score_breakdown(
         for t in verdict.priority_terms
     ]
     base = sum(t.contribution for t in verdict.priority_terms)
+    engine_score = pct100(verdict.priority)
     score = pct100(shipped_priority(alert))
     if verdict.heavy_multiplier:
         terms.append(
             ScoreTerm(
                 label=f"Ağır araç (x{verdict.heavy_multiplier:g})",
-                points=score - pct100(base),
+                points=engine_score - pct100(base),
                 detail="ağır araç çarpanı",
+            )
+        )
+    if alert.agent_probability is not None and score > engine_score:
+        terms.append(
+            ScoreTerm(
+                label="Ajan olasılığı",
+                points=score - engine_score,
+                detail="kural puanının üzerindeki değerlendirme",
             )
         )
 
     # Each term is rounded on its own and `priority` is clamped at 1.0, so the rows
     # may miss the total by a point or so; that rounding goes onto the largest row.
-    # Anything more means the rows do not explain the engine's number, and hiding
+    # Anything more means the rows do not explain the displayed number, and hiding
     # it would repeat the bug above - so it fails loudly instead.
     drift = score - sum(t.points for t in terms)
     if abs(drift) > len(terms):
         raise ValueError(
-            f"{alert.alert_id}: breakdown misses the engine's score by {drift} points"
+            f"{alert.alert_id}: breakdown misses the displayed score by {drift} points"
         )
     if drift:
         biggest = max(range(len(terms)), key=lambda i: abs(terms[i].points))

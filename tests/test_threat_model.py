@@ -121,3 +121,25 @@ def test_the_score_breakdown_explains_the_engine_score_against_the_base(pipeline
     assert "Kritik halka" in labels
     assert "Bölgeye" not in labels
     assert sum(term["points"] for term in alert["breakdown"]["terms"]) == alert["breakdown"]["score"]
+
+
+@pytest.mark.parametrize("track_id", ["T0008", "T0062"])
+def test_live_assessor_priority_has_its_own_breakdown_term(pipeline, cfg, track_id):
+    """A live probability above the rule score must not crash the streamed card."""
+    from web.scripts.export_fixtures import score_breakdown
+
+    analysis = pipeline.analyse_image("img_008333")
+    alert = next(item for item in analysis.alerts if item.track_id == track_id)
+    raised = min(1.0, alert.priority + 0.43)
+    live_alert = alert.model_copy(update={
+        "priority": raised, "agent_probability": raised, "source": "agent",
+    })
+    breakdown = score_breakdown(
+        live_alert, analysis.verdicts[alert.track_id],
+        analysis.base_assessments[alert.track_id], "", cfg,
+    )
+    assert breakdown["score"] == round(raised * 100)
+    assert sum(term["points"] for term in breakdown["terms"]) == breakdown["score"]
+    assert any("Ajan" in term["label"] for term in breakdown["terms"])
+    if track_id == "T0062":
+        assert any("Ağır araç" in term["label"] for term in breakdown["terms"])
