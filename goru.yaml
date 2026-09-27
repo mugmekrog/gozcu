@@ -87,7 +87,7 @@ sim:
 
 agents:
   enabled: true
-  cache_only: true          # rehearsal: cached runs only, no paid calls
+  cache_only: false         # live demo: cache misses call GLM within the budget
   base_url: "https://berriailitellm-databasev1826rc3-production-d691.up.railway.app/v1"
   model: "glm-5.3-flash"    # the only model this key may access
   api_key_env: GLM_API_KEY
@@ -185,7 +185,7 @@ voice:                      # what a finalised transcript is allowed to do
 
 jev:
   enabled: true
-  cache_only: true
+  cache_only: false         # live demo: cache misses call JEV within the budget
   model: "jev-latest"
   api_key_env: TYPESAFE_API_KEY
   timeout_s: 10.0

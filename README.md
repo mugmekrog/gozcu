@@ -104,8 +104,10 @@ raw Overpass responses are cached in `data/processed/osm/`):
 python web/scripts/export_basemap.py                   # --refresh to re-download
 ```
 
-The frontend runs on static fixtures by default so it works with the network off.
-Set `VITE_API_BASE_URL` to point it at the live REST API instead.
+The local Vite frontend connects to the live REST API at `http://127.0.0.1:8080`
+by default. Start the backend first, or set `VITE_API_BASE_URL` to another API
+address. Docker Compose supplies that URL automatically. Production builds
+without an API URL retain the fixture adapter.
 
 For voice control, point it at the speech service as well — without this the
 microphone is disabled and says why, which is the shipped default:
