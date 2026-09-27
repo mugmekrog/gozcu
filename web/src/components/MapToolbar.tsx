@@ -46,7 +46,7 @@ export const MapToolbar = memo(function MapToolbar({
 
     <div className="map-toolbar__filters">
       <details className="filter-popover">
-        <summary aria-label={`${T.filter.zone}: ${zoneName}`}>
+        <summary aria-label={`${T.filter.zone}: ${zoneName}`} title={zoneName}>
           <span className="filter-popover__caption">{T.filter.zone}</span>
           <strong>{zoneName}</strong><span className="filter-popover__chevron" aria-hidden="true">⌄</span>
         </summary>
@@ -70,18 +70,30 @@ export const MapToolbar = memo(function MapToolbar({
     </div>
 
     <div className="map-toolbar__spacer" />
+    {/* Two questions, two groups: the shape says what the vehicle is, the colour
+        says how worried to be. Mixed in one run they read as one scale. */}
     <div className="map-toolbar__legend" aria-label="Araç işaretleri ve uyarı renkleri">
-      <span className="map-toolbar__class"><b>■</b> Otomobil</span>
-      <span className="map-toolbar__class"><b>▲</b> Minibüs</span>
-      <span className="map-toolbar__class"><b>★</b> Kamyon</span>
-      <span className="map-toolbar__class"><b>●</b> Otobüs</span>
-      <span className="map-toolbar__risk"><i data-risk="safe" />Güvenli</span>
-      <span className="map-toolbar__risk"><i data-risk="watch" />Şüpheli</span>
-      <span className="map-toolbar__risk"><i data-risk="alert" />Tehlike</span>
-      {heatOn && <span className="map-toolbar__heat" aria-label={T.heat.ramp}>
-        {T.heat.legend}
-        {HEAT_RAMP.map((colour) => <i key={colour} style={{ background: colour }} aria-hidden="true" />)}
-      </span>}
+      <div className="map-toolbar__legend-group" role="group" aria-label="Araç türü">
+        <span className="map-toolbar__legend-title" aria-hidden="true">Araç türü</span>
+        <span className="map-toolbar__class"><b>■</b> Otomobil</span>
+        <span className="map-toolbar__class"><b>▲</b> Minibüs</span>
+        <span className="map-toolbar__class"><b>★</b> Kamyon</span>
+        <span className="map-toolbar__class"><b>●</b> Otobüs</span>
+      </div>
+      <span className="map-toolbar__legend-divider" aria-hidden="true" />
+      <div className="map-toolbar__legend-group" role="group" aria-label="Risk">
+        <span className="map-toolbar__legend-title" aria-hidden="true">Risk</span>
+        <span className="map-toolbar__risk"><i data-risk="safe" />Güvenli</span>
+        <span className="map-toolbar__risk"><i data-risk="watch" />Şüpheli</span>
+        <span className="map-toolbar__risk"><i data-risk="alert" />Tehlike</span>
+      </div>
+      {heatOn && <>
+        <span className="map-toolbar__legend-divider" aria-hidden="true" />
+        <span className="map-toolbar__heat" aria-label={T.heat.ramp}>
+          {T.heat.legend}
+          {HEAT_RAMP.map((colour) => <i key={colour} style={{ background: colour }} aria-hidden="true" />)}
+        </span>
+      </>}
     </div>
     <div className="map-toolbar__zoom" role="group" aria-label="Harita ölçeği">
       <button type="button" aria-label="Yakınlaştır" disabled={scaleKm <= MIN_SCALE}
