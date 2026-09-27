@@ -20,3 +20,8 @@ web/dist/
 # Generated from the real pipeline by web/scripts/export_fixtures.py.
 # Derived data, and 14 MB of it -- regenerate rather than commit.
 web/public/fixtures/
+
+# Deployment & credentials
+cloudrun-env.yaml
+.firebase/
+
